@@ -43,3 +43,26 @@ pip install -r requirements.txt
 
 # Run the application
 python app.py
+```
+
+### 🎙️ Audio Setup (Windows)
+
+PyAudio requires special handling on Windows. Use the automated setup script:
+
+```powershell
+cd .\scripts
+.\setup_audio_windows.ps1
+```
+
+This script will:
+- Attempt standard pip installation
+- Fallback to `pipwin` if needed
+- Verify microphone access
+- Provide manual installation instructions if automated methods fail
+
+For detailed audio setup instructions, see [AUDIO_SETUP.md](docs/AUDIO_SETUP.md).
+
+**Requirements:**
+- Microphone (USB or built-in)
+- Python 3.8+
+- Internet connection (for Google Speech Recognition API)
