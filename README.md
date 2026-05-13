@@ -17,7 +17,7 @@ Auralis is a smart desktop application that allows users to manage files and fol
 ## 🛠️ Tech Stack
 
 ### Frontend
-- (Add if applicable – HTML, CSS, JavaScript, Electron)
+- HTML, CSS, JavaScript, Electron
 
 ### Backend
 - Python / Node.js *(update based on your project)*
