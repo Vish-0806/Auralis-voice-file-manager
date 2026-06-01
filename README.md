@@ -66,3 +66,6 @@ For detailed audio setup instructions, see [AUDIO_SETUP.md](docs/AUDIO_SETUP.md)
 - Microphone (USB or built-in)
 - Python 3.8+
 - Internet connection (for Google Speech Recognition API)
+
+**Status**
+- On Progress
