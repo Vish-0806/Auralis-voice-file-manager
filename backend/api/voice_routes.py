@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException
 from voice_engine.speech_to_text import listen
 from ai_engine.command_parser import parse_command
 from file_engine.file_operations import execute_action
+from voice_engine.text_to_speech import speak as tts_speak
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -46,12 +47,56 @@ def handle_voice_command():
         )
     
     # Step 2: Parse the command
-    logger.info("Executing action")
+    logger.info("Parsing recognized text")
     parsed_action = parse_command(recognized_text)
-    
+
+    # Handle unknown commands early
+    if parsed_action.get("action") == "unknown":
+        msg = "Command not recognized"
+        try:
+            tts_speak(msg)
+        except Exception:
+            logger.exception("Failed to speak unknown-command message")
+
+        logger.warning("Unknown command: %s", recognized_text)
+        raise HTTPException(status_code=400, detail=msg)
+
     # Step 3: Execute the action
-    result = execute_action(parsed_action)
-    
+    logger.info("Executing parsed action: %s", parsed_action)
+    try:
+        result = execute_action(parsed_action)
+    except Exception as exc:
+        logger.exception("Error executing action: %s", exc)
+        msg = "Failed to execute command"
+        try:
+            tts_speak(msg)
+        except Exception:
+            logger.exception("Failed to speak execution-failure message")
+        raise HTTPException(status_code=500, detail=msg)
+
+    # Prepare spoken message (map common responses to user-friendly phrases)
+    try:
+        lr = result.lower()
+        if lr.startswith("opened"):
+            speak_msg = result
+        elif "created" in lr:
+            speak_msg = "Folder created successfully"
+        elif "not found" in lr:
+            speak_msg = f"{parsed_action.get('target')} not found"
+        elif lr == "unknown action":
+            speak_msg = "Command not recognized"
+        else:
+            speak_msg = result
+
+        # Announce result via TTS (best-effort)
+        try:
+            tts_speak(speak_msg)
+        except Exception:
+            logger.exception("Failed to speak result message")
+
+    except Exception:
+        logger.exception("Error preparing or speaking result message")
+
     # Step 4: Return structured response
     response = {
         "status": "success",
@@ -59,6 +104,6 @@ def handle_voice_command():
         "parsed_action": parsed_action,
         "result": result
     }
-    
-    logger.info(f"Voice command executed successfully: {parsed_action['action']}")
+
+    logger.info("Voice command executed successfully: %s", parsed_action.get("action"))
     return response
