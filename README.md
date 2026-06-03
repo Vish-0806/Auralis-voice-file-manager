@@ -17,7 +17,7 @@ Auralis is a smart desktop application that allows users to manage files and fol
 ## 🛠️ Tech Stack
 
 ### Frontend
-- (Add if applicable – HTML, CSS, JavaScript, Electron)
+- HTML, CSS, JavaScript, Electron
 
 ### Backend
 - Python / Node.js *(update based on your project)*
@@ -66,3 +66,6 @@ For detailed audio setup instructions, see [AUDIO_SETUP.md](docs/AUDIO_SETUP.md)
 - Microphone (USB or built-in)
 - Python 3.8+
 - Internet connection (for Google Speech Recognition API)
+
+**Status**
+- On Progress
