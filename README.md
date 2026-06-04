@@ -1,71 +1,112 @@
-# 🎙️ Auralis – Voice-Controlled File Manager
+# 🎙️ Auralis — Voice File Manager
 
-Auralis is a smart desktop application that allows users to manage files and folders using voice commands. It combines speech recognition and natural language processing (NLP) to provide a hands-free file management experience.
+[![CI](https://github.com/your-username/auralis/actions/workflows/ci.yml/badge.svg)](https://github.com/your-username/auralis/actions) [![Coverage](https://img.shields.io/codecov/c/github/your-username/auralis.svg)](https://codecov.io/gh/your-username/auralis) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/) [![Node.js](https://img.shields.io/badge/node-16%2B-green.svg)](https://nodejs.org/)
+
+Auralis is a voice-enabled file manager that provides hands-free file and folder operations using speech recognition and NLP.
 
 ---
 
-## 🚀 Features
+## 🚀 Highlights
 
-- 🎤 Voice-based file and folder operations  
-- 📁 Create, delete, rename, and open files using voice  
-- 🔍 Smart command recognition  
-- ⚡ Fast and efficient file handling  
-- 🧠 NLP-powered command processing  
+- Voice commands for creating, renaming, deleting, moving, and opening files
+- NLP-based command parsing and intent handling
+- Modular backend API and a Vite + React frontend
+- Cross-platform audio setup helpers for Windows
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Frontend
-- HTML, CSS, JavaScript, Electron
-
-### Backend
-- Python / Node.js *(update based on your project)*
-
-### Libraries Used
-- SpeechRecognition  
-- Pyttsx3 (Text-to-Speech)  
-- OS / File System modules  
+- **Backend:** Python, FastAPI
+- **Frontend:** Vite, React
+- **Audio / Voice:** speech-to-text and TTS modules (see `backend/` and `frontend/`)
 
 ---
 
-## 📦 Installation
+## Quick Start
+
+Prerequisites: Python 3.8+, Node.js (16+), and a microphone.
+
+1) Start the backend
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/auralis.git
-
-# Navigate into the project folder
-cd auralis
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run the application
-python app.py
+pip install -r backend/requirements.txt
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 🎙️ Audio Setup (Windows)
+2) Start the frontend
 
-PyAudio requires special handling on Windows. Use the automated setup script:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+3) Audio setup (Windows)
 
 ```powershell
-cd .\scripts
+cd scripts
 .\setup_audio_windows.ps1
 ```
 
-This script will:
-- Attempt standard pip installation
-- Fallback to `pipwin` if needed
-- Verify microphone access
-- Provide manual installation instructions if automated methods fail
+The backend exposes a FastAPI service at `http://localhost:8000` by default.
 
-For detailed audio setup instructions, see [AUDIO_SETUP.md](docs/AUDIO_SETUP.md).
+---
 
-**Requirements:**
-- Microphone (USB or built-in)
-- Python 3.8+
-- Internet connection (for Google Speech Recognition API)
+## Usage
 
-**Status**
-- On Progress
+Quick examples for interacting with the running backend:
+
+- Check backend health:
+
+```bash
+curl http://localhost:8000/
+```
+
+- Send a text command to be parsed and executed:
+
+```bash
+curl -s -X POST http://localhost:8000/command \
+	-H "Content-Type: application/json" \
+	-d '{"command":"create folder Projects"}'
+```
+
+- Trigger voice listening (backend will capture microphone input):
+
+```bash
+curl http://localhost:8000/voice/listen
+```
+
+Notes:
+- Replace `your-username/auralis` in the badge URLs with your repository owner/name to enable real CI/coverage badges.
+- The `/voice/listen` endpoint requires microphone access on the machine running the backend and proper audio setup.
+
+## Project Structure (selected)
+
+- `backend/` — FastAPI backend, AI engine, file engine, and API routes
+- `frontend/` — Vite + React UI
+- `scripts/` — helper scripts for audio and setup
+- `docs/` — architecture and deployment notes
+
+---
+
+## Development & Testing
+
+- Run backend tests: `pytest backend/tests` (if tests present)
+- Linting/format: use your preferred tools (e.g., `black`, `flake8`)
+
+---
+
+## Contributing
+
+Contributions welcome. Open an issue or submit a pull request with a clear description of changes and tests where appropriate.
+
+---
+
+## License
+
+See the `LICENSE` file in the repository root.
+
+---
+
+If you'd like a different tone, more details, or badges (CI, coverage), tell me what to add and I will update the README accordingly.
