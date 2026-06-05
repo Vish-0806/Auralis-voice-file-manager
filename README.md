@@ -15,6 +15,17 @@ Auralis is a voice-enabled file manager that provides hands-free file and folder
 
 ---
 
+## What Has Been Done So Far
+
+- Refactored the command parsing flow into a modular NLP pipeline in `backend/ai_engine/`
+- Added a reusable command normalization layer for cleaning filler words and standardizing folder names
+- Split intent detection and entity extraction into separate, rule-based components
+- Extended parser support for search-style commands such as `find`, `search for`, `locate`, and `where is`
+- Kept the existing `parse_command()` API compatible for the backend routes and file execution flow
+- Added comprehensive pytest coverage for intent detection, target extraction, and normalization behavior
+
+---
+
 ## 🛠️ Tech Stack
 
 - **Backend:** Python, FastAPI
