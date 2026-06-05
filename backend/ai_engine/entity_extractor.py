@@ -28,9 +28,11 @@ def _strip_action_prefix(command: str, intent: str | None = None) -> str:
 		return (match.group(1) if match else text).strip()
 
 	if intent == "search":
-		match = re.search(r"\b(?:search|find)\b(?:\s+for)?\s*(.*)", text)
+		match = re.search(r"\b(?:search|find|locate)\b(?:\s+for)?\s*(.*)", text)
 		if not match:
 			match = re.search(r"\blook\s+for\b\s*(.*)", text)
+		if not match:
+			match = re.search(r"\bwhere\s+is\b\s*(.*)", text)
 		return (match.group(1) if match else text).strip()
 
 	if intent in {"open", "delete"}:
@@ -73,8 +75,9 @@ def extract_folder_names(command: str) -> List[str]:
 	for pattern in [
 		r"\b(?:folder|directory)\b\s*(.+)$",
 		r"\b(?:open|delete|remove|move|create|make|rename)\b\s*(.+)$",
-		r"\b(?:search|find)\b(?:\s+for)?\s*(.+)$",
+		r"\b(?:search|find|locate)\b(?:\s+for)?\s*(.+)$",
 		r"\blook\s+for\b\s*(.+)$",
+		r"\bwhere\s+is\b\s*(.+)$",
 	]:
 		match = re.search(pattern, text)
 		if match:

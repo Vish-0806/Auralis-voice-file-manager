@@ -18,6 +18,10 @@ from ai_engine.intent_classifier import classify_intent
         ("create a folder called notes", "create_folder", "notes"),
         ("delete report.pdf", "delete", "report.pdf"),
         ("delete my report.pdf file", "delete", "report.pdf"),
+        ("find report.pdf", "search", "report.pdf"),
+        ("search for report.pdf", "search", "report.pdf"),
+        ("locate report.pdf", "search", "report.pdf"),
+        ("where is report.pdf", "search", "report.pdf"),
     ],
 )
 def test_parse_command_cases(command, expected_action, expected_target):
@@ -36,6 +40,9 @@ def test_parse_command_cases(command, expected_action, expected_target):
         ("move downloads to archive", "move"),
         ("rename report.txt to summary.txt", "rename"),
         ("search for receipts", "search"),
+        ("find receipts", "search"),
+        ("locate receipts", "search"),
+        ("where is receipts", "search"),
         ("sing a song", "unknown"),
     ],
 )
@@ -55,6 +62,10 @@ def test_intent_detection(command, expected_intent):
         ("create a folder called notes", "notes"),
         ("delete report.pdf", "report.pdf"),
         ("delete my report.pdf file", "report.pdf"),
+        ("find report.pdf", "report.pdf"),
+        ("search for report.pdf", "report.pdf"),
+        ("locate report.pdf", "report.pdf"),
+        ("where is report.pdf", "report.pdf"),
     ],
 )
 def test_target_extraction(command, expected_target):

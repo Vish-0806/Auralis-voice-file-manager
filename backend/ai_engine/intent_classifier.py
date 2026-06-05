@@ -15,7 +15,7 @@ INTENT_PATTERNS = [
 	("rename", [r"\brename\b", r"\b(?:change|set)\s+name\b"]),
 	("move", [r"\bmove\b", r"\brelocate\b"]),
 	("delete", [r"\b(?:delete|remove|trash|discard)\b"]),
-	("search", [r"\b(?:search|find|look\s+for)\b"]),
+	("search", [r"\b(?:search|find|look\s+for|locate|where\s+is)\b"]),
 	("open", [r"\b(?:open|show|go\s+to|navigate\s+to)\b"]),
 ]
 
