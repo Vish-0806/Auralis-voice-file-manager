@@ -17,6 +17,7 @@ FILLER_PHRASES = [
     r"would you",
     r"my",
     r"the",
+    r"called",
 ]
 
 TRAILING_NOISE_WORDS = [
@@ -59,6 +60,9 @@ def normalize_command(command: str) -> str:
 
     if not re.match(r"^\s*(create|make)\b", normalized):
         normalized = _remove_phrases(normalized, TRAILING_NOISE_WORDS)
+
+    for source, replacement in COMMON_FOLDER_NAMES.items():
+        normalized = re.sub(r"\b" + re.escape(source) + r"\b", replacement, normalized)
 
     normalized = re.sub(r"\s+", " ", normalized).strip()
 

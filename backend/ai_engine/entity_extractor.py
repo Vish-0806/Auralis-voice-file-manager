@@ -48,9 +48,9 @@ def extract_file_names(command: str) -> List[str]:
 	text = command.strip()
 	candidates = []
 
-	candidates.extend(re.findall(r"[\w\- ]+\.[A-Za-z0-9]{1,8}", text))
 	candidates.extend(re.findall(r'"([^"]+\.[A-Za-z0-9]{1,8})"', text))
 	candidates.extend(re.findall(r"'([^']+\.[A-Za-z0-9]{1,8})'", text))
+	candidates.extend(re.findall(r"(?<!\S)([^\s\"']+\.[A-Za-z0-9]{1,8})(?!\S)", text))
 
 	cleaned = []
 	for candidate in candidates:
