@@ -1,4 +1,5 @@
 from ai_engine.command_parser import parse_command
+from ai_engine.command_normalizer import normalize_command, normalize_target
 from ai_engine.entity_extractor import extract_file_names, extract_folder_names, extract_targets
 from ai_engine.intent_classifier import classify_intent
 
@@ -54,3 +55,13 @@ def test_entity_extractor_helpers():
     assert extract_folder_names("open my downloads folder") == ["downloads"]
     assert extract_targets("open my downloads folder", intent="open") == "downloads"
     assert extract_targets("search for receipts", intent="search") == "receipts"
+
+
+def test_command_normalization_examples():
+    assert normalize_command("please open my downloads folder") == "open downloads"
+    assert normalize_command("can you open the documents directory") == "open documents"
+    assert normalize_command("could you delete my report.pdf file") == "delete report.pdf"
+    assert normalize_target("download") == "downloads"
+    assert normalize_target("document") == "documents"
+    assert normalize_target("picture") == "pictures"
+    assert normalize_target("video") == "videos"

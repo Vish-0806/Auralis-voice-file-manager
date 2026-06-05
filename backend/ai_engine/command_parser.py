@@ -4,6 +4,7 @@ Compatibility parser that orchestrates the NLP pipeline.
 
 from typing import Dict
 
+from ai_engine.command_normalizer import normalize_command
 from ai_engine.entity_extractor import extract_targets
 from ai_engine.intent_classifier import classify_intent
 from utils.logger import get_logger
@@ -21,8 +22,9 @@ def parse_command(command: str) -> Dict[str, str]:
         logger.debug("parse_command received empty command")
         return {"action": "unknown", "target": ""}
 
-    intent = classify_intent(command)
-    target = extract_targets(command, intent=intent)
+    normalized_command = normalize_command(command)
+    intent = classify_intent(normalized_command)
+    target = extract_targets(normalized_command, intent=intent)
 
     if intent == "unknown":
         logger.info("No intent matched for command: %s", command)

@@ -5,69 +5,15 @@ Rule-based entity extraction for Auralis commands.
 import re
 from typing import List
 
+from ai_engine.command_normalizer import normalize_command, normalize_target
 from utils.logger import get_logger
 
 
 logger = get_logger(__name__)
 
 
-FILLER_PATTERNS = [
-	r"please",
-	r"can you",
-	r"could you",
-	r"would you",
-	r"my",
-	r"the",
-	r"a",
-	r"an",
-]
-
-COMMON_FOLDER_NAMES = {
-	"download": "downloads",
-	"downloads": "downloads",
-	"document": "documents",
-	"documents": "documents",
-	"picture": "pictures",
-	"pictures": "pictures",
-	"photo": "pictures",
-	"photos": "pictures",
-	"video": "videos",
-	"videos": "videos",
-	"desktop": "desktop",
-	"music": "music",
-}
-
-
-def _clean_text(text: str) -> str:
-	normalized = text.lower()
-	normalized = re.sub(r"[\.,!?;:]", "", normalized)
-
-	for pattern in FILLER_PATTERNS:
-		normalized = re.sub(r"\b" + pattern + r"\b", "", normalized)
-
-	normalized = re.sub(r"\s+", " ", normalized).strip()
-	return normalized
-
-
-def _normalize_target(target: str) -> str:
-	value = target.strip().lower()
-	value = re.sub(r"\b(folder|directory)\b", "", value).strip()
-	value = re.sub(r"\b(please|my|the|a|an|could you|can you|would you)\b", "", value).strip()
-
-	if value in COMMON_FOLDER_NAMES:
-		return COMMON_FOLDER_NAMES[value]
-
-	if value.endswith("s"):
-		return value
-
-	if value in ["download", "document", "picture", "photo", "video"]:
-		return COMMON_FOLDER_NAMES.get(value, value + "s")
-
-	return value
-
-
 def _strip_action_prefix(command: str, intent: str | None = None) -> str:
-	text = _clean_text(command)
+	text = normalize_command(command)
 
 	if intent == "create_folder":
 		match = re.search(r"\b(?:create|make)\s+(?:a\s+)?(?:folder|directory)\b\s*(.*)", text)
@@ -121,7 +67,7 @@ def extract_folder_names(command: str) -> List[str]:
 	if not isinstance(command, str) or not command.strip():
 		return []
 
-	text = _clean_text(command)
+	text = normalize_command(command)
 	candidates = []
 
 	for pattern in [
@@ -136,7 +82,7 @@ def extract_folder_names(command: str) -> List[str]:
 
 	results = []
 	for candidate in candidates:
-		normalized = _normalize_target(candidate)
+		normalized = normalize_target(candidate)
 		if normalized and normalized not in results:
 			results.append(normalized)
 
@@ -162,7 +108,7 @@ def extract_targets(command: str, intent: str | None = None) -> str:
 		return target
 
 	remainder = _strip_action_prefix(command, intent=intent)
-	target = _normalize_target(remainder)
+	target = normalize_target(remainder)
 
 	logger.debug(
 		"Extracted target '%s' from command '%s' using intent '%s'",
