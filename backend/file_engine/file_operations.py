@@ -3,6 +3,15 @@ import shutil
 
 HOME_DIR = os.path.expanduser("~")
 
+SUPPORTED_LOCATIONS = {
+    "desktop",
+    "downloads",
+    "documents",
+    "pictures",
+    "music",
+    "videos",
+}
+
 COMMON_FOLDERS = {
     "desktop": os.path.join(HOME_DIR, "Desktop"),
     "downloads": os.path.join(HOME_DIR, "Downloads"),
@@ -30,7 +39,10 @@ def get_location_path(location):
         return HOME_DIR
 
     location = location.lower()
-    return COMMON_FOLDERS.get(location, os.path.join(HOME_DIR, location))
+    if location in SUPPORTED_LOCATIONS:
+        return COMMON_FOLDERS[location]
+
+    return HOME_DIR
 
 
 def execute_action(action_data):
