@@ -25,12 +25,23 @@ def get_target_path(target):
     return os.path.join(HOME_DIR, target)
 
 
+def get_location_path(location):
+    if not location:
+        return HOME_DIR
+
+    location = location.lower()
+    return COMMON_FOLDERS.get(location, os.path.join(HOME_DIR, location))
+
+
 def execute_action(action_data):
 
     action = action_data["action"]
     target = action_data["target"]
+    location = action_data.get("location", "")
 
     path = get_target_path(target)
+    if action == "create_folder" and location:
+        path = os.path.join(get_location_path(location), target)
 
     try:
 

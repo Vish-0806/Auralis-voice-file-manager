@@ -12,6 +12,10 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+LOCATION_ENTITIES = ["desktop", "downloads", "documents", "pictures", "music", "videos"]
+LOCATION_PREPOSITIONS = r"(?:in|on|inside|within|under|at)"
+
+
 def _strip_action_prefix(command: str, intent: str | None = None) -> str:
 	text = normalize_command(command)
 
@@ -40,6 +44,20 @@ def _strip_action_prefix(command: str, intent: str | None = None) -> str:
 		return (match.group(1) if match else text).strip()
 
 	return text
+
+
+def _extract_location_match(text: str) -> re.Match[str] | None:
+	location_pattern = r"\b" + LOCATION_PREPOSITIONS + r"\s+(?:the\s+)?(" + "|".join(LOCATION_ENTITIES) + r")\b"
+	return re.search(location_pattern, text)
+
+
+def _remove_location_clause(text: str) -> str:
+	match = _extract_location_match(text)
+	if not match:
+		return text
+
+	remaining = (text[: match.start()] + " " + text[match.end() :]).strip()
+	return re.sub(r"\s+", " ", remaining)
 
 
 def extract_file_names(command: str) -> List[str]:
@@ -93,6 +111,22 @@ def extract_folder_names(command: str) -> List[str]:
 	return results
 
 
+def extract_folder_location(command: str, intent: str | None = None) -> str:
+	"""Extract the destination folder location from a command."""
+	if not isinstance(command, str) or not command.strip():
+		return ""
+
+	text = normalize_command(command)
+	if intent == "create_folder":
+		text = _strip_action_prefix(text, intent=intent)
+
+	match = _extract_location_match(text)
+	location = match.group(1) if match else ""
+
+	logger.debug("Extracted folder location from '%s': %s", command, location)
+	return location
+
+
 def extract_targets(command: str, intent: str | None = None) -> str:
 	"""Extract the most relevant target phrase from a command."""
 	if not isinstance(command, str) or not command.strip():
@@ -107,6 +141,8 @@ def extract_targets(command: str, intent: str | None = None) -> str:
 	folder_names = extract_folder_names(command)
 	if folder_names:
 		target = folder_names[0]
+		if intent == "create_folder":
+			target = normalize_target(_remove_location_clause(target))
 		logger.debug("Selected folder target '%s' from command: %s", target, command)
 		return target
 
@@ -119,7 +155,10 @@ def extract_targets(command: str, intent: str | None = None) -> str:
 		command,
 		intent,
 	)
+	if intent == "create_folder":
+		target = normalize_target(_remove_location_clause(target))
+
 	return target
 
 
-__all__ = ["extract_file_names", "extract_folder_names", "extract_targets"]
+__all__ = ["extract_file_names", "extract_folder_names", "extract_folder_location", "extract_targets"]

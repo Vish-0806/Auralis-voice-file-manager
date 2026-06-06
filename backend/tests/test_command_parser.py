@@ -32,6 +32,22 @@ def test_parse_command_cases(command, expected_action, expected_target):
 
 
 @pytest.mark.parametrize(
+    ("command", "expected_target", "expected_location"),
+    [
+        ("create a folder called notes in documents", "notes", "documents"),
+        ("create a folder on desktop called college", "college", "desktop"),
+        ("create folder archive", "archive", ""),
+    ],
+)
+def test_create_folder_location_extraction(command, expected_target, expected_location):
+    result = parse_command(command)
+
+    assert result["action"] == "create_folder"
+    assert result["target"] == expected_target
+    assert result.get("location", "") == expected_location
+
+
+@pytest.mark.parametrize(
     ("command", "expected_intent"),
     [
         ("open downloads", "open"),
@@ -107,6 +123,10 @@ def test_entity_extractor_helpers():
     assert extract_file_names('open "report.txt"') == ["report.txt"]
     assert extract_folder_names("open my downloads folder") == ["downloads"]
     assert extract_targets("search for receipts", intent="search") == "receipts"
+    assert extract_targets("create a folder called notes in documents", intent="create_folder") == "notes"
+    assert extract_targets("create a folder on desktop called college", intent="create_folder") == "college"
+    assert extract_folder_location("create a folder called notes in documents", intent="create_folder") == "documents"
+    assert extract_folder_location("create a folder on desktop called college", intent="create_folder") == "desktop"
 
 
 def test_unknown_command_behaviour():

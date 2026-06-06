@@ -5,7 +5,7 @@ Contains natural language processing and command parsing logic.
 
 from ai_engine.command_parser import parse_command
 from ai_engine.command_normalizer import normalize_command, normalize_target
-from ai_engine.entity_extractor import extract_file_names, extract_folder_names, extract_targets
+from ai_engine.entity_extractor import extract_file_names, extract_folder_location, extract_folder_names, extract_targets
 from ai_engine.intent_classifier import classify_intent
 
 __all__ = [
@@ -14,6 +14,7 @@ __all__ = [
 	"normalize_target",
 	"classify_intent",
 	"extract_file_names",
+	"extract_folder_location",
 	"extract_folder_names",
 	"extract_targets",
 ]
