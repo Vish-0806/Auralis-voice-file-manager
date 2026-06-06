@@ -10,6 +10,8 @@ Auralis is a voice-enabled file manager that provides hands-free file and folder
 
 - Voice commands for creating, renaming, deleting, moving, and opening files
 - NLP-based command parsing and intent handling
+- Rule-based search parsing for commands like `find`, `search for`, `locate`, and `where is`
+- Location-aware folder creation for commands like `create a folder in documents called notes`
 - Modular backend API and a Vite + React frontend
 - Cross-platform audio setup helpers for Windows
 
@@ -21,6 +23,7 @@ Auralis is a voice-enabled file manager that provides hands-free file and folder
 - Added a reusable command normalization layer for cleaning filler words and standardizing folder names
 - Split intent detection and entity extraction into separate, rule-based components
 - Extended parser support for search-style commands such as `find`, `search for`, `locate`, and `where is`
+- Added location extraction for create-folder commands so the parser can return both `target` and `location`
 - Kept the existing `parse_command()` API compatible for the backend routes and file execution flow
 - Added comprehensive pytest coverage for intent detection, target extraction, and normalization behavior
 
@@ -82,6 +85,28 @@ curl -s -X POST http://localhost:8000/command \
 	-d '{"command":"create folder Projects"}'
 ```
 
+Examples supported by the parser:
+
+```bash
+curl -s -X POST http://localhost:8000/command \
+	-H "Content-Type: application/json" \
+	-d '{"command":"find report.pdf"}'
+
+curl -s -X POST http://localhost:8000/command \
+	-H "Content-Type: application/json" \
+	-d '{"command":"create a folder called notes in documents"}'
+```
+
+The parser returns structured output such as:
+
+```json
+{
+	"action": "create_folder",
+	"target": "notes",
+	"location": "documents"
+}
+```
+
 - Trigger voice listening (backend will capture microphone input):
 
 ```bash
@@ -91,6 +116,7 @@ curl http://localhost:8000/voice/listen
 Notes:
 - Replace `your-username/auralis` in the badge URLs with your repository owner/name to enable real CI/coverage badges.
 - The `/voice/listen` endpoint requires microphone access on the machine running the backend and proper audio setup.
+- Search commands are parsed by the backend, but actual file-search execution is not implemented yet.
 
 ## Project Structure (selected)
 
