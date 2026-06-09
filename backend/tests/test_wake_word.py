@@ -104,11 +104,93 @@ class TestWhitespace:
         assert result["cleaned_command"] == "open downloads"
 
     def test_extra_internal_whitespace(self):
-        """Extra spaces between wake phrase and command are collapsed by strip."""
+        """Extra spaces between wake phrase and command are collapsed."""
         result = detect_wake_word("hey auralis   open downloads")
         assert result["activated"] is True
-        # Internal spaces within the payload are preserved after the first strip.
         assert result["cleaned_command"] == "open downloads"
+
+    def test_extra_spaces_within_wake_phrase(self):
+        """Extra spaces inside the wake phrase itself are collapsed."""
+        result = detect_wake_word("hey   auralis open downloads")
+        assert result["activated"] is True
+        assert result["cleaned_command"] == "open downloads"
+
+    def test_extra_spaces_everywhere(self):
+        result = detect_wake_word("  hello   auralis   open   documents  ")
+        assert result["activated"] is True
+        assert result["cleaned_command"] == "open documents"
+
+
+# ---------------------------------------------------------------------------
+# Punctuation handling
+# ---------------------------------------------------------------------------
+
+class TestPunctuation:
+    """Confirm punctuation between wake phrase and command is ignored."""
+
+    def test_comma_after_wake_phrase(self):
+        result = detect_wake_word("Hey Auralis, open downloads")
+        assert result["activated"] is True
+        assert result["cleaned_command"] == "open downloads"
+
+    def test_period_after_wake_phrase(self):
+        result = detect_wake_word("Hey Auralis. open downloads")
+        assert result["activated"] is True
+        assert result["cleaned_command"] == "open downloads"
+
+    def test_exclamation_after_wake_phrase(self):
+        result = detect_wake_word("Hey Auralis! open downloads")
+        assert result["activated"] is True
+        assert result["cleaned_command"] == "open downloads"
+
+    def test_question_mark_in_command(self):
+        result = detect_wake_word("Hey Auralis, what time is it?")
+        assert result["activated"] is True
+        assert result["cleaned_command"] == "what time is it"
+
+    def test_semicolon_after_wake_phrase(self):
+        result = detect_wake_word("Auralis; show files")
+        assert result["activated"] is True
+        assert result["cleaned_command"] == "show files"
+
+    def test_multiple_punctuation_marks(self):
+        result = detect_wake_word("Hey Auralis!! open downloads...")
+        assert result["activated"] is True
+        assert result["cleaned_command"] == "open downloads"
+
+    def test_comma_no_space(self):
+        result = detect_wake_word("Hey Auralis,open downloads")
+        assert result["activated"] is True
+        assert result["cleaned_command"] == "open downloads"
+
+    def test_punctuation_only_no_activation(self):
+        """Punctuation alone should not trigger activation."""
+        result = detect_wake_word(",,, !!!")
+        assert result["activated"] is False
+        assert result["cleaned_command"] == ""
+
+
+# ---------------------------------------------------------------------------
+# User-provided examples
+# ---------------------------------------------------------------------------
+
+class TestUserExamples:
+    """Exact examples from the requirements."""
+
+    def test_hey_auralis_comma_open_downloads(self):
+        result = detect_wake_word("Hey Auralis, open downloads")
+        assert result["activated"] is True
+        assert result["cleaned_command"] == "open downloads"
+
+    def test_hello_auralis_open_documents(self):
+        result = detect_wake_word("Hello Auralis open documents")
+        assert result["activated"] is True
+        assert result["cleaned_command"] == "open documents"
+
+    def test_auralis_create_folder_notes(self):
+        result = detect_wake_word("Auralis create folder notes")
+        assert result["activated"] is True
+        assert result["cleaned_command"] == "create folder notes"
 
 
 # ---------------------------------------------------------------------------
@@ -130,6 +212,11 @@ class TestWakePhraseOnly:
 
     def test_hello_auralis_only_with_whitespace(self):
         result = detect_wake_word("  hello auralis  ")
+        assert result["activated"] is True
+        assert result["cleaned_command"] == ""
+
+    def test_wake_phrase_with_trailing_comma(self):
+        result = detect_wake_word("hey auralis,")
         assert result["activated"] is True
         assert result["cleaned_command"] == ""
 
@@ -210,3 +297,9 @@ class TestAllPhrasesParametrized:
         result = detect_wake_word(phrase)
         assert result["activated"] is True
         assert result["cleaned_command"] == ""
+
+    def test_phrase_with_comma(self, phrase):
+        result = detect_wake_word(f"{phrase}, do something")
+        assert result["activated"] is True
+        assert result["cleaned_command"] == "do something"
+
