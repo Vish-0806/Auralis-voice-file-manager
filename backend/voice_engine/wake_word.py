@@ -4,6 +4,8 @@ Provides lightweight, rule-based wake word detection that identifies
 activation phrases and extracts the cleaned command payload.
 """
 
+import re
+
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -17,14 +19,28 @@ WAKE_PHRASES = [
     "auralis",
 ]
 
+# Regex that matches any character that is NOT a letter, digit, or whitespace.
+_PUNCTUATION_RE = re.compile(r"[^\w\s]", re.UNICODE)
+# Regex that matches runs of whitespace (2+).
+_EXTRA_SPACE_RE = re.compile(r"\s{2,}")
+
+
+def _normalize(text: str) -> str:
+    """Lowercase, strip punctuation, collapse extra spaces, and trim."""
+    text = text.lower()
+    text = _PUNCTUATION_RE.sub("", text)
+    text = _EXTRA_SPACE_RE.sub(" ", text)
+    return text.strip()
+
 
 def detect_wake_word(command: str) -> dict:
     """
     Detect whether a voice command begins with a supported wake phrase.
 
-    The check is case-insensitive and ignores leading/trailing whitespace.
-    When a wake phrase is found the function returns the remaining text
-    after the phrase (also trimmed) as ``cleaned_command``.
+    The check is case-insensitive and ignores punctuation, extra spaces,
+    and leading/trailing whitespace. When a wake phrase is found the
+    function returns the remaining text after the phrase (also trimmed)
+    as ``cleaned_command``.
 
     Args:
         command: Raw voice command string captured from speech-to-text.
@@ -36,8 +52,11 @@ def detect_wake_word(command: str) -> dict:
               or an empty string when not activated.
 
     Examples:
-        >>> detect_wake_word("Hey Auralis open downloads")
+        >>> detect_wake_word("Hey Auralis, open downloads")
         {'activated': True, 'cleaned_command': 'open downloads'}
+
+        >>> detect_wake_word("Hello  Auralis   open documents")
+        {'activated': True, 'cleaned_command': 'open documents'}
 
         >>> detect_wake_word("open downloads")
         {'activated': False, 'cleaned_command': ''}
@@ -46,7 +65,7 @@ def detect_wake_word(command: str) -> dict:
         logger.warning("detect_wake_word received non-string input: %s", type(command).__name__)
         return {"activated": False, "cleaned_command": ""}
 
-    normalized = command.strip().lower()
+    normalized = _normalize(command)
     logger.debug("Wake-word check on normalized input: '%s'", normalized)
 
     for phrase in WAKE_PHRASES:
@@ -62,3 +81,4 @@ def detect_wake_word(command: str) -> dict:
 
     logger.debug("No wake word detected in input.")
     return {"activated": False, "cleaned_command": ""}
+
