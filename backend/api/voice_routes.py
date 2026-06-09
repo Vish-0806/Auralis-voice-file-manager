@@ -5,6 +5,7 @@ Integrates with ai_engine for command parsing and file_engine for execution.
 
 from fastapi import APIRouter, HTTPException
 from voice_engine.speech_to_text import listen
+from voice_engine.wake_word import detect_wake_word
 from ai_engine.command_parser import parse_command
 from file_engine.file_operations import execute_action
 from voice_engine.text_to_speech import speak as tts_speak
@@ -23,9 +24,10 @@ def handle_voice_command():
     Flow:
     1. Capture audio from microphone
     2. Convert speech to text
-    3. Parse command into action and target
-    4. Execute action using file engine
-    5. Return structured response
+    3. Detect wake word
+    4. Parse command into action and target
+    5. Execute action using file engine
+    6. Return structured response
     
     Returns:
         dict: Response containing status, recognized command, parsed action, and result
@@ -46,9 +48,29 @@ def handle_voice_command():
             detail="Could not recognize speech. Please try again."
         )
     
-    # Step 2: Parse the command
+    # Step 2: Detect wake word
+    wake_result = detect_wake_word(recognized_text)
+    
+    if not wake_result["activated"]:
+        logger.info("Wake word not detected, ignoring input: '%s'", recognized_text)
+        return {"status": "ignored", "message": "Wake word not detected"}
+    
+    logger.info("Wake word detected. Cleaned command: '%s'", wake_result["cleaned_command"])
+    command = wake_result["cleaned_command"]
+    
+    # If the user only said the wake phrase with no trailing command, prompt them
+    if not command:
+        msg = "How can I help you?"
+        logger.info("Wake word detected but no command followed")
+        try:
+            tts_speak(msg)
+        except Exception:
+            logger.exception("Failed to speak prompt message")
+        return {"status": "awaiting_command", "message": msg}
+    
+    # Step 3: Parse the command
     logger.info("Parsing recognized text")
-    parsed_action = parse_command(recognized_text)
+    parsed_action = parse_command(command)
 
     # Handle unknown commands early
     if parsed_action.get("action") == "unknown":
@@ -58,10 +80,10 @@ def handle_voice_command():
         except Exception:
             logger.exception("Failed to speak unknown-command message")
 
-        logger.warning("Unknown command: %s", recognized_text)
+        logger.warning("Unknown command: %s", command)
         raise HTTPException(status_code=400, detail=msg)
 
-    # Step 3: Execute the action
+    # Step 4: Execute the action
     logger.info("Executing parsed action: %s", parsed_action)
     try:
         result = execute_action(parsed_action)
@@ -97,10 +119,11 @@ def handle_voice_command():
     except Exception:
         logger.exception("Error preparing or speaking result message")
 
-    # Step 4: Return structured response
+    # Step 5: Return structured response
     response = {
         "status": "success",
-        "command": recognized_text,
+        "recognized_text": recognized_text,
+        "command": command,
         "parsed_action": parsed_action,
         "result": result
     }
