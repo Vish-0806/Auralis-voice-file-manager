@@ -26,6 +26,14 @@ class ContinuousListener:
         self._thread = None
         self._lock = threading.Lock()
 
+    @property
+    def is_running(self) -> bool:
+        """
+        Check if the listener is running.
+        """
+        with self._lock:
+            return self._running
+
     def start(self, run_in_thread: bool = False) -> None:
         """
         Start the continuous listening loop.
@@ -131,3 +139,19 @@ class ContinuousListener:
                 logger.exception("Unexpected error in listen loop: %s", str(e))
                 # Add a brief pause to avoid tight loops on persistent errors
                 time.sleep(0.5)
+
+
+_listener_instance = None
+_listener_lock = threading.Lock()
+
+
+def get_listener() -> ContinuousListener:
+    """
+    Get the singleton instance of ContinuousListener.
+    """
+    global _listener_instance
+    if _listener_instance is None:
+        with _listener_lock:
+            if _listener_instance is None:
+                _listener_instance = ContinuousListener()
+    return _listener_instance

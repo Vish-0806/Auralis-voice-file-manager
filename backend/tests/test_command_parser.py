@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 import pytest
 
 from ai_engine.command_normalizer import normalize_command, normalize_target

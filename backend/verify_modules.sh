@@ -36,6 +36,8 @@ try:
     print('  OK: api.routes')
     from api.voice_routes import router as voice_router
     print('  OK: api.voice_routes')
+    from api.listener_routes import router as listener_router
+    print('  OK: api.listener_routes')
     from ai_engine.command_parser import parse_command
     print('  OK: ai_engine.command_parser')
     from file_engine.file_operations import execute_action

@@ -34,6 +34,7 @@ echo.
 echo Testing module imports...
 python -c "from api.routes import router; print('  OK: api.routes')" || (echo   ERROR: api.routes & exit /b 1)
 python -c "from api.voice_routes import router as voice_router; print('  OK: api.voice_routes')" || (echo   ERROR: api.voice_routes & exit /b 1)
+python -c "from api.listener_routes import router as listener_router; print('  OK: api.listener_routes')" || (echo   ERROR: api.listener_routes & exit /b 1)
 python -c "from ai_engine.command_parser import parse_command; print('  OK: ai_engine.command_parser')" || (echo   ERROR: ai_engine.command_parser & exit /b 1)
 python -c "from file_engine.file_operations import execute_action; print('  OK: file_engine.file_operations')" || (echo   ERROR: file_engine.file_operations & exit /b 1)
 python -c "from voice_engine.speech_to_text import listen; print('  OK: voice_engine.speech_to_text')" || (echo   ERROR: voice_engine.speech_to_text & exit /b 1)
