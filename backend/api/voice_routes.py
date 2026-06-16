@@ -10,6 +10,7 @@ from ai_engine.command_parser import parse_command
 from file_engine.file_operations import execute_action
 from voice_engine.text_to_speech import speak as tts_speak
 from utils.logger import get_logger
+from utils.helpers import format_speak_message
 
 logger = get_logger(__name__)
 
@@ -98,17 +99,7 @@ def handle_voice_command():
 
     # Prepare spoken message (map common responses to user-friendly phrases)
     try:
-        lr = result.lower()
-        if lr.startswith("opened"):
-            speak_msg = result
-        elif "created" in lr:
-            speak_msg = "Folder created successfully"
-        elif "not found" in lr:
-            speak_msg = f"{parsed_action.get('target')} not found"
-        elif lr == "unknown action":
-            speak_msg = "Command not recognized"
-        else:
-            speak_msg = result
+        speak_msg = format_speak_message(result, parsed_action)
 
         # Announce result via TTS (best-effort)
         try:

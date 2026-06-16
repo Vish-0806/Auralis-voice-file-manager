@@ -23,6 +23,8 @@ from ai_engine.intent_classifier import classify_intent
         ("search for report.pdf", "search", "report.pdf"),
         ("locate report.pdf", "search", "report.pdf"),
         ("where is report.pdf", "search", "report.pdf"),
+        ("where is resume", "search", "resume"),
+        ("find resume", "search", "resume"),
     ],
 )
 def test_parse_command_cases(command, expected_action, expected_target):
