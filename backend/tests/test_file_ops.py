@@ -123,3 +123,26 @@ def test_search_files_permission_error(mock_walk, mock_exists):
     assert len(results) == 1
     assert results[0]["name"] == "secret.txt"
     assert results[0]["path"] == "C:\\Users\\User\\Documents\\secret.txt"
+
+
+@patch("file_engine.file_operations.search_files")
+def test_execute_action_search(mock_search_files):
+    from file_engine.file_operations import execute_action
+
+    # Case 1: Results found
+    mock_search_files.return_value = [
+        {"name": "file1.txt", "path": "path/to/file1.txt", "type": ".txt"}
+    ]
+    action_data = {"action": "search", "target": "file1"}
+    res = execute_action(action_data)
+    assert res == {
+        "count": 1,
+        "results": [{"name": "file1.txt", "path": "path/to/file1.txt", "type": ".txt"}]
+    }
+
+    # Case 2: No results found
+    mock_search_files.return_value = []
+    action_data = {"action": "search", "target": "missing"}
+    res = execute_action(action_data)
+    assert res == "No files found matching 'missing'"
+

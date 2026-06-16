@@ -91,7 +91,13 @@ def execute_action(action_data):
 
         # SEARCH
         elif action == "search":
-            return search_files(target)
+            results = search_files(target)
+            if not results:
+                return f"No files found matching '{target}'"
+            return {
+                "count": len(results),
+                "results": results
+            }
 
         return "Unknown action"
 
