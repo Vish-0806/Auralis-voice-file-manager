@@ -146,3 +146,46 @@ def test_execute_action_search(mock_search_files):
     res = execute_action(action_data)
     assert res == "No files found matching 'missing'"
 
+
+def test_format_speak_message():
+    from utils.helpers import format_speak_message
+
+    # Test No results cases
+    parsed_action = {"action": "search", "target": "report"}
+    assert format_speak_message([], parsed_action) == "I couldn't find any files named report."
+    assert format_speak_message("No files found matching 'report'", parsed_action) == "I couldn't find any files named report."
+    assert format_speak_message({"count": 0, "results": []}, parsed_action) == "I couldn't find any files named report."
+
+    # Test Single result cases
+    parsed_action = {"action": "search", "target": "report.pdf"}
+    single_res = {
+        "count": 1,
+        "results": [
+            {"name": "report.pdf", "path": "C:\\Users\\User\\Documents\\report.pdf", "type": ".pdf"}
+        ]
+    }
+    assert format_speak_message(single_res, parsed_action) == "I found report.pdf in Documents."
+
+    # Test Single result in other folder cases
+    single_res_downloads = {
+        "count": 1,
+        "results": [
+            {"name": "report.pdf", "path": "C:\\Users\\User\\Downloads\\report.pdf", "type": ".pdf"}
+        ]
+    }
+    assert format_speak_message(single_res_downloads, parsed_action) == "I found report.pdf in Downloads."
+
+    # Test Multiple results cases
+    parsed_action = {"action": "search", "target": "report"}
+    multi_res = {
+        "count": 5,
+        "results": [{"name": f"file_{i}.txt", "path": f"path/file_{i}.txt", "type": ".txt"} for i in range(5)]
+    }
+    assert format_speak_message(multi_res, parsed_action) == "I found 5 matching files."
+
+    # Test other commands formatting
+    assert format_speak_message("Opened downloads", {"action": "open", "target": "downloads"}) == "Opened downloads"
+    assert format_speak_message("Folder 'college' created", {"action": "create_folder", "target": "college"}) == "Folder created successfully"
+    assert format_speak_message("report.pdf not found", {"action": "delete", "target": "report.pdf"}) == "report.pdf not found"
+
+

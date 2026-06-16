@@ -10,6 +10,7 @@ from voice_engine.wake_word import detect_wake_word
 from voice_engine.text_to_speech import speak as tts_speak
 from ai_engine.command_parser import parse_command
 from file_engine.file_operations import execute_action
+from utils.helpers import format_speak_message
 
 logger = get_logger(__name__)
 
@@ -119,18 +120,7 @@ class ContinuousListener:
 
                 # Step 6: Speak response
                 try:
-                    lr = result.lower()
-                    if lr.startswith("opened"):
-                        speak_msg = result
-                    elif "created" in lr:
-                        speak_msg = "Folder created successfully"
-                    elif "not found" in lr:
-                        speak_msg = f"{parsed_action.get('target')} not found"
-                    elif lr == "unknown action":
-                        speak_msg = "Command not recognized"
-                    else:
-                        speak_msg = result
-
+                    speak_msg = format_speak_message(result, parsed_action)
                     tts_speak(speak_msg)
                 except Exception as e:
                     logger.error("Failed to speak response: %s", str(e))
