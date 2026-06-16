@@ -1,5 +1,6 @@
 import os
 import shutil
+from .search_engine import search_files
 
 HOME_DIR = os.path.expanduser("~")
 
@@ -88,7 +89,11 @@ def execute_action(action_data):
 
             return f"{target} not found"
 
+        # SEARCH
+        elif action == "search":
+            return search_files(target)
+
         return "Unknown action"
 
     except Exception as e:
-        return str(e)
+        return str(e)
