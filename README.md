@@ -25,7 +25,12 @@ Auralis is a voice-enabled file manager that provides hands-free file and folder
 - Extended parser support for search-style commands such as `find`, `search for`, `locate`, and `where is`
 - Added location extraction for create-folder commands so the parser can return both `target` and `location`
 - Kept the existing `parse_command()` API compatible for the backend routes and file execution flow
-- Added comprehensive pytest coverage for intent detection, target extraction, and normalization behavior
+- Implemented a recursive file search engine scanning `Desktop`, `Documents`, and `Downloads`
+- Optimized search traversal with early exit limits (capping at the first 20 matches)
+- Handled folder permission errors (`PermissionError`, `OSError`) gracefully during recursive scanning
+- Exposed search capability via a `GET /files/search` API endpoint and integrated it into the `/command` pipeline
+- Modularized voice feedback by adding a unified `format_speak_message` utility to yield context-aware TTS voice notifications (counts, locations, fallbacks)
+- Added comprehensive pytest coverage for parser, search operations, permission errors, and voice response structures
 
 ---
 
@@ -116,7 +121,6 @@ curl http://localhost:8000/voice/listen
 Notes:
 - Replace `your-username/auralis` in the badge URLs with your repository owner/name to enable real CI/coverage badges.
 - The `/voice/listen` endpoint requires microphone access on the machine running the backend and proper audio setup.
-- Search commands are parsed by the backend, but actual file-search execution is not implemented yet.
 
 ## Project Structure (selected)
 
