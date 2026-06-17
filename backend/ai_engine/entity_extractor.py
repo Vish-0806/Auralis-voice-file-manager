@@ -43,6 +43,10 @@ def _strip_action_prefix(command: str, intent: str | None = None) -> str:
 		match = re.search(r"\b(?:open|show|go to|navigate to|delete|remove|trash|discard)\b\s*(.*)", text)
 		return (match.group(1) if match else text).strip()
 
+	if intent == "organize":
+		match = re.search(r"\b(?:organize|clean|sort)\b\s*(.*)", text)
+		return (match.group(1) if match else text).strip()
+
 	return text
 
 

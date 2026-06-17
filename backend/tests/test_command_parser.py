@@ -25,6 +25,11 @@ from ai_engine.intent_classifier import classify_intent
         ("where is report.pdf", "search", "report.pdf"),
         ("where is resume", "search", "resume"),
         ("find resume", "search", "resume"),
+        ("organize downloads", "organize", "downloads"),
+        ("organize my downloads", "organize", "downloads"),
+        ("clean downloads", "organize", "downloads"),
+        ("sort downloads", "organize", "downloads"),
+        ("organize desktop", "organize", "desktop"),
     ],
 )
 def test_parse_command_cases(command, expected_action, expected_target):
@@ -63,6 +68,11 @@ def test_create_folder_location_extraction(command, expected_target, expected_lo
         ("locate receipts", "search"),
         ("where is receipts", "search"),
         ("sing a song", "unknown"),
+        ("organize downloads", "organize"),
+        ("organize my downloads", "organize"),
+        ("clean downloads", "organize"),
+        ("sort downloads", "organize"),
+        ("organize desktop", "organize"),
     ],
 )
 def test_intent_detection(command, expected_intent):
@@ -85,6 +95,11 @@ def test_intent_detection(command, expected_intent):
         ("search for report.pdf", "report.pdf"),
         ("locate report.pdf", "report.pdf"),
         ("where is report.pdf", "report.pdf"),
+        ("organize downloads", "downloads"),
+        ("organize my downloads", "downloads"),
+        ("clean downloads", "downloads"),
+        ("sort downloads", "downloads"),
+        ("organize desktop", "desktop"),
     ],
 )
 def test_target_extraction(command, expected_target):
