@@ -8,6 +8,8 @@ def format_speak_message(result, parsed_action: dict) -> str:
     target = parsed_action.get("target", "")
 
     if isinstance(result, dict):
+        if result.get("status") == "pending_confirmation":
+            return result.get("message", "Are you sure?")
         if result.get("status") == "disambiguation":
             return f"Multiple files found matching {target}. Which one did you mean?"
         if result.get("status") == "error":
@@ -56,6 +58,10 @@ def format_speak_message(result, parsed_action: dict) -> str:
         return "Folder created successfully"
     elif "not found" in lr:
         return f"{target} not found"
+    elif "no action pending" in lr:
+        return "There is no action pending confirmation."
+    elif "action cancelled" in lr:
+        return "Action cancelled."
     elif lr == "unknown action":
         return "Command not recognized"
     else:

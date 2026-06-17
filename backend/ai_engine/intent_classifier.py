@@ -11,6 +11,8 @@ logger = get_logger(__name__)
 
 
 INTENT_PATTERNS = [
+	("confirm", [r"\b(?:yes|yep|sure|confirm|correct|ok|okay)\b"]),
+	("cancel", [r"\b(?:no|nope|cancel|deny|stop)\b"]),
 	("create_folder", [r"\b(?:create|make)\s+(?:a\s+)?(?:folder|directory)\b"]),
 	("rename", [r"\brename\b", r"\b(?:change|set)\s+name\b"]),
 	("move", [r"\bmove\b", r"\brelocate\b", r"\btransfer\b"]),
