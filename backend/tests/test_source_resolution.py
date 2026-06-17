@@ -82,7 +82,37 @@ def test_execute_action_move_single_match(mock_move_item, mock_get_location, moc
     assert isinstance(res, dict)
     assert res["status"] == "success"
     assert res["destination"] == "/mock/documents/report.pdf"
+    assert res["message"] == "Moved report.pdf to Documents."
     mock_move_item.assert_called_once_with("/mock/report.pdf", "/mock/documents")
+
+
+@patch("file_engine.source_resolver.search_files")
+@patch("file_engine.file_operations.get_location_path")
+@patch("file_engine.transfer.copy_item")
+def test_execute_action_copy_single_match(mock_copy_item, mock_get_location, mock_search):
+    mock_search.return_value = [
+        {"name": "resume.pdf", "path": "/mock/resume.pdf", "type": ".pdf"}
+    ]
+    mock_get_location.return_value = "/mock/desktop"
+    mock_copy_item.return_value = {
+        "status": "success",
+        "message": "Successfully copied resume.pdf to resume.pdf",
+        "source": "/mock/resume.pdf",
+        "destination": "/mock/desktop/resume.pdf"
+    }
+
+    action_data = {
+        "action": "copy",
+        "target": "resume.pdf",
+        "destination": "desktop"
+    }
+
+    res = execute_action(action_data)
+    assert isinstance(res, dict)
+    assert res["status"] == "success"
+    assert res["destination"] == "/mock/desktop/resume.pdf"
+    assert res["message"] == "Copied resume.pdf to Desktop."
+    mock_copy_item.assert_called_once_with("/mock/resume.pdf", "/mock/desktop")
 
 
 @patch("file_engine.source_resolver.search_files")

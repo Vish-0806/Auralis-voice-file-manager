@@ -117,7 +117,10 @@ def execute_action(action_data):
             if resolution["status"] == "success":
                 from .transfer import move_item
                 dest_dir = get_location_path(destination)
-                return move_item(resolution["path"], dest_dir)
+                res = move_item(resolution["path"], dest_dir)
+                if isinstance(res, dict) and res.get("status") == "success":
+                    res["message"] = f"Moved {os.path.basename(resolution['path'])} to {destination.title()}."
+                return res
             else:
                 return resolution
 
@@ -133,7 +136,10 @@ def execute_action(action_data):
             if resolution["status"] == "success":
                 from .transfer import copy_item
                 dest_dir = get_location_path(destination)
-                return copy_item(resolution["path"], dest_dir)
+                res = copy_item(resolution["path"], dest_dir)
+                if isinstance(res, dict) and res.get("status") == "success":
+                    res["message"] = f"Copied {os.path.basename(resolution['path'])} to {destination.title()}."
+                return res
             else:
                 return resolution
 
