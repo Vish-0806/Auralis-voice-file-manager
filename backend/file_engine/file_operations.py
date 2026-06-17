@@ -105,6 +105,38 @@ def execute_action(action_data):
             summary = organize_directory(path)
             return f"Successfully organized {target.title()} folder. Moved {summary['moved_files']} files into {summary['categories_created']} categories."
 
+        # MOVE
+        elif action == "move":
+            destination = action_data.get("destination", "")
+            if not destination:
+                return "Destination not specified"
+
+            from .source_resolver import resolve_source
+            resolution = resolve_source(target)
+
+            if resolution["status"] == "success":
+                from .transfer import move_item
+                dest_dir = get_location_path(destination)
+                return move_item(resolution["path"], dest_dir)
+            else:
+                return resolution
+
+        # COPY
+        elif action == "copy":
+            destination = action_data.get("destination", "")
+            if not destination:
+                return "Destination not specified"
+
+            from .source_resolver import resolve_source
+            resolution = resolve_source(target)
+
+            if resolution["status"] == "success":
+                from .transfer import copy_item
+                dest_dir = get_location_path(destination)
+                return copy_item(resolution["path"], dest_dir)
+            else:
+                return resolution
+
         return "Unknown action"
 
     except Exception as e:
