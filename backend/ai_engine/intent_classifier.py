@@ -13,7 +13,8 @@ logger = get_logger(__name__)
 INTENT_PATTERNS = [
 	("create_folder", [r"\b(?:create|make)\s+(?:a\s+)?(?:folder|directory)\b"]),
 	("rename", [r"\brename\b", r"\b(?:change|set)\s+name\b"]),
-	("move", [r"\bmove\b", r"\brelocate\b"]),
+	("move", [r"\bmove\b", r"\brelocate\b", r"\btransfer\b"]),
+	("copy", [r"\bcopy\b"]),
 	("delete", [r"\b(?:delete|remove|trash|discard)\b"]),
 	("search", [r"\b(?:search|find|look\s+for|locate|where\s+is)\b"]),
 	("open", [r"\b(?:open|show|go\s+to|navigate\s+to)\b"]),

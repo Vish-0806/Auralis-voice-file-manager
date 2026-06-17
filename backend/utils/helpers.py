@@ -7,6 +7,14 @@ def format_speak_message(result, parsed_action: dict) -> str:
     action = parsed_action.get("action")
     target = parsed_action.get("target", "")
 
+    if isinstance(result, dict):
+        if result.get("status") == "disambiguation":
+            return f"Multiple files found matching {target}. Which one did you mean?"
+        if result.get("status") == "error":
+            return result.get("message", "An error occurred.")
+        if action in {"move", "copy"} and result.get("status") == "success":
+            return result.get("message", "Operation completed successfully.")
+
     if action == "organize":
         if isinstance(result, dict):
             moved = result.get("moved_files", 0)

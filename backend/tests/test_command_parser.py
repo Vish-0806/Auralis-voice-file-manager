@@ -30,6 +30,11 @@ from ai_engine.intent_classifier import classify_intent
         ("clean downloads", "organize", "downloads"),
         ("sort downloads", "organize", "downloads"),
         ("organize desktop", "organize", "desktop"),
+        ("move report.pdf to documents", "move", "report.pdf"),
+        ("move notes.txt to downloads", "move", "notes.txt"),
+        ("copy resume.pdf to desktop", "copy", "resume.pdf"),
+        ("copy notes.txt to desktop", "copy", "notes.txt"),
+        ("copy project folder to documents", "copy", "project"),
     ],
 )
 def test_parse_command_cases(command, expected_action, expected_target):
@@ -56,6 +61,28 @@ def test_create_folder_location_extraction(command, expected_target, expected_lo
 
 
 @pytest.mark.parametrize(
+    ("command", "expected_action", "expected_target", "expected_destination"),
+    [
+        ("move report.pdf to documents", "move", "report.pdf", "documents"),
+        ("move notes.txt to downloads", "move", "notes.txt", "downloads"),
+        ("copy resume.pdf to desktop", "copy", "resume.pdf", "desktop"),
+        ("copy notes.txt to desktop", "copy", "notes.txt", "desktop"),
+        ("copy project folder to documents", "copy", "project", "documents"),
+        ("move my file", "move", "", ""),
+        ("copy file to", "copy", "", ""),
+        ("transfer file to", "move", "", ""),
+        ("transfer notes.txt to downloads", "move", "notes.txt", "downloads"),
+    ],
+)
+def test_move_copy_destination_extraction(command, expected_action, expected_target, expected_destination):
+    result = parse_command(command)
+
+    assert result["action"] == expected_action
+    assert result["target"] == expected_target
+    assert result.get("destination", "") == expected_destination
+
+
+@pytest.mark.parametrize(
     ("command", "expected_intent"),
     [
         ("open downloads", "open"),
@@ -73,6 +100,9 @@ def test_create_folder_location_extraction(command, expected_target, expected_lo
         ("clean downloads", "organize"),
         ("sort downloads", "organize"),
         ("organize desktop", "organize"),
+        ("transfer file to", "move"),
+        ("copy file to", "copy"),
+        ("copy resume.pdf to desktop", "copy"),
     ],
 )
 def test_intent_detection(command, expected_intent):
@@ -100,6 +130,10 @@ def test_intent_detection(command, expected_intent):
         ("clean downloads", "downloads"),
         ("sort downloads", "downloads"),
         ("organize desktop", "desktop"),
+        ("move report.pdf to documents", "report.pdf"),
+        ("copy resume.pdf to desktop", "resume.pdf"),
+        ("copy notes.txt to desktop", "notes.txt"),
+        ("copy project folder to documents", "project"),
     ],
 )
 def test_target_extraction(command, expected_target):
