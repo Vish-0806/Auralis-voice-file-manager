@@ -99,6 +99,12 @@ def execute_action(action_data):
                 "results": results
             }
 
+        # ORGANIZE
+        elif action == "organize":
+            from .organizer import organize_directory
+            summary = organize_directory(path)
+            return f"Successfully organized {target.title()} folder. Moved {summary['moved_files']} files into {summary['categories_created']} categories."
+
         return "Unknown action"
 
     except Exception as e:

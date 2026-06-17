@@ -28,6 +28,11 @@ assert_parsed('create a folder called notes in documents', 'create_folder', 'not
 assert_parsed('create a folder on desktop called college', 'create_folder', 'college', 'desktop')
 assert_parsed('delete document', 'delete', 'documents')
 assert_parsed('remove pictures', 'delete', 'pictures')
+assert_parsed('organize downloads', 'organize', 'downloads')
+assert_parsed('organize my downloads', 'organize', 'downloads')
+assert_parsed('clean downloads', 'organize', 'downloads')
+assert_parsed('sort downloads', 'organize', 'downloads')
+assert_parsed('organize desktop', 'organize', 'desktop')
 res = parse_command('fly to the moon')
 assert res['action'] == 'unknown'
 print('parser smoke tests passed')
