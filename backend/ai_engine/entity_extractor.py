@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 
 LOCATION_ENTITIES = ["desktop", "downloads", "documents", "pictures", "music", "videos"]
-LOCATION_PREPOSITIONS = r"(?:in|on|inside|within|under|at)"
+LOCATION_PREPOSITIONS = r"(?:in|on|inside|within|under|at|to|into)"
 
 
 def _strip_action_prefix(command: str, intent: str | None = None) -> str:
@@ -28,7 +28,11 @@ def _strip_action_prefix(command: str, intent: str | None = None) -> str:
 		return (match.group(1) if match else text).strip()
 
 	if intent == "move":
-		match = re.search(r"\bmove\b\s*(.*)", text)
+		match = re.search(r"\b(?:move|transfer)\b\s*(.*)", text)
+		return (match.group(1) if match else text).strip()
+
+	if intent == "copy":
+		match = re.search(r"\bcopy\b\s*(.*)", text)
 		return (match.group(1) if match else text).strip()
 
 	if intent == "search":
@@ -96,7 +100,7 @@ def extract_folder_names(command: str) -> List[str]:
 
 	for pattern in [
 		r"\b(?:folder|directory)\b\s*(.+)$",
-		r"\b(?:open|delete|remove|move|create|make|rename)\b\s*(.+)$",
+		r"\b(?:open|delete|remove|move|create|make|rename|copy|transfer)\b\s*(.+)$",
 		r"\b(?:search|find|locate)\b(?:\s+for)?\s*(.+)$",
 		r"\blook\s+for\b\s*(.+)$",
 		r"\bwhere\s+is\b\s*(.+)$",
@@ -121,7 +125,7 @@ def extract_folder_location(command: str, intent: str | None = None) -> str:
 		return ""
 
 	text = normalize_command(command)
-	if intent == "create_folder":
+	if intent in {"create_folder", "move", "copy"}:
 		text = _strip_action_prefix(text, intent=intent)
 
 	match = _extract_location_match(text)
@@ -136,22 +140,27 @@ def extract_targets(command: str, intent: str | None = None) -> str:
 	if not isinstance(command, str) or not command.strip():
 		return ""
 
+	target = ""
 	file_names = extract_file_names(command)
 	if file_names:
 		target = file_names[0]
 		logger.debug("Selected file target '%s' from command: %s", target, command)
-		return target
+	else:
+		folder_names = extract_folder_names(command)
+		if folder_names:
+			target = folder_names[0]
+			if intent in {"create_folder", "move", "copy"}:
+				target = normalize_target(_remove_location_clause(target))
+			logger.debug("Selected folder target '%s' from command: %s", target, command)
+		else:
+			remainder = _strip_action_prefix(command, intent=intent)
+			target = normalize_target(remainder)
+			if intent in {"create_folder", "move", "copy"}:
+				target = normalize_target(_remove_location_clause(target))
 
-	folder_names = extract_folder_names(command)
-	if folder_names:
-		target = folder_names[0]
-		if intent == "create_folder":
-			target = normalize_target(_remove_location_clause(target))
-		logger.debug("Selected folder target '%s' from command: %s", target, command)
-		return target
-
-	remainder = _strip_action_prefix(command, intent=intent)
-	target = normalize_target(remainder)
+	# Filter out isolated prepositions
+	if target in {"to", "into", "in", "on", "inside", "within", "under", "at"}:
+		target = ""
 
 	logger.debug(
 		"Extracted target '%s' from command '%s' using intent '%s'",
@@ -159,9 +168,6 @@ def extract_targets(command: str, intent: str | None = None) -> str:
 		command,
 		intent,
 	)
-	if intent == "create_folder":
-		target = normalize_target(_remove_location_clause(target))
-
 	return target
 
 
