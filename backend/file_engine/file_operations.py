@@ -23,6 +23,18 @@ COMMON_FOLDERS = {
 }
 
 
+_pending_action = None
+
+
+def set_pending_action(action_data):
+    global _pending_action
+    _pending_action = action_data
+
+
+def get_pending_action():
+    return _pending_action
+
+
 def get_target_path(target):
 
     target = target.lower()
@@ -76,6 +88,16 @@ def execute_action(action_data):
 
         # DELETE
         elif action == "delete":
+            if not action_data.get("confirmed"):
+                if not os.path.exists(path):
+                    return f"{target} not found"
+
+                set_pending_action(action_data)
+                return {
+                    "status": "pending_confirmation",
+                    "message": f"Are you sure you want to delete {target}?",
+                    "pending_action": action_data
+                }
 
             if os.path.exists(path):
 
@@ -105,16 +127,51 @@ def execute_action(action_data):
             summary = organize_directory(path)
             return f"Successfully organized {target.title()} folder. Moved {summary['moved_files']} files into {summary['categories_created']} categories."
 
+        # CONFIRM
+        elif action == "confirm":
+            pending = get_pending_action()
+            if not pending:
+                return "No action pending confirmation"
+            set_pending_action(None)
+            pending["confirmed"] = True
+            return execute_action(pending)
+
+        # CANCEL
+        elif action == "cancel":
+            pending = get_pending_action()
+            if not pending:
+                return "No action pending confirmation"
+            set_pending_action(None)
+            return "Action cancelled"
+
         # MOVE
         elif action == "move":
             destination = action_data.get("destination", "")
             if not destination:
                 return "Destination not specified"
 
-            from .source_resolver import resolve_source
-            resolution = resolve_source(target)
+            resolved_path = action_data.get("resolved_source_path")
+            if resolved_path:
+                resolution = {
+                    "status": "success",
+                    "path": resolved_path
+                }
+            else:
+                from .source_resolver import resolve_source
+                resolution = resolve_source(target)
 
             if resolution["status"] == "success":
+                if not action_data.get("confirmed"):
+                    pending_data = action_data.copy()
+                    pending_data["resolved_source_path"] = resolution["path"]
+                    set_pending_action(pending_data)
+                    filename = os.path.basename(resolution["path"])
+                    return {
+                        "status": "pending_confirmation",
+                        "message": f"Are you sure you want to move {filename} to {destination.title()}?",
+                        "pending_action": pending_data
+                    }
+
                 from .transfer import move_item
                 dest_dir = get_location_path(destination)
                 res = move_item(resolution["path"], dest_dir)

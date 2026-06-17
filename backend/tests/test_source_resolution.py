@@ -75,7 +75,8 @@ def test_execute_action_move_single_match(mock_move_item, mock_get_location, moc
     action_data = {
         "action": "move",
         "target": "report.pdf",
-        "destination": "documents"
+        "destination": "documents",
+        "confirmed": True
     }
 
     res = execute_action(action_data)
