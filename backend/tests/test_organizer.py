@@ -137,9 +137,7 @@ def test_execute_action_organize(tmp_path):
         action_data = {"action": "organize", "target": "downloads"}
         result = execute_action(action_data)
 
-        assert isinstance(result, dict)
-        assert result["moved_files"] == 1
-        assert result["categories_created"] == 1
+        assert result == "Successfully organized Downloads folder. Moved 1 files into 1 categories."
         assert (tmp_path / "Documents" / "notes.txt").exists()
 
 
