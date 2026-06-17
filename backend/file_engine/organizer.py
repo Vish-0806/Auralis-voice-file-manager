@@ -1,24 +1,9 @@
 import os
 import shutil
 from utils.logger import get_logger
+from utils.constants import CATEGORY_EXTENSIONS
 
 logger = get_logger(__name__)
-
-# Category mapping to set of extensions (all lowercase, including leading dot)
-CATEGORY_EXTENSIONS = {
-    "PDFs": {".pdf"},
-    "Images": {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".svg", ".webp", ".heic", ".heif", ".ico"},
-    "Videos": {".mp4", ".mkv", ".avi", ".mov", ".flv", ".wmv", ".m4v", ".webm", ".3gp"},
-    "Documents": {
-        ".docx", ".doc", ".txt", ".rtf", ".odt", ".xlsx", ".xls", ".pptx", ".ppt", ".csv",
-        ".pages", ".key", ".numbers", ".epub", ".odt", ".ods", ".odp"
-    },
-    "Archives": {".zip", ".tar", ".gz", ".rar", ".7z", ".tgz", ".bz2", ".xz"},
-    "Code": {
-        ".py", ".js", ".ts", ".html", ".css", ".java", ".cpp", ".c", ".sh", ".bat",
-        ".json", ".xml", ".yaml", ".yml", ".md", ".go", ".rs", ".cs", ".sql", ".h", ".php"
-    },
-}
 
 
 def get_category_for_file(filename: str) -> str:
