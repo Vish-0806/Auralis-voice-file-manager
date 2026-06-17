@@ -99,6 +99,11 @@ def execute_action(action_data):
                 "results": results
             }
 
+        # ORGANIZE
+        elif action == "organize":
+            from .organizer import organize_directory
+            return organize_directory(path)
+
         return "Unknown action"
 
     except Exception as e:
