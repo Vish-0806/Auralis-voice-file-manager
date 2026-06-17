@@ -33,6 +33,7 @@ from ai_engine.intent_classifier import classify_intent
         ("move report.pdf to documents", "move", "report.pdf"),
         ("move notes.txt to downloads", "move", "notes.txt"),
         ("copy resume.pdf to desktop", "copy", "resume.pdf"),
+        ("copy notes.txt to desktop", "copy", "notes.txt"),
         ("copy project folder to documents", "copy", "project"),
     ],
 )
@@ -65,6 +66,7 @@ def test_create_folder_location_extraction(command, expected_target, expected_lo
         ("move report.pdf to documents", "move", "report.pdf", "documents"),
         ("move notes.txt to downloads", "move", "notes.txt", "downloads"),
         ("copy resume.pdf to desktop", "copy", "resume.pdf", "desktop"),
+        ("copy notes.txt to desktop", "copy", "notes.txt", "desktop"),
         ("copy project folder to documents", "copy", "project", "documents"),
         ("move my file", "move", "", ""),
         ("copy file to", "copy", "", ""),
@@ -130,6 +132,7 @@ def test_intent_detection(command, expected_intent):
         ("organize desktop", "desktop"),
         ("move report.pdf to documents", "report.pdf"),
         ("copy resume.pdf to desktop", "resume.pdf"),
+        ("copy notes.txt to desktop", "notes.txt"),
         ("copy project folder to documents", "project"),
     ],
 )
