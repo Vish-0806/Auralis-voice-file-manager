@@ -9,8 +9,11 @@ from utils.helpers import format_speak_message
 def test_confirmation_intent_classification():
     # Confirm
     assert classify_intent("yes") == "confirm"
+    assert classify_intent("yeah") == "confirm"
     assert classify_intent("yep") == "confirm"
     assert classify_intent("sure") == "confirm"
+    assert classify_intent("confirm") == "confirm"
+    assert classify_intent("proceed") == "confirm"
     assert classify_intent("ok") == "confirm"
     assert classify_intent("okay") == "confirm"
 
@@ -223,3 +226,101 @@ def test_organize_cancel_flow(tmp_path):
         assert temp_file.exists()
         assert not (downloads_dir / "PDFs" / "report.pdf").exists()
         assert get_pending_action() is None
+
+
+from fastapi.testclient import TestClient
+from main import app
+client = TestClient(app)
+
+@patch("api.voice_routes.listen")
+@patch("api.voice_routes.detect_wake_word")
+@patch("api.voice_routes.tts_speak")
+def test_voice_route_confirmation_flow(mock_speak, mock_detect, mock_listen):
+    set_pending_action(None)
+    
+    # 1. Simulate there is a pending action (e.g. a delete action)
+    action_data = {
+        "action": "delete",
+        "target": "report.pdf",
+        "resolved_source_path": "/mock/report.pdf",
+        "confirmed": False
+    }
+    set_pending_action(action_data)
+    
+    # 2. Mock user saying "yes"
+    mock_listen.return_value = "hey auralis yes"
+    mock_detect.return_value = {"activated": True, "cleaned_command": "yes"}
+    
+    with patch("api.voice_routes.execute_action") as mock_execute:
+        mock_execute.return_value = "/mock/report.pdf deleted"
+        
+        response = client.get("/voice/listen")
+        assert response.status_code == 200
+        res_json = response.json()
+        assert res_json["status"] == "success"
+        assert res_json["command"] == "yes"
+        assert res_json["parsed_action"] == {"action": "confirm", "target": ""}
+        assert res_json["result"] == "/mock/report.pdf deleted"
+        
+        mock_execute.assert_called_once_with({"action": "confirm", "target": ""})
+
+@patch("api.voice_routes.listen")
+@patch("api.voice_routes.detect_wake_word")
+@patch("api.voice_routes.tts_speak")
+def test_voice_route_cancellation_flow(mock_speak, mock_detect, mock_listen):
+    set_pending_action(None)
+    
+    # 1. Simulate there is a pending action
+    action_data = {
+        "action": "delete",
+        "target": "report.pdf",
+        "resolved_source_path": "/mock/report.pdf",
+        "confirmed": False
+    }
+    set_pending_action(action_data)
+    
+    # 2. Mock user saying "no"
+    mock_listen.return_value = "hey auralis no"
+    mock_detect.return_value = {"activated": True, "cleaned_command": "no"}
+    
+    with patch("api.voice_routes.execute_action") as mock_execute:
+        mock_execute.return_value = "Action cancelled"
+        
+        response = client.get("/voice/listen")
+        assert response.status_code == 200
+        res_json = response.json()
+        assert res_json["status"] == "success"
+        assert res_json["command"] == "no"
+        assert res_json["parsed_action"] == {"action": "cancel", "target": ""}
+        assert res_json["result"] == "Action cancelled"
+        
+        mock_execute.assert_called_once_with({"action": "cancel", "target": ""})
+
+@patch("api.voice_routes.listen")
+@patch("api.voice_routes.detect_wake_word")
+@patch("api.voice_routes.tts_speak")
+def test_voice_route_invalid_flow_when_pending(mock_speak, mock_detect, mock_listen):
+    set_pending_action(None)
+    
+    # 1. Simulate there is a pending action
+    action_data = {
+        "action": "delete",
+        "target": "report.pdf",
+        "resolved_source_path": "/mock/report.pdf",
+        "confirmed": False
+    }
+    set_pending_action(action_data)
+    
+    # 2. Mock user saying something unrelated, e.g. "create folder notes"
+    mock_listen.return_value = "hey auralis create folder notes"
+    mock_detect.return_value = {"activated": True, "cleaned_command": "create folder notes"}
+    
+    response = client.get("/voice/listen")
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Action pending. Please say yes or no."
+    
+    # Verify mock_speak warned the user
+    mock_speak.assert_called_once_with("Action pending. Please say yes or no.")
+    
+    # Clear state
+    set_pending_action(None)

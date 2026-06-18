@@ -106,8 +106,28 @@ class ContinuousListener:
                         logger.error("Failed to speak prompt: %s", str(e))
                     continue
 
-                # Step 4: Parse command
-                parsed_action = parse_command(command)
+                # Step 4: Parse or handle pending action
+                from file_engine.file_operations import get_pending_action
+                from ai_engine.intent_classifier import classify_intent
+
+                pending = get_pending_action()
+                if pending:
+                    logger.info("Pending action exists. Checking for voice confirmation/cancellation: '%s'", command)
+                    intent = classify_intent(command)
+                    logger.info("Classified voice intent for pending action: '%s'", intent)
+                    if intent == "confirm":
+                        parsed_action = {"action": "confirm", "target": ""}
+                    elif intent == "cancel":
+                        parsed_action = {"action": "cancel", "target": ""}
+                    else:
+                        logger.warning("Voice command '%s' ignored because a confirmation is pending", command)
+                        try:
+                            tts_speak("Action pending. Please say yes or no.")
+                        except Exception as e:
+                            logger.error("Failed to speak pending warning: %s", str(e))
+                        continue
+                else:
+                    parsed_action = parse_command(command)
 
                 # Step 5: Execute file operation
                 try:
