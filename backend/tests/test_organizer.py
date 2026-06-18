@@ -135,9 +135,16 @@ def test_execute_action_organize(tmp_path):
     # Mock get_target_path to return our temp dir
     with patch("file_engine.file_operations.get_target_path", return_value=str(tmp_path)):
         action_data = {"action": "organize", "target": "downloads"}
+        
+        # Step 1: Initial organize request (requires confirmation)
         result = execute_action(action_data)
+        assert isinstance(result, dict)
+        assert result["status"] == "pending_confirmation"
+        assert result["message"] == "Are you sure you want to organize downloads?"
 
-        assert result == "Successfully organized Downloads folder. Moved 1 files into 1 categories."
+        # Step 2: Confirm
+        confirm_res = execute_action({"action": "confirm", "target": ""})
+        assert confirm_res == "Successfully organized Downloads folder. Moved 1 files into 1 categories."
         assert (tmp_path / "Documents" / "notes.txt").exists()
 
 

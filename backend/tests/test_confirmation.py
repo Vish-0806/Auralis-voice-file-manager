@@ -54,7 +54,10 @@ def test_delete_confirmation_flow(tmp_path):
     assert os.path.exists(str(temp_file))
 
     # Verify pending action is stored
-    assert get_pending_action() == action_data
+    pending = get_pending_action()
+    assert pending["action"] == "delete"
+    assert pending["target"] == str(temp_file)
+    assert pending["resolved_source_path"] == str(temp_file)
 
     # Step 2: Confirm action
     confirm_res = execute_action({"action": "confirm", "target": ""})
@@ -129,3 +132,94 @@ def test_move_confirmation_flow(mock_move_item, mock_get_location, mock_search):
     assert confirm_res["message"] == "Moved report.pdf to Documents."
     mock_move_item.assert_called_once_with("/mock/report.pdf", "/mock/documents")
     assert get_pending_action() is None
+
+
+@patch("file_engine.source_resolver.search_files")
+def test_move_cancel_flow(mock_search):
+    # Ensure no pending action
+    set_pending_action(None)
+
+    mock_search.return_value = [
+        {"name": "report.pdf", "path": "/mock/report.pdf", "type": ".pdf"}
+    ]
+
+    action_data = {
+        "action": "move",
+        "target": "report.pdf",
+        "destination": "documents"
+    }
+
+    # Step 1: Initial move request
+    res = execute_action(action_data)
+    assert isinstance(res, dict)
+    assert res["status"] == "pending_confirmation"
+
+    # Step 2: Cancel
+    cancel_res = execute_action({"action": "cancel", "target": ""})
+    assert cancel_res == "Action cancelled"
+    assert get_pending_action() is None
+
+
+def test_organize_confirmation_flow(tmp_path):
+    # Ensure no pending action
+    set_pending_action(None)
+
+    # Setup a folder to organize
+    downloads_dir = tmp_path / "downloads"
+    downloads_dir.mkdir()
+    temp_file = downloads_dir / "report.pdf"
+    temp_file.write_text("dummy")
+
+    action_data = {
+        "action": "organize",
+        "target": "downloads"
+    }
+
+    # Mock get_target_path to return our temp downloads_dir
+    with patch("file_engine.file_operations.get_target_path", return_value=str(downloads_dir)):
+        # Step 1: Initial organize request
+        res = execute_action(action_data)
+        assert isinstance(res, dict)
+        assert res["status"] == "pending_confirmation"
+        assert res["message"] == "Are you sure you want to organize downloads?"
+        assert get_pending_action() == action_data
+
+        # Step 2: Confirm action
+        confirm_res = execute_action({"action": "confirm", "target": ""})
+        assert "Successfully organized" in confirm_res
+        
+        # File should be organized into PDFs folder
+        assert (downloads_dir / "PDFs" / "report.pdf").exists()
+        assert get_pending_action() is None
+
+
+def test_organize_cancel_flow(tmp_path):
+    # Ensure no pending action
+    set_pending_action(None)
+
+    # Setup a folder to organize
+    downloads_dir = tmp_path / "downloads"
+    downloads_dir.mkdir()
+    temp_file = downloads_dir / "report.pdf"
+    temp_file.write_text("dummy")
+
+    action_data = {
+        "action": "organize",
+        "target": "downloads"
+    }
+
+    # Mock get_target_path to return our temp downloads_dir
+    with patch("file_engine.file_operations.get_target_path", return_value=str(downloads_dir)):
+        # Step 1: Initial organize request
+        res = execute_action(action_data)
+        assert isinstance(res, dict)
+        assert res["status"] == "pending_confirmation"
+
+        # Step 2: Cancel action
+        cancel_res = execute_action({"action": "cancel", "target": ""})
+        assert cancel_res == "Action cancelled"
+        
+        # File should not be organized
+        assert temp_file.exists()
+        assert not (downloads_dir / "PDFs" / "report.pdf").exists()
+        assert get_pending_action() is None
