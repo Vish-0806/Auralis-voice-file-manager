@@ -69,20 +69,41 @@ def handle_voice_command():
             logger.exception("Failed to speak prompt message")
         return {"status": "awaiting_command", "message": msg}
     
-    # Step 3: Parse the command
-    logger.info("Parsing recognized text")
-    parsed_action = parse_command(command)
+    # Step 3: Parse or handle pending action
+    from file_engine.file_operations import get_pending_action
+    from ai_engine.intent_classifier import classify_intent
 
-    # Handle unknown commands early
-    if parsed_action.get("action") == "unknown":
-        msg = "Command not recognized"
-        try:
-            tts_speak(msg)
-        except Exception:
-            logger.exception("Failed to speak unknown-command message")
+    pending = get_pending_action()
+    if pending:
+        logger.info("Pending action exists. Checking for voice confirmation/cancellation: '%s'", command)
+        intent = classify_intent(command)
+        logger.info("Classified voice intent for pending action: '%s'", intent)
+        if intent == "confirm":
+            parsed_action = {"action": "confirm", "target": ""}
+        elif intent == "cancel":
+            parsed_action = {"action": "cancel", "target": ""}
+        else:
+            logger.warning("Voice command '%s' ignored because a confirmation is pending", command)
+            msg = "Action pending. Please say yes or no."
+            try:
+                tts_speak(msg)
+            except Exception:
+                logger.exception("Failed to speak action pending message")
+            raise HTTPException(status_code=400, detail=msg)
+    else:
+        logger.info("Parsing recognized text")
+        parsed_action = parse_command(command)
 
-        logger.warning("Unknown command: %s", command)
-        raise HTTPException(status_code=400, detail=msg)
+        # Handle unknown commands early
+        if parsed_action.get("action") == "unknown":
+            msg = "Command not recognized"
+            try:
+                tts_speak(msg)
+            except Exception:
+                logger.exception("Failed to speak unknown-command message")
+
+            logger.warning("Unknown command: %s", command)
+            raise HTTPException(status_code=400, detail=msg)
 
     # Step 4: Execute the action
     logger.info("Executing parsed action: %s", parsed_action)
