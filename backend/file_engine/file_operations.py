@@ -88,28 +88,40 @@ def execute_action(action_data):
 
         # DELETE
         elif action == "delete":
-            if not action_data.get("confirmed"):
-                if not os.path.exists(path):
-                    return f"{target} not found"
-
-                set_pending_action(action_data)
-                return {
-                    "status": "pending_confirmation",
-                    "message": f"Are you sure you want to delete {target}?",
-                    "pending_action": action_data
+            resolved_path = action_data.get("resolved_source_path")
+            if resolved_path:
+                resolution = {
+                    "status": "success",
+                    "path": resolved_path
                 }
+            else:
+                from .source_resolver import resolve_source
+                resolution = resolve_source(target)
 
-            if os.path.exists(path):
+            if resolution["status"] == "success":
+                path_to_delete = resolution["path"]
+                if not action_data.get("confirmed"):
+                    pending_data = action_data.copy()
+                    pending_data["resolved_source_path"] = path_to_delete
+                    set_pending_action(pending_data)
+                    return {
+                        "status": "pending_confirmation",
+                        "message": f"Are you sure you want to delete {os.path.basename(path_to_delete)}?",
+                        "pending_action": pending_data
+                    }
 
-                if os.path.isfile(path):
-                    os.remove(path)
+                if os.path.exists(path_to_delete):
+                    if os.path.isfile(path_to_delete):
+                        os.remove(path_to_delete)
+                    elif os.path.isdir(path_to_delete):
+                        shutil.rmtree(path_to_delete)
+                    return f"{path_to_delete} deleted"
 
-                elif os.path.isdir(path):
-                    shutil.rmtree(path)
-
-                return f"{target} deleted"
-
-            return f"{target} not found"
+                return f"{os.path.basename(path_to_delete)} not found"
+            else:
+                if resolution.get("status") == "error":
+                    return f"{target} not found"
+                return resolution
 
         # SEARCH
         elif action == "search":
@@ -123,6 +135,17 @@ def execute_action(action_data):
 
         # ORGANIZE
         elif action == "organize":
+            if not os.path.exists(path) or not os.path.isdir(path):
+                return f"Directory '{target}' not found"
+
+            if not action_data.get("confirmed"):
+                set_pending_action(action_data)
+                return {
+                    "status": "pending_confirmation",
+                    "message": f"Are you sure you want to organize {target}?",
+                    "pending_action": action_data
+                }
+
             from .organizer import organize_directory
             summary = organize_directory(path)
             return f"Successfully organized {target.title()} folder. Moved {summary['moved_files']} files into {summary['categories_created']} categories."
