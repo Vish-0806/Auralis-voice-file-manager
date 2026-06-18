@@ -8,7 +8,7 @@ Auralis is a voice-enabled file manager that provides hands-free file and folder
 
 ## 🚀 Highlights
 
-- Voice commands for creating, renaming, deleting, moving, and opening files
+- Voice commands for creating, renaming, deleting, moving, copying, and opening files
 - NLP-based command parsing and intent handling
 - Rule-based search parsing for commands like `find`, `search for`, `locate`, and `where is`
 - Location-aware folder creation for commands like `create a folder in documents called notes`
@@ -30,7 +30,10 @@ Auralis is a voice-enabled file manager that provides hands-free file and folder
 - Handled folder permission errors (`PermissionError`, `OSError`) gracefully during recursive scanning
 - Exposed search capability via a `GET /files/search` API endpoint and integrated it into the `/command` pipeline
 - Modularized voice feedback by adding a unified `format_speak_message` utility to yield context-aware TTS voice notifications (counts, locations, fallbacks)
-- Added comprehensive pytest coverage for parser, search operations, permission errors, and voice response structures
+- Implemented interactive confirmation workflows for destructive operations (`delete`, `move`, and `organize`) to protect against accidental operations
+- Enhanced `delete` with dynamic path resolution (using `resolve_source`) so files can be deleted by name matching alone after user confirmation
+- Created a centralized `StateManager` (`backend/app/state_manager.py`) to track pending actions (`pending_action`, `pending_target`, `pending_destination`, `timestamp`) and handle multi-step automated workflows
+- Added comprehensive pytest coverage for parser, search, state manager, and operation confirmation/cancellation flows
 
 ---
 
@@ -93,22 +96,34 @@ curl -s -X POST http://localhost:8000/command \
 Examples supported by the parser:
 
 ```bash
+# Find / Search
 curl -s -X POST http://localhost:8000/command \
 	-H "Content-Type: application/json" \
 	-d '{"command":"find report.pdf"}'
 
+# Create Folder with Location
 curl -s -X POST http://localhost:8000/command \
 	-H "Content-Type: application/json" \
 	-d '{"command":"create a folder called notes in documents"}'
+
+# Move File
+curl -s -X POST http://localhost:8000/command \
+	-H "Content-Type: application/json" \
+	-d '{"command":"move report.pdf to documents"}'
+
+# Copy File
+curl -s -X POST http://localhost:8000/command \
+	-H "Content-Type: application/json" \
+	-d '{"command":"copy resume.pdf to desktop"}'
 ```
 
 The parser returns structured output such as:
 
 ```json
 {
-	"action": "create_folder",
-	"target": "notes",
-	"location": "documents"
+	"action": "move",
+	"target": "report.pdf",
+	"destination": "documents"
 }
 ```
 
@@ -148,6 +163,3 @@ Contributions welcome. Open an issue or submit a pull request with a clear descr
 
 See the `LICENSE` file in the repository root.
 
----
-
-If you'd like a different tone, more details, or badges (CI, coverage), tell me what to add and I will update the README accordingly.
