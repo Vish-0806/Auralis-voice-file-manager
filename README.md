@@ -12,13 +12,25 @@ Auralis is a voice-enabled file manager that provides hands-free file and folder
 - NLP-based command parsing and intent handling
 - Rule-based search parsing for commands like `find`, `search for`, `locate`, and `where is`
 - Location-aware folder creation for commands like `create a folder in documents called notes`
-- Modular backend API and a Vite + React frontend
+- Modular backend API and a **Vite + React frontend with a dark glassmorphic UI**
 - Cross-platform audio setup helpers for Windows
 
 ---
 
 ## What Has Been Done So Far
 
+### 🎨 Frontend & UI Architecture
+- **Vite + React Setup:** Configured standard package scripts, build targets, and environment variables.
+- **Glassmorphic Styling System:** Implemented a pure Vanilla CSS theme (`global.css`) utilizing modern font typography (Plus Jakarta Sans, Space Grotesk), translucent glass panels with blur effects, neon status tags, and animations (glowing ripples, floating icons, rotating spinners).
+- **Core UI Components:**
+  - `VoiceButton`: Circular microphone button displaying animated SVG soundwave bars when recording.
+  - `StatusIndicator`: Real-time state indicator reflecting connecting phases alongside background listener toggles.
+  - `SearchResults`: File card grids displaying extension-mapped icons (PDFs, images, code, archives) with quick click-to-open and click-to-delete actions.
+  - `CommandCard`: A structured activity log mapping operations with color-coded intent pills.
+- **useVoiceCommands State Hook:** A state management machine syncing continuous background listener statuses via periodic polling (every 3 seconds), handling user response prompts, and tracking activity histories.
+- **Reverse Proxy Integration:** Setup local Vite proxy configurations mapping API targets to backend port `8000` to completely eliminate local development CORS issues.
+
+### ⚙️ Backend & Command Processing
 - Refactored the command parsing flow into a modular NLP pipeline in `backend/ai_engine/`
 - Added a reusable command normalization layer for cleaning filler words and standardizing folder names
 - Split intent detection and entity extraction into separate, rule-based components
@@ -39,8 +51,8 @@ Auralis is a voice-enabled file manager that provides hands-free file and folder
 
 ## 🛠️ Tech Stack
 
-- **Backend:** Python, FastAPI
-- **Frontend:** Vite, React
+- **Backend:** Python, FastAPI, Uvicorn
+- **Frontend:** Vite, React, Vanilla CSS, Lucide Icons
 - **Audio / Voice:** speech-to-text and TTS modules (see `backend/` and `frontend/`)
 
 ---
@@ -63,6 +75,7 @@ cd frontend
 npm install
 npm run dev
 ```
+The frontend dev server starts at `http://localhost:5173`. By default, Vite proxies requests from the frontend app to the backend FastAPI server running at `http://localhost:8000`.
 
 3) Audio setup (Windows)
 
@@ -93,73 +106,39 @@ curl -s -X POST http://localhost:8000/command \
 	-d '{"command":"create folder Projects"}'
 ```
 
-Examples supported by the parser:
+Examples supported by the parser (can be typed into the frontend console or spoken via mic):
 
 ```bash
 # Find / Search
-curl -s -X POST http://localhost:8000/command \
-	-H "Content-Type: application/json" \
-	-d '{"command":"find report.pdf"}'
+find report.pdf
 
 # Create Folder with Location
-curl -s -X POST http://localhost:8000/command \
-	-H "Content-Type: application/json" \
-	-d '{"command":"create a folder called notes in documents"}'
+create a folder called notes in documents
 
 # Move File
-curl -s -X POST http://localhost:8000/command \
-	-H "Content-Type: application/json" \
-	-d '{"command":"move report.pdf to documents"}'
+move report.pdf to documents
 
 # Copy File
-curl -s -X POST http://localhost:8000/command \
-	-H "Content-Type: application/json" \
-	-d '{"command":"copy resume.pdf to desktop"}'
+copy resume.pdf to desktop
 ```
 
-The parser returns structured output such as:
-
-```json
-{
-	"action": "move",
-	"target": "report.pdf",
-	"destination": "documents"
-}
-```
-
-- Trigger voice listening (backend will capture microphone input):
-
-```bash
-curl http://localhost:8000/voice/listen
-```
-
-Notes:
-- Replace `your-username/auralis` in the badge URLs with your repository owner/name to enable real CI/coverage badges.
-- The `/voice/listen` endpoint requires microphone access on the machine running the backend and proper audio setup.
+---
 
 ## Project Structure (selected)
 
 - `backend/` — FastAPI backend, AI engine, file engine, and API routes
 - `frontend/` — Vite + React UI
-- `scripts/` — helper scripts for audio and setup
-- `docs/` — architecture and deployment notes
+  - `src/components/` — UI components (`VoiceButton`, `StatusIndicator`, `CommandCard`, `SearchResults`)
+  - `src/hooks/` — Custom hook `useVoiceCommands` for state management & status polling
+  - `src/services/` — Frontend fetch-based HTTP service handler (`api.js`)
+  - `src/pages/` — Main dashboard layout (`Dashboard.jsx`)
+  - `src/styles/` — Global glassmorphic stylesheet (`global.css`)
+- `scripts/` — Helper scripts for audio and setup
+- `docs/` — Architecture and deployment notes
 
 ---
 
 ## Development & Testing
 
-- Run backend tests: `pytest backend/tests` (if tests present)
-- Linting/format: use your preferred tools (e.g., `black`, `flake8`)
-
----
-
-## Contributing
-
-Contributions welcome. Open an issue or submit a pull request with a clear description of changes and tests where appropriate.
-
----
-
-## License
-
-See the `LICENSE` file in the repository root.
-
+- Run backend tests: `pytest backend/tests`
+- Run frontend build verification: `npm run build` inside `frontend/`
