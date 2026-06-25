@@ -1,0 +1,3 @@
+"""
+Concrete OSAL Adapter: windows
+"""

@@ -3,7 +3,7 @@ Listener API routes to manage the continuous voice listener singleton.
 """
 
 from fastapi import APIRouter, HTTPException, status
-from voice_engine.continuous_listener import get_listener
+from core.assistant import get_assistant
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -16,7 +16,8 @@ def start_listener():
     """
     Start the continuous listener in a background thread if it is not already running.
     """
-    listener = get_listener()
+    assistant = get_assistant()
+    listener = assistant.get_voice_listener()
     if listener.is_running:
         logger.info("Request to start listener ignored: already running")
         return {
@@ -43,7 +44,8 @@ def stop_listener():
     """
     Stop the continuous listener if it is running.
     """
-    listener = get_listener()
+    assistant = get_assistant()
+    listener = assistant.get_voice_listener()
     if not listener.is_running:
         logger.info("Request to stop listener ignored: not running")
         return {
@@ -70,7 +72,8 @@ def get_listener_status():
     """
     Get the current status of the continuous listener.
     """
-    listener = get_listener()
+    assistant = get_assistant()
+    listener = assistant.get_voice_listener()
     is_running = listener.is_running
     return {
         "running": is_running,

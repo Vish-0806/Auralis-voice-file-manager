@@ -7,7 +7,7 @@ import time
 from unittest.mock import patch, MagicMock
 
 import pytest
-from voice_engine.continuous_listener import ContinuousListener
+from voice.continuous_listener import ContinuousListener
 
 
 def test_listener_start_stop_sync():
@@ -23,11 +23,11 @@ def test_listener_start_stop_sync():
         listener.stop()
         return "hey auralis open downloads"
 
-    with patch("voice_engine.continuous_listener.listen", side_effect=mock_listen), \
-         patch("voice_engine.continuous_listener.detect_wake_word") as mock_detect, \
-         patch("voice_engine.continuous_listener.parse_command") as mock_parse, \
-         patch("voice_engine.continuous_listener.execute_action") as mock_exec, \
-         patch("voice_engine.continuous_listener.tts_speak") as mock_speak:
+    with patch("voice.continuous_listener.listen", side_effect=mock_listen), \
+         patch("voice.continuous_listener.detect_wake_word") as mock_detect, \
+         patch("voice.continuous_listener.parse_command") as mock_parse, \
+         patch("voice.continuous_listener.execute_action") as mock_exec, \
+         patch("voice.continuous_listener.tts_speak") as mock_speak:
 
         mock_detect.return_value = {"activated": True, "cleaned_command": "open downloads"}
         mock_parse.return_value = {"action": "open", "target": "downloads"}
@@ -51,8 +51,8 @@ def test_listener_empty_input():
         listener.stop()
         return ""
 
-    with patch("voice_engine.continuous_listener.listen", side_effect=mock_listen), \
-         patch("voice_engine.continuous_listener.detect_wake_word") as mock_detect:
+    with patch("voice.continuous_listener.listen", side_effect=mock_listen), \
+         patch("voice.continuous_listener.detect_wake_word") as mock_detect:
 
         listener.start(run_in_thread=False)
 
@@ -68,9 +68,9 @@ def test_listener_wake_word_not_activated():
         listener.stop()
         return "open downloads"
 
-    with patch("voice_engine.continuous_listener.listen", side_effect=mock_listen), \
-         patch("voice_engine.continuous_listener.detect_wake_word") as mock_detect, \
-         patch("voice_engine.continuous_listener.parse_command") as mock_parse:
+    with patch("voice.continuous_listener.listen", side_effect=mock_listen), \
+         patch("voice.continuous_listener.detect_wake_word") as mock_detect, \
+         patch("voice.continuous_listener.parse_command") as mock_parse:
 
         mock_detect.return_value = {"activated": False, "cleaned_command": ""}
 
@@ -89,10 +89,10 @@ def test_listener_empty_command_after_wake():
         listener.stop()
         return "hey auralis"
 
-    with patch("voice_engine.continuous_listener.listen", side_effect=mock_listen), \
-         patch("voice_engine.continuous_listener.detect_wake_word") as mock_detect, \
-         patch("voice_engine.continuous_listener.tts_speak") as mock_speak, \
-         patch("voice_engine.continuous_listener.parse_command") as mock_parse:
+    with patch("voice.continuous_listener.listen", side_effect=mock_listen), \
+         patch("voice.continuous_listener.detect_wake_word") as mock_detect, \
+         patch("voice.continuous_listener.tts_speak") as mock_speak, \
+         patch("voice.continuous_listener.parse_command") as mock_parse:
 
         mock_detect.return_value = {"activated": True, "cleaned_command": ""}
 
@@ -116,8 +116,8 @@ def test_listener_graceful_exception_handling():
         listener.stop()
         return "hey auralis open downloads"
 
-    with patch("voice_engine.continuous_listener.listen", side_effect=mock_listen), \
-         patch("voice_engine.continuous_listener.detect_wake_word") as mock_detect, \
+    with patch("voice.continuous_listener.listen", side_effect=mock_listen), \
+         patch("voice.continuous_listener.detect_wake_word") as mock_detect, \
          patch("time.sleep") as mock_sleep:
 
         mock_detect.return_value = {"activated": False, "cleaned_command": ""}
@@ -140,7 +140,7 @@ def test_listener_thread_execution():
         time.sleep(0.05)
         return ""
 
-    with patch("voice_engine.continuous_listener.listen", side_effect=mock_listen):
+    with patch("voice.continuous_listener.listen", side_effect=mock_listen):
         listener.start(run_in_thread=True)
         assert listener._running is True
         assert listener._thread is not None

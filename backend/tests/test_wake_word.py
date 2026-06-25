@@ -3,7 +3,7 @@ Unit tests for the wake word detection module.
 """
 
 import pytest
-from voice_engine.wake_word import detect_wake_word, WAKE_PHRASES
+from voice.wake_word import detect_wake_word, WAKE_PHRASES
 
 
 # ---------------------------------------------------------------------------

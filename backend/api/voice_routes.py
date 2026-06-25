@@ -1,16 +1,11 @@
 """
 Voice API routes for speech-to-text command handling.
-Integrates with ai_engine for command parsing and file_engine for execution.
+Integrates with core.assistant for command parsing and execution.
 """
 
 from fastapi import APIRouter, HTTPException
-from voice_engine.speech_to_text import listen
-from voice_engine.wake_word import detect_wake_word
-from ai_engine.command_parser import parse_command
-from file_engine.file_operations import execute_action
-from voice_engine.text_to_speech import speak as tts_speak
+from core.assistant import get_assistant
 from utils.logger import get_logger
-from utils.helpers import format_speak_message
 
 logger = get_logger(__name__)
 
@@ -29,18 +24,12 @@ def handle_voice_command():
     4. Parse command into action and target
     5. Execute action using file engine
     6. Return structured response
-    
-    Returns:
-        dict: Response containing status, recognized command, parsed action, and result
-        
-    Raises:
-        HTTPException: If speech recognition fails or command execution errors occur
     """
-    
     logger.info("Voice command endpoint invoked")
+    assistant = get_assistant()
     
     # Step 1: Capture and recognize speech
-    recognized_text = listen()
+    recognized_text = assistant.listen_voice()
     
     if recognized_text is None:
         logger.warning("Failed to recognize speech")
@@ -50,7 +39,7 @@ def handle_voice_command():
         )
     
     # Step 2: Detect wake word
-    wake_result = detect_wake_word(recognized_text)
+    wake_result = assistant.detect_wake_word(recognized_text)
     
     if not wake_result["activated"]:
         logger.info("Wake word not detected, ignoring input: '%s'", recognized_text)
@@ -64,19 +53,16 @@ def handle_voice_command():
         msg = "How can I help you?"
         logger.info("Wake word detected but no command followed")
         try:
-            tts_speak(msg)
+            assistant.speak(msg)
         except Exception:
             logger.exception("Failed to speak prompt message")
         return {"status": "awaiting_command", "message": msg}
     
     # Step 3: Parse or handle pending action
-    from file_engine.file_operations import get_pending_action
-    from ai_engine.intent_classifier import classify_intent
-
-    pending = get_pending_action()
+    pending = assistant.get_pending_action()
     if pending:
         logger.info("Pending action exists. Checking for voice confirmation/cancellation: '%s'", command)
-        intent = classify_intent(command)
+        intent = assistant.classify_intent(command)
         logger.info("Classified voice intent for pending action: '%s'", intent)
         if intent == "confirm":
             parsed_action = {"action": "confirm", "target": ""}
@@ -86,19 +72,19 @@ def handle_voice_command():
             logger.warning("Voice command '%s' ignored because a confirmation is pending", command)
             msg = "Action pending. Please say yes or no."
             try:
-                tts_speak(msg)
+                assistant.speak(msg)
             except Exception:
                 logger.exception("Failed to speak action pending message")
             raise HTTPException(status_code=400, detail=msg)
     else:
         logger.info("Parsing recognized text")
-        parsed_action = parse_command(command)
+        parsed_action = assistant.parse_command(command)
 
         # Handle unknown commands early
         if parsed_action.get("action") == "unknown":
             msg = "Command not recognized"
             try:
-                tts_speak(msg)
+                assistant.speak(msg)
             except Exception:
                 logger.exception("Failed to speak unknown-command message")
 
@@ -108,23 +94,23 @@ def handle_voice_command():
     # Step 4: Execute the action
     logger.info("Executing parsed action: %s", parsed_action)
     try:
-        result = execute_action(parsed_action)
+        result = assistant.execute_action(parsed_action)
     except Exception as exc:
         logger.exception("Error executing action: %s", exc)
         msg = "Failed to execute command"
         try:
-            tts_speak(msg)
+            assistant.speak(msg)
         except Exception:
             logger.exception("Failed to speak execution-failure message")
         raise HTTPException(status_code=500, detail=msg)
 
     # Prepare spoken message (map common responses to user-friendly phrases)
     try:
-        speak_msg = format_speak_message(result, parsed_action)
+        speak_msg = assistant.format_speak_message(result, parsed_action)
 
         # Announce result via TTS (best-effort)
         try:
-            tts_speak(speak_msg)
+            assistant.speak(speak_msg)
         except Exception:
             logger.exception("Failed to speak result message")
 
