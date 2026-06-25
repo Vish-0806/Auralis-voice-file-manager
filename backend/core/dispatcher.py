@@ -2,26 +2,27 @@
 Module: backend.core.dispatcher
 
 Responsibility:
-    Executes and dispatches structured actions to target Capability modules.
-    Enforces permission checking policies and confirmation checkpoints.
+    Executes and dispatches planned actions to registered Capability modules.
+    Enforces security permissions checking and logs events to the EventBus.
 
 This module SHOULD:
-    - Define an ActionDispatcher class that routes commands based on capability registries.
-    - Declare an ExecutionResult wrapper structure containing status flags, outputs, and tracebacks.
-    - Integrate check callbacks for security validation steps.
+    - Inject the IEventBus interface in its constructor to dispatch execution events.
+    - Match actions against registered ICapability tool instances.
+    - Publish runtime execution status events (success, failure, security blocks) to the EventBus.
 
 This module should NEVER:
-    - Execute shell operations or OS system commands directly.
-    - Hardcode specific capability logic (e.g. file copying or folder sorting).
-    - Hardcode API endpoints.
+    - Interface with native OS libraries, terminal processes, or files directly.
+    - Hardcode specific capability logic or directories.
+    - Block asynchronous threads.
 """
 
 from typing import Dict, Any, List, Callable, Optional
 from backend.core.interfaces import ICapability
+from backend.events.interfaces import IEventBus
 
 
 class ExecutionResult:
-    """Standardized return structure for capability execution actions."""
+    """Standardized return envelope for capability actions execution outcomes."""
     
     def __init__(self,
                  success: bool,
@@ -35,20 +36,21 @@ class ExecutionResult:
 
 
 class ActionDispatcher:
-    """Routes execution actions to registered Capability components."""
+    """Dispatches execution steps to registered capabilities and logs details to the EventBus."""
     
-    def __init__(self) -> None:
+    def __init__(self, event_bus: IEventBus) -> None:
+        self.event_bus: IEventBus = event_bus
         self.capabilities: Dict[str, ICapability] = {}
         self.security_guard: Optional[Callable[[str, Dict[str, Any]], bool]] = None
 
     def register_capability(self, capability: ICapability) -> None:
-        """Indexes a Capability instance by its registration key."""
+        """Registers a system capability by its name key."""
         pass
 
     def set_security_guard(self, guard: Callable[[str, Dict[str, Any]], bool]) -> None:
-        """Sets a security validation callback interface."""
+        """Configures the security validation guard callback."""
         pass
 
     def dispatch(self, capability_name: str, action: str, arguments: Dict[str, Any]) -> ExecutionResult:
-        """Dispatches an action request to the target capability after running safety checks."""
+        """Dispatches the action request after verifying permission boundaries and logs results."""
         pass

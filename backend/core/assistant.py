@@ -3,21 +3,24 @@ Module: backend.core.assistant
 
 Responsibility:
     Acts as the main entry orchestrator for the Auralis AI Operating System Assistant.
-    Coordinates the execution flow from user input to OS operations.
+    Coordinates requests by connecting gateways, state observers, planners, and dispatchers.
 
 This module SHOULD:
-    - Define the AuralisAssistant manager orchestrating core workflows.
-    - Coordinate request processing by retrieving sessions, context, and plans.
-    - Dispatch plans to the ActionDispatcher and return execution outcomes.
+    - Inject IAgentBrain, IMemoryManager, IEventBus, and IOSAdapter in its constructor.
+    - Coordinate context gathering, planning, execution dispatching, and response cycles.
+    - Track global state transitions and notify the event bus of operation updates.
 
 This module should NEVER:
-    - Hardcode HTTP/WebSocket socket listeners or route endpoints.
-    - Write specific capability code (e.g. database transactions or file copying).
-    - Manage active threads or process voice stream data directly.
+    - Execute specific file operations, shell scripts, or databases operations directly.
+    - Hardcode specific model names, endpoint routes, or UI layouts.
+    - Reference concrete implementation classes of the AI, Memory, or OS adapters.
 """
 
 from typing import Dict, Any, Optional
-from backend.core.interfaces import IAgentBrain, IMemoryEngine, IOSAdapter
+from backend.core.interfaces import IAgentBrain, IOSAdapter
+from backend.memory.interfaces import IMemoryManager
+from backend.events.interfaces import IEventBus
+from backend.events.event_types import SystemEvents
 from backend.core.session import SessionManager, UserSession
 from backend.core.context import ContextBuilder, SystemContext
 from backend.core.state import StateManager, SystemStatus
@@ -26,28 +29,34 @@ from backend.core.dispatcher import ActionDispatcher, ExecutionResult
 
 
 class AuralisAssistant:
-    """The central orchestrator of the Auralis system."""
+    """The central coordinator of the Auralis core pipeline, managing the request lifecycle."""
     
     def __init__(self,
                  agent_brain: IAgentBrain,
-                 memory_engine: IMemoryEngine,
+                 memory_manager: IMemoryManager,
+                 event_bus: IEventBus,
                  os_adapter: IOSAdapter) -> None:
+        # Dependency Injection of Interfaces
         self.agent_brain: IAgentBrain = agent_brain
-        self.memory_engine: IMemoryEngine = memory_engine
+        self.memory_manager: IMemoryManager = memory_manager
+        self.event_bus: IEventBus = event_bus
         self.os_adapter: IOSAdapter = os_adapter
-        
+
+        # Core Components Initialization
         self.session_manager: SessionManager = SessionManager()
         self.context_builder: ContextBuilder = ContextBuilder(os_adapter)
         self.state_manager: StateManager = StateManager()
-        self.planner: Planner = Planner(agent_brain)
-        self.dispatcher: ActionDispatcher = ActionDispatcher()
+        
+        # Inject dependencies into Planner and Dispatcher
+        self.planner: Planner = Planner(agent_brain, event_bus)
+        self.dispatcher: ActionDispatcher = ActionDispatcher(event_bus)
 
     def process_request(self, session_id: str, request: str) -> Dict[str, Any]:
-        """Processes a user request by coordinating context assembly, planning, and execution."""
-        # 1. Retrieve user session state
-        # 2. Query system context metrics
-        # 3. Transition system status to processing
-        # 4. Generate plan sequence via planner
-        # 5. Dispatch actions via dispatcher
-        # 6. Save outcome to memory and return response
+        """Runs the request orchestration pipeline."""
+        # 1. Retrieve session and query memory manager for context
+        # 2. Publish 'planning_started' event to EventBus
+        # 3. Request execution steps from Planner
+        # 4. Dispatch actions to Capabilities via Dispatcher
+        # 5. Commit logs back to MemoryManager
+        # 6. Publish 'planning_completed' event and return response
         pass

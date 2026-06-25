@@ -2,26 +2,27 @@
 Module: backend.core.planner
 
 Responsibility:
-    Parses user requests into a sequence of executable capability actions.
-    Builds execution plan objects containing dependency steps and parameters.
+    Decomposes user requests into sequential execution plan structures.
+    Queries the AI Brain for intent classification and tool parameters.
 
 This module SHOULD:
-    - Define an ExecutionPlan class that groups a list of planned actions.
-    - Provide a Planner class that translates user intents and contexts into plans.
-    - Support validation checks to ensure all actions match registered capabilities.
+    - Inject IAgentBrain and IEventBus interfaces into its constructor.
+    - Generate ExecutionPlans containing step IDs, capability tools, and arguments.
+    - Publish planner activity events (e.g. AI planning lifecycle) to the EventBus.
 
 This module should NEVER:
-    - Directly invoke the LLM inference wrappers.
-    - Execute capabilities, files, or process commands.
-    - Hardcode specific folder paths.
+    - Execute capabilities, system processes, or edit files directly.
+    - Import concrete model providers or connection libraries.
+    - Reference hardcoded system paths.
 """
 
 from typing import Dict, Any, List, Optional
 from backend.core.interfaces import IAgentBrain
+from backend.events.interfaces import IEventBus
 
 
 class PlannedAction:
-    """Represents a single planned capability action step."""
+    """Represents a planned capability action step to be executed."""
     
     def __init__(self, step_id: int, capability: str, action: str, arguments: Dict[str, Any]) -> None:
         self.step_id: int = step_id
@@ -32,7 +33,7 @@ class PlannedAction:
 
 
 class ExecutionPlan:
-    """Represents a structured sequence of actions designed to achieve a user goal."""
+    """A sequence of steps generated to achieve a user goal."""
     
     def __init__(self, plan_id: str, goal: str) -> None:
         self.plan_id: str = plan_id
@@ -50,13 +51,14 @@ class ExecutionPlan:
 
 
 class Planner:
-    """Generates and validates ExecutionPlans using the AI Brain."""
+    """Processes user requests into ExecutionPlans and publishes events."""
     
-    def __init__(self, agent_brain: IAgentBrain) -> None:
+    def __init__(self, agent_brain: IAgentBrain, event_bus: IEventBus) -> None:
         self.agent_brain: IAgentBrain = agent_brain
+        self.event_bus: IEventBus = event_bus
 
     def create_plan(self, user_request: str, system_context: Dict[str, Any]) -> ExecutionPlan:
-        """Invokes the AI Brain to build an ExecutionPlan for a user request."""
+        """Queries the AI Brain to build an ExecutionPlan and emits planning events."""
         pass
 
     def validate_plan(self, plan: ExecutionPlan, active_capabilities: List[str]) -> bool:
