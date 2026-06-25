@@ -1,3 +1,3 @@
 """
-Auralis Backend Module: Automation Engine
+Capability Package: automation
 """

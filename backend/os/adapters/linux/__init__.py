@@ -1,3 +1,3 @@
 """
-Auralis Backend Module: Linux Platform Adapters
+Concrete OSAL Adapter: linux
 """

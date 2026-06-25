@@ -1,3 +1,3 @@
 """
-Auralis Backend Module: Files Capability
+Capability Package: files
 """

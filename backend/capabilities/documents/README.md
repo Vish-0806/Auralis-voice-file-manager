@@ -1,13 +1,15 @@
-# Document Intelligence Capability
+# Documents Capability
+## Purpose
+Document parsing, text extraction, local OCR, and summarization.
 
-## Purpose of this Module
-Local document parsing, layout extraction, and summarization.
+## Architecture
+- `pdf.py`: PDF layout and text parsing.
+- `office.py`: Microsoft Office documents parsing.
+- `reader.py`: Plain text and markdown readers.
+- `summarize.py`: Generates summaries and action items.
+- `translate.py`: Local language translation.
 
-## Future Responsibility
-Reading text from PDFs, Word files, Excel files; OCR processing; summarizing pages.
-
-## What Should Belong Here
-- PDF layout engines, table extractors, local OCR controllers.
-
-## What Should NOT Belong Here
-- Process termination rules, shell script executions, network interfaces.
+## Relationships
+- **Core:** Summarizes active PDFs or documents.
+- **Memory:** Commits chunk embeddings to the vector database.
+- **OS Layer:** Reads files using the File System Port.

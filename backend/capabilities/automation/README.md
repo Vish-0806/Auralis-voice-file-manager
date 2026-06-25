@@ -1,13 +1,15 @@
-# Automation Engine
+# Automation Capability
+## Purpose
+Orchestrates scheduled tasks and event-based macros.
 
-## Purpose of this Module
-Rule matrices and scheduled routines execution.
+## Architecture
+- `scheduler.py`: Handles cron schedules.
+- `triggers.py`: Evaluates event triggers.
+- `conditions.py`: Checks execution state rules.
+- `actions.py`: Launches automated macros.
+- `workflows.py`: Coordinates sequential workflows.
 
-## Future Responsibility
-Checking conditions, managing cron triggers, sequencing workflows.
-
-## What Should Belong Here
-- Trigger schedules tables, file system event observers, event macro managers.
-
-## What Should NOT Belong Here
-- LLM agent reasoning loops, audio stream recorders, command terminal runs.
+## Relationships
+- **Core:** Core starts automated tasks asynchronously.
+- **Events:** Listens to `voice.stt_transcribed` or system boot events.
+- **OS Layer:** Monitors system logs and schedules cron events.

@@ -1,3 +1,3 @@
 """
-Auralis Backend Module: System Diagnostics Capability
+Capability Package: system
 """

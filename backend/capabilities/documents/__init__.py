@@ -1,3 +1,3 @@
 """
-Auralis Backend Module: Document Intelligence Capability
+Capability Package: documents
 """

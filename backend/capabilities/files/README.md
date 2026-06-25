@@ -1,13 +1,15 @@
 # Files Capability
+## Purpose
+Intelligent file system navigation, recursive searches, and directory organization.
 
-## Purpose of this Module
-Intelligent file system navigation, query indexing, and organization.
+## Architecture
+- `operations.py`: Basic CRUD actions (create, delete, copy, rename).
+- `organization.py`: Decoupled directory auto-sorting rules.
+- `search.py`: Recursive search engine queries.
+- `indexing.py`: File search index updating hooks.
 
-## Future Responsibility
-Recursive folder scanning, auto-sorting categories, and safe file transfers.
-
-## What Should Belong Here
-- Directory sorting logic, file transfer controllers, search tools.
-
-## What Should NOT Belong Here
-- Direct OS-specific API calls, speech processing hooks, git version control.
+## Relationships
+- **Core:** The Dispatcher calls operations using path parameters.
+- **Memory:** Search queries are cached to improve retrieval speeds.
+- **Events:** Publishes `capability.file_created` and `capability.file_deleted` events.
+- **OS Layer:** Interfaces with the File System Port to execute actions.

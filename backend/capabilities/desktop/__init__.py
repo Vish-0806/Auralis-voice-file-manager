@@ -1,3 +1,3 @@
 """
-Auralis Backend Module: Desktop Control Capability
+Capability Package: desktop
 """

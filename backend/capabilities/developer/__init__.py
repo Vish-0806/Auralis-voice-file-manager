@@ -1,3 +1,3 @@
 """
-Auralis Backend Module: Developer Assistant Capability
+Capability Package: developer
 """

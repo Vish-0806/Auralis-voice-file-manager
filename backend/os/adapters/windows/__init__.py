@@ -1,3 +1,3 @@
 """
-Auralis Backend Module: Windows Platform Adapters
+Concrete OSAL Adapter: windows
 """

@@ -1,13 +1,16 @@
 # Developer Assistant Capability
+## Purpose
+Developer productivity routines, Git workflows, and terminal shells management.
 
-## Purpose of this Module
-Productivity routines, git actions, and terminal tasks.
+## Architecture
+- `git.py`: Git commit, status, and branch operations.
+- `terminal.py`: Manages persistent shell execution processes.
+- `docker.py`: Evaluates active container runtimes.
+- `vscode.py`: Controls VS Code workspaces.
+- `python.py` / `node.py` / `java.py`: Checks runtime environments and packages.
 
-## Future Responsibility
-Stage/commit management, container diagnostics, environment checks, error trace reviews.
-
-## What Should Belong Here
-- Git operations, environment diagnostic controllers, traceback compilers.
-
-## What Should NOT Belong Here
-- Offline TTS speech synthesis, file sorting rules, visual widgets.
+## Relationships
+- **Core:** The Dispatcher runs shells and commits code.
+- **Memory:** Diagnostic traces are cached to help explain errors.
+- **Events:** Emits events when builds fail or containers stop.
+- **OS Layer:** Spawns subprocess shells via the OSAL Terminal Port.

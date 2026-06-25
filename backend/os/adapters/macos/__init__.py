@@ -1,3 +1,3 @@
 """
-Auralis Backend Module: macOS Platform Adapters
+Concrete OSAL Adapter: macos
 """

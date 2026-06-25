@@ -1,13 +1,12 @@
 # System Diagnostics Capability
+## Purpose
+System resource monitoring and process management.
 
-## Purpose of this Module
-Operating system diagnostics and process management.
+## Architecture
+- `cpu.py` / `memory.py` / `storage.py` / `battery.py` / `network.py`: Profiles diagnostic resource metrics.
+- `processes.py`: Monitors and terminates active OS processes.
 
-## Future Responsibility
-Reading memory usage, scanning process tables, reporting hardware logs.
-
-## What Should Belong Here
-- CPU/RAM stats trackers, OS process controller targets, system diagnostics.
-
-## What Should NOT Belong Here
-- Git commit generation, file categorization rules, vector embeddings models.
+## Relationships
+- **Core:** Reports diagnostic statistics to the context builder.
+- **Events:** Emits alert events if CPU/RAM thresholds are exceeded.
+- **OS Layer:** Queries metrics using OSAL Process and Diagnostics Ports.
