@@ -5,9 +5,9 @@ Continuous Listening module for Auralis Voice Assistant.
 import threading
 import time
 from utils.logger import get_logger
-from voice_engine.speech_to_text import listen
-from voice_engine.wake_word import detect_wake_word
-from voice_engine.text_to_speech import speak as tts_speak
+from voice.speech_to_text import listen
+from voice.wake_word import detect_wake_word
+from voice.text_to_speech import speak as tts_speak
 from ai_engine.command_parser import parse_command
 from file_engine.file_operations import execute_action
 from utils.helpers import format_speak_message
