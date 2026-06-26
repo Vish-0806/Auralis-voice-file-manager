@@ -1,6 +1,6 @@
 import os
 import shutil
-from .search_engine import search_files
+from file_engine.search_engine import search_files
 
 HOME_DIR = os.path.expanduser("~")
 
@@ -95,7 +95,7 @@ def execute_action(action_data):
                     "path": resolved_path
                 }
             else:
-                from .source_resolver import resolve_source
+                from file_engine.source_resolver import resolve_source
                 resolution = resolve_source(target)
 
             if resolution["status"] == "success":
@@ -146,7 +146,7 @@ def execute_action(action_data):
                     "pending_action": action_data
                 }
 
-            from .organizer import organize_directory
+            from file_engine.organizer import organize_directory
             summary = organize_directory(path)
             return f"Successfully organized {target.title()} folder. Moved {summary['moved_files']} files into {summary['categories_created']} categories."
 
@@ -180,7 +180,7 @@ def execute_action(action_data):
                     "path": resolved_path
                 }
             else:
-                from .source_resolver import resolve_source
+                from file_engine.source_resolver import resolve_source
                 resolution = resolve_source(target)
 
             if resolution["status"] == "success":
@@ -195,7 +195,7 @@ def execute_action(action_data):
                         "pending_action": pending_data
                     }
 
-                from .transfer import move_item
+                from file_engine.transfer import move_item
                 dest_dir = get_location_path(destination)
                 res = move_item(resolution["path"], dest_dir)
                 if isinstance(res, dict) and res.get("status") == "success":
@@ -210,11 +210,11 @@ def execute_action(action_data):
             if not destination:
                 return "Destination not specified"
 
-            from .source_resolver import resolve_source
+            from file_engine.source_resolver import resolve_source
             resolution = resolve_source(target)
 
             if resolution["status"] == "success":
-                from .transfer import copy_item
+                from file_engine.transfer import copy_item
                 dest_dir = get_location_path(destination)
                 res = copy_item(resolution["path"], dest_dir)
                 if isinstance(res, dict) and res.get("status") == "success":
@@ -226,4 +226,4 @@ def execute_action(action_data):
         return "Unknown action"
 
     except Exception as e:
-        return str(e)
+        return str(e)

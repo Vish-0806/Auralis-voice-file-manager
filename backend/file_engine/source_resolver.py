@@ -1,6 +1,6 @@
 import os
 from typing import Dict, Any
-from .search_engine import search_files
+from file_engine.search_engine import search_files
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
