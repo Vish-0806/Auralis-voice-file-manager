@@ -1,84 +1,13 @@
 """
-Wake Word Detection module for Auralis Voice Assistant.
-Provides lightweight, rule-based wake word detection that identifies
-activation phrases and extracts the cleaned command payload.
+Wake Word Detection module (Legacy compatibility wrapper).
+Delegates to the new VoiceManager.
 """
 
-import re
-
-from utils.logger import get_logger
-
-logger = get_logger(__name__)
-
-# Supported wake phrases, ordered longest-first so greedy matching
-# strips the most specific prefix before falling back to shorter ones.
-WAKE_PHRASES = [
-    "hey auralis",
-    "hi auralis",
-    "hello auralis",
-    "auralis",
-]
-
-# Regex that matches any character that is NOT a letter, digit, or whitespace.
-_PUNCTUATION_RE = re.compile(r"[^\w\s]", re.UNICODE)
-# Regex that matches runs of whitespace (2+).
-_EXTRA_SPACE_RE = re.compile(r"\s{2,}")
+from typing import Any, Dict
+from voice.manager import get_voice_manager
+from voice.providers.rule_wake_word import DEFAULT_WAKE_PHRASES as WAKE_PHRASES
 
 
-def _normalize(text: str) -> str:
-    """Lowercase, strip punctuation, collapse extra spaces, and trim."""
-    text = text.lower()
-    text = _PUNCTUATION_RE.sub("", text)
-    text = _EXTRA_SPACE_RE.sub(" ", text)
-    return text.strip()
-
-
-def detect_wake_word(command: str) -> dict:
-    """
-    Detect whether a voice command begins with a supported wake phrase.
-
-    The check is case-insensitive and ignores punctuation, extra spaces,
-    and leading/trailing whitespace. When a wake phrase is found the
-    function returns the remaining text after the phrase (also trimmed)
-    as ``cleaned_command``.
-
-    Args:
-        command: Raw voice command string captured from speech-to-text.
-
-    Returns:
-        dict with two keys:
-            - activated (bool): True if a wake phrase was detected.
-            - cleaned_command (str): The command text after the wake phrase,
-              or an empty string when not activated.
-
-    Examples:
-        >>> detect_wake_word("Hey Auralis, open downloads")
-        {'activated': True, 'cleaned_command': 'open downloads'}
-
-        >>> detect_wake_word("Hello  Auralis   open documents")
-        {'activated': True, 'cleaned_command': 'open documents'}
-
-        >>> detect_wake_word("open downloads")
-        {'activated': False, 'cleaned_command': ''}
-    """
-    if not isinstance(command, str):
-        logger.warning("detect_wake_word received non-string input: %s", type(command).__name__)
-        return {"activated": False, "cleaned_command": ""}
-
-    normalized = _normalize(command)
-    logger.debug("Wake-word check on normalized input: '%s'", normalized)
-
-    for phrase in WAKE_PHRASES:
-        if normalized.startswith(phrase):
-            # Extract everything after the wake phrase and strip whitespace.
-            cleaned = normalized[len(phrase):].strip()
-            logger.info(
-                "Wake word detected (phrase='%s'). Cleaned command: '%s'",
-                phrase,
-                cleaned,
-            )
-            return {"activated": True, "cleaned_command": cleaned}
-
-    logger.debug("No wake word detected in input.")
-    return {"activated": False, "cleaned_command": ""}
-
+def detect_wake_word(command: str) -> Dict[str, Any]:
+    """Legacy compatibility wrapper for detect_wake_word()."""
+    return get_voice_manager().detect_wake_word(command)
