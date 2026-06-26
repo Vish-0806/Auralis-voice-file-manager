@@ -18,10 +18,10 @@ This module should NEVER:
 
 from typing import Dict, Any, List, Optional
 import threading
-from backend.events.interfaces import IEventBus, IEventRegistry, IEventDispatcher, IEventSubscriber
-from backend.events.models import EventEnvelope
-from backend.events.registry import SubscriptionRegistry
-from backend.events.dispatcher import EventDispatcher
+from events.interfaces import IEventBus, IEventRegistry, IEventDispatcher, IEventSubscriber
+from events.models import EventEnvelope
+from events.registry import SubscriptionRegistry
+from events.dispatcher import EventDispatcher
 
 
 class EventBus(IEventBus):

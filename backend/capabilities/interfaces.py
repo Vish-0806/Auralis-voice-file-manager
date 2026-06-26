@@ -11,7 +11,7 @@ Future Expansion:
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
-from backend.capabilities.models import ToolActionDefinition, ActionResult
+from capabilities.models import ToolActionDefinition, ActionResult
 
 
 class ICapability(ABC):

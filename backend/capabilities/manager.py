@@ -8,7 +8,7 @@ Future Expansion:
     Scanning third-party plugin paths to load custom capability packages.
 """
 
-from backend.capabilities.interfaces import ICapabilityManager, ICapabilityRegistry
+from capabilities.interfaces import ICapabilityManager, ICapabilityRegistry
 
 
 class CapabilityManager(ICapabilityManager):

@@ -17,8 +17,8 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Optional
-from backend.memory.interfaces import IMemoryStore
-from backend.memory.models import UserPreference
+from memory.interfaces import IMemoryStore
+from memory.models import UserPreference
 
 
 class PreferenceMemory:

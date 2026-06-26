@@ -6,6 +6,12 @@ backend_dir = os.path.dirname(os.path.abspath(__file__))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
+# Monkeypatch standard library os to recognize the local os folder as a package
+local_os_path = os.path.join(backend_dir, "os")
+if os.path.isdir(local_os_path):
+    os.__path__ = [local_os_path]
+
+
 from fastapi import FastAPI
 from api.routes import router
 from api.voice_routes import router as voice_router

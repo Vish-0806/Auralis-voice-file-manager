@@ -10,7 +10,7 @@ Future Expansion:
 
 from typing import Dict, Any, List, Optional
 import threading
-from backend.capabilities.interfaces import ICapabilityRegistry, ICapability
+from capabilities.interfaces import ICapabilityRegistry, ICapability
 
 
 class CapabilityRegistry(ICapabilityRegistry):

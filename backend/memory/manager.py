@@ -17,7 +17,7 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Optional
-from backend.memory.interfaces import IMemoryManager, IMemoryStore, ISemanticStorage, ICacheStore
+from memory.interfaces import IMemoryManager, IMemoryStore, ISemanticStorage, ICacheStore
 
 
 class MemoryManager(IMemoryManager):

@@ -18,7 +18,7 @@ This module should NEVER:
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
-from backend.memory.models import MemoryEntry, SemanticVector, UserPreference
+from memory.models import MemoryEntry, SemanticVector, UserPreference
 
 
 class IMemoryStore(ABC):

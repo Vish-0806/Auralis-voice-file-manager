@@ -18,7 +18,7 @@ This module should NEVER:
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional, Callable
-from backend.events.models import EventEnvelope, Subscription
+from events.models import EventEnvelope, Subscription
 
 
 class IEventSubscriber(ABC):

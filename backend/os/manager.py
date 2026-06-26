@@ -9,8 +9,8 @@ Future Expansion:
 """
 
 from typing import Optional
-from backend.os.interfaces import IOSPlatformAdapter
-from backend.os.registry import OSAdapterRegistry
+from os.interfaces import IOSPlatformAdapter
+from os.registry import OSAdapterRegistry
 
 
 class OSManager:

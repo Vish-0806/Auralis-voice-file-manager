@@ -18,7 +18,7 @@ This module should NEVER:
 
 from typing import Dict, Any, List, Optional
 import time
-from backend.memory.interfaces import ICacheStore
+from memory.interfaces import ICacheStore
 
 
 class CacheItem:

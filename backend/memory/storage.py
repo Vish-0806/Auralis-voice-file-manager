@@ -17,8 +17,8 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Optional
-from backend.memory.interfaces import IMemoryStore, ISemanticStorage
-from backend.memory.models import MemoryEntry, SemanticVector
+from memory.interfaces import IMemoryStore, ISemanticStorage
+from memory.models import MemoryEntry, SemanticVector
 
 
 class SQLiteStorageAdapter(IMemoryStore):

@@ -8,7 +8,7 @@ Future Expansion:
     Support OS error-code translation maps.
 """
 
-from backend.core.exceptions import AuralisCoreException
+from core.exceptions import AuralisCoreException
 
 
 class OSALException(AuralisCoreException):

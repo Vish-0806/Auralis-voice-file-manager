@@ -17,8 +17,8 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Optional
-from backend.ai.interfaces import ISafetyValidator
-from backend.ai.models import ModelResponse, SafetyReport
+from ai.interfaces import ISafetyValidator
+from ai.models import ModelResponse, SafetyReport
 
 
 class AISafetyValidator(ISafetyValidator):
