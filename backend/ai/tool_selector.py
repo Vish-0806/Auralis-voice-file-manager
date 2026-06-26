@@ -17,8 +17,8 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Optional
-from backend.ai.interfaces import IToolSelector
-from backend.ai.models import ToolDefinition
+from ai.interfaces import IToolSelector
+from ai.models import ToolDefinition
 
 
 class AIToolSelector(IToolSelector):

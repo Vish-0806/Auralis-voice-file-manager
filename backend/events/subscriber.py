@@ -17,8 +17,8 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Optional, Callable
-from backend.events.interfaces import IEventSubscriber
-from backend.events.models import EventEnvelope
+from events.interfaces import IEventSubscriber
+from events.models import EventEnvelope
 
 
 class EventSubscriber(IEventSubscriber):

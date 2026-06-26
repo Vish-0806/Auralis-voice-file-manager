@@ -18,8 +18,8 @@ This module should NEVER:
 
 from typing import Dict, Any, List, Optional, Set
 import threading
-from backend.events.interfaces import IEventRegistry, IEventSubscriber
-from backend.events.models import Subscription
+from events.interfaces import IEventRegistry, IEventSubscriber
+from events.models import Subscription
 
 
 class SubscriptionRegistry(IEventRegistry):

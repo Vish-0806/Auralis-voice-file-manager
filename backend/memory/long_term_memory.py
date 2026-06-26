@@ -17,8 +17,8 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Optional
-from backend.memory.interfaces import ISemanticStorage
-from backend.memory.models import SemanticVector
+from memory.interfaces import ISemanticStorage
+from memory.models import SemanticVector
 
 
 class LongTermMemory:

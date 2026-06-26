@@ -17,8 +17,8 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Optional
-from backend.ai.interfaces import ILLMProvider, IReasoningStrategy, ISafetyValidator, IToolSelector
-from backend.ai.models import ChatMessage, ModelResponse, SafetyReport
+from ai.interfaces import ILLMProvider, IReasoningStrategy, ISafetyValidator, IToolSelector
+from ai.models import ChatMessage, ModelResponse, SafetyReport
 
 
 class AIOperatingSystemAgent:

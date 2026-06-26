@@ -17,8 +17,8 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Callable, Optional
-from backend.core.interfaces import ICapability
-from backend.events.interfaces import IEventBus
+from core.interfaces import ICapability
+from events.interfaces import IEventBus
 
 
 class ExecutionResult:

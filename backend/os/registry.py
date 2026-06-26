@@ -10,7 +10,7 @@ Future Expansion:
 
 from typing import Dict, Any, List, Optional
 import threading
-from backend.os.interfaces import IOSPlatformAdapter
+from .interfaces import IOSPlatformAdapter
 
 
 class OSAdapterRegistry:

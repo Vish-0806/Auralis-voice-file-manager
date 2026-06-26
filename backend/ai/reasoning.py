@@ -17,8 +17,8 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Optional
-from backend.ai.interfaces import IReasoningStrategy, ILLMProvider
-from backend.ai.models import ToolDefinition, ModelResponse
+from ai.interfaces import IReasoningStrategy, ILLMProvider
+from ai.models import ToolDefinition, ModelResponse
 
 
 class ReasoningStrategy(IReasoningStrategy):

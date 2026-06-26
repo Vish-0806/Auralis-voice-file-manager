@@ -17,15 +17,15 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Optional
-from backend.core.interfaces import IAgentBrain, IOSAdapter
-from backend.memory.interfaces import IMemoryManager
-from backend.events.interfaces import IEventBus
-from backend.events.event_types import SystemEvents
-from backend.core.session import SessionManager, UserSession
-from backend.core.context import ContextBuilder, SystemContext
-from backend.core.state import StateManager, SystemStatus
-from backend.core.planner import Planner, ExecutionPlan
-from backend.core.dispatcher import ActionDispatcher, ExecutionResult
+from core.interfaces import IAgentBrain, IOSAdapter
+from memory.interfaces import IMemoryManager
+from events.interfaces import IEventBus
+from events.event_types import SystemEvents
+from core.session import SessionManager, UserSession
+from core.context import ContextBuilder, SystemContext
+from core.state import StateManager, SystemStatus
+from core.planner import Planner, ExecutionPlan
+from core.dispatcher import ActionDispatcher, ExecutionResult
 
 
 # ===========================================================================

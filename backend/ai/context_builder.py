@@ -17,7 +17,7 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Optional
-from backend.ai.interfaces import IContextBuilder
+from ai.interfaces import IContextBuilder
 
 
 class AIContextBuilder(IContextBuilder):

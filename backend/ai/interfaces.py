@@ -18,7 +18,7 @@ This module should NEVER:
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
-from backend.ai.models import ChatMessage, PromptPayload, ToolDefinition, ModelResponse, SafetyReport
+from ai.models import ChatMessage, PromptPayload, ToolDefinition, ModelResponse, SafetyReport
 
 
 class ILLMProvider(ABC):

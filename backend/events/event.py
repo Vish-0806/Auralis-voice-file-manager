@@ -17,7 +17,7 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Optional
-from backend.events.models import EventEnvelope
+from events.models import EventEnvelope
 
 
 class EventFactory:

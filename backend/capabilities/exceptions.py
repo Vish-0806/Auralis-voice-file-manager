@@ -8,7 +8,7 @@ Future Expansion:
     Support error-code mapping for IPC integrations.
 """
 
-from backend.core.exceptions import AuralisCoreException
+from core.exceptions import AuralisCoreException
 
 
 class CapabilityException(AuralisCoreException):

@@ -19,8 +19,8 @@ This module should NEVER:
 from typing import Dict, Any, List, Optional
 import queue
 import threading
-from backend.events.interfaces import IEventDispatcher, IEventSubscriber
-from backend.events.models import EventEnvelope
+from events.interfaces import IEventDispatcher, IEventSubscriber
+from events.models import EventEnvelope
 
 
 class EventDispatcher(IEventDispatcher):

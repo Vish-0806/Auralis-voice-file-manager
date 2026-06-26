@@ -17,8 +17,8 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Optional
-from backend.core.interfaces import IAgentBrain
-from backend.events.interfaces import IEventBus
+from core.interfaces import IAgentBrain
+from events.interfaces import IEventBus
 
 
 class PlannedAction:

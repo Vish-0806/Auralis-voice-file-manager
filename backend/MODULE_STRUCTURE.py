@@ -86,7 +86,7 @@ PACKAGES = {
     },
 }
 
-# Import Paths (from backend directory)
+# Import Paths (from directory)
 # ====================================
 
 IMPORT_EXAMPLES = {

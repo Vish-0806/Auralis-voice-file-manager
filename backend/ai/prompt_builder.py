@@ -17,8 +17,8 @@ This module should NEVER:
 """
 
 from typing import Dict, Any, List, Optional
-from backend.ai.interfaces import IPromptBuilder
-from backend.ai.models import ChatMessage, ToolDefinition, PromptPayload
+from ai.interfaces import IPromptBuilder
+from ai.models import ChatMessage, ToolDefinition, PromptPayload
 
 
 class AIPromptBuilder(IPromptBuilder):
