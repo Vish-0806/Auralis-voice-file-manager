@@ -1,66 +1,429 @@
-"""
-Module: backend.core.planner
+"""Planner contracts and keyword-based request analysis for Auralis.
 
-Responsibility:
-    Decomposes user requests into sequential execution plan structures.
-    Queries the AI Brain for intent classification and tool parameters.
-
-This module SHOULD:
-    - Inject IAgentBrain and IEventBus interfaces into its constructor.
-    - Generate ExecutionPlans containing step IDs, capability tools, and arguments.
-    - Publish planner activity events (e.g. AI planning lifecycle) to the EventBus.
-
-This module should NEVER:
-    - Execute capabilities, system processes, or edit files directly.
-    - Import concrete model providers or connection libraries.
-    - Reference hardcoded system paths.
+This module implements the core planning boundary only. It converts an
+AssistantRequest into a structured ExecutionPlan using lightweight keyword
+parsing and simple heuristics. No AI services, file operations, or execution
+side effects are performed here.
 """
 
-from typing import Dict, Any, List, Optional
-from core.interfaces import IAgentBrain
-from events.interfaces import IEventBus
+from __future__ import annotations
+
+import logging
+import re
+from typing import Any, Final
+
+from .exceptions import ValidationException
+from .interfaces import IPlanner
+from .models import AssistantRequest, ExecutionPlan as CoreExecutionPlan, SessionContext
+
+ExecutionPlan = CoreExecutionPlan
 
 
-class PlannedAction:
-    """Represents a planned capability action step to be executed."""
-    
-    def __init__(self, step_id: int, capability: str, action: str, arguments: Dict[str, Any]) -> None:
-        self.step_id: int = step_id
-        self.capability: str = capability
-        self.action: str = action
-        self.arguments: Dict[str, Any] = arguments
-        self.dependencies: List[int] = []
+class Planner(IPlanner):
+    """Builds simple execution plans from assistant requests.
+
+    The planner uses only deterministic keyword parsing so it remains fully
+    unit-testable and independent from any language model or execution engine.
+    """
+
+    SUPPORTED_INTENTS: Final[tuple[str, ...]] = (
+        "OPEN_FOLDER",
+        "OPEN_FILE",
+        "SEARCH_FILE",
+        "LIST_DIRECTORY",
+        "UNKNOWN",
+    )
+
+    _FOLDER_NAMES: Final[tuple[str, ...]] = (
+        "desktop",
+        "downloads",
+        "documents",
+        "pictures",
+        "music",
+        "videos",
+    )
+
+    _OPEN_FOLDER_HINTS: Final[tuple[str, ...]] = (
+        "open folder",
+        "open the folder",
+        "go to folder",
+        "navigate to folder",
+        "show folder",
+    )
+
+    _OPEN_FILE_HINTS: Final[tuple[str, ...]] = (
+        "open file",
+        "open the file",
+        "open document",
+        "open the document",
+    )
+
+    _SEARCH_FILE_HINTS: Final[tuple[str, ...]] = (
+        "search file",
+        "find file",
+        "look for file",
+        "search for",
+        "find",
+    )
+
+    _LIST_DIRECTORY_HINTS: Final[tuple[str, ...]] = (
+        "list directory",
+        "list folder",
+        "show directory",
+        "show files in",
+        "list files in",
+        "show contents",
+        "list contents",
+    )
+
+    _FILE_EXTENSION_PATTERN: Final[re.Pattern[str]] = re.compile(
+        r"\b[^\s<>:\"'|?*]+\.(?:txt|md|pdf|docx|doc|csv|xlsx|xls|json|yaml|yml|png|jpg|jpeg|gif|mp3|wav|mp4|zip)\b",
+        re.IGNORECASE,
+    )
+
+    _QUOTED_TEXT_PATTERN: Final[re.Pattern[str]] = re.compile(
+        r'"([^"]+)"|\'([^\']+)\'',
+    )
+
+    def __init__(
+        self,
+        agent_brain: Any | None = None,
+        event_bus: Any | None = None,
+        logger: logging.Logger | None = None,
+    ) -> None:
+        """Initializes the planner.
+
+        Args:
+            agent_brain: Retained for compatibility with the current codebase.
+            event_bus: Retained for compatibility with the current codebase.
+            logger: Optional logger used for planner diagnostics.
+        """
+
+        self._agent_brain = agent_brain
+        self._event_bus = event_bus
+        self._logger = logger or logging.getLogger(__name__)
+
+    def create_plan(
+        self,
+        request: AssistantRequest,
+        context: SessionContext | None = None,
+    ) -> ExecutionPlan:
+        """Creates a structured execution plan from a user request.
+
+        Args:
+            request: The incoming assistant request.
+            context: Optional session context for future extensibility.
+
+        Returns:
+            A validated ExecutionPlan populated with intent, target, and
+            confidence metadata.
+
+        Raises:
+            ValidationException: If the request is missing a usable message.
+        """
+
+        self._validate_request(request)
+
+        normalized_message = self._normalize_text(request.message)
+        intent = self._detect_intent(normalized_message)
+        target = self._extract_target(normalized_message, intent)
+        confidence = self._calculate_confidence(normalized_message, intent, target)
+
+        parameters: dict[str, Any] = {
+            "source": request.source,
+            "normalized_message": normalized_message,
+        }
+        if context is not None:
+            parameters["session_context"] = context.model_dump()
+        if target is not None:
+            parameters["target"] = target
+
+        plan = ExecutionPlan(
+            intent=intent,
+            target=target,
+            parameters=parameters,
+            confidence=confidence,
+        )
+
+        self._logger.debug(
+            "Created execution plan",
+            extra={
+                "intent": intent,
+                "target": target,
+                "confidence": confidence,
+            },
+        )
+        return plan
+
+    def validate_plan(self, plan: ExecutionPlan) -> bool:
+        """Validates that a plan is structurally ready for downstream use.
+
+        Args:
+            plan: The execution plan to validate.
+
+        Returns:
+            True when the plan is valid, otherwise False.
+        """
+
+        if not isinstance(plan, CoreExecutionPlan):
+            return False
+
+        if plan.intent not in self.SUPPORTED_INTENTS:
+            return False
+
+        if not 0.0 <= plan.confidence <= 1.0:
+            return False
+
+        if not isinstance(plan.parameters, dict):
+            return False
+
+        if plan.target is not None and not plan.target.strip():
+            return False
+
+        return True
+
+    def _validate_request(self, request: AssistantRequest) -> None:
+        """Validates the incoming request object.
+
+        Args:
+            request: The assistant request to validate.
+
+        Raises:
+            ValidationException: If the request is not usable.
+        """
+
+        if not isinstance(request, AssistantRequest):
+            raise ValidationException("Request must be an AssistantRequest instance.")
+
+        if not request.message or not request.message.strip():
+            raise ValidationException("Request message cannot be empty.")
+
+        if not request.source or not request.source.strip():
+            raise ValidationException("Request source cannot be empty.")
+
+    def _normalize_text(self, text: str) -> str:
+        """Normalizes request text for deterministic keyword matching.
+
+        Args:
+            text: The raw request message.
+
+        Returns:
+            A lower-cased, whitespace-normalized string.
+        """
+
+        normalized = text.strip().lower()
+        normalized = re.sub(r"\s+", " ", normalized)
+        return normalized
+
+    def _detect_intent(self, normalized_message: str) -> str:
+        """Detects the most likely supported intent.
+
+        Args:
+            normalized_message: The normalized request text.
+
+        Returns:
+            One of the supported intent labels.
+        """
+
+        if self._looks_like_open_file_request(normalized_message):
+            return "OPEN_FILE"
+
+        if self._looks_like_open_folder_request(normalized_message):
+            return "OPEN_FOLDER"
+
+        if self._contains_any(normalized_message, self._LIST_DIRECTORY_HINTS):
+            return "LIST_DIRECTORY"
+
+        if self._contains_any(normalized_message, self._SEARCH_FILE_HINTS):
+            return "SEARCH_FILE"
+
+        if self._looks_like_file_request(normalized_message):
+            return "OPEN_FILE"
+
+        if self._looks_like_directory_request(normalized_message):
+            return "LIST_DIRECTORY"
+
+        return "UNKNOWN"
+
+    def _extract_target(self, normalized_message: str, intent: str) -> str | None:
+        """Extracts a likely target from the normalized request.
+
+        Args:
+            normalized_message: The normalized request text.
+            intent: The detected intent.
+
+        Returns:
+            A likely file or folder target, or None when no clear target exists.
+        """
+
+        quoted_target = self._extract_quoted_text(normalized_message)
+        if quoted_target:
+            return quoted_target
+
+        explicit_folder = self._extract_folder_name(normalized_message)
+        if explicit_folder:
+            return explicit_folder
+
+        explicit_file = self._extract_file_name(normalized_message)
+        if explicit_file:
+            return explicit_file
+
+        if intent in {"OPEN_FOLDER", "LIST_DIRECTORY"}:
+            return self._extract_tail_after_action(normalized_message)
+
+        if intent == "OPEN_FILE":
+            return self._extract_tail_after_action(normalized_message)
+
+        if intent == "SEARCH_FILE":
+            return self._extract_search_phrase(normalized_message)
+
+        return None
+
+    def _calculate_confidence(
+        self,
+        normalized_message: str,
+        intent: str,
+        target: str | None,
+    ) -> float:
+        """Calculates a confidence score for the detected plan.
+
+        Args:
+            normalized_message: The normalized request text.
+            intent: The detected intent.
+            target: The extracted target, if any.
+
+        Returns:
+            A confidence value between 0.0 and 1.0.
+        """
+
+        base_scores = {
+            "OPEN_FOLDER": 0.72,
+            "OPEN_FILE": 0.74,
+            "SEARCH_FILE": 0.70,
+            "LIST_DIRECTORY": 0.68,
+            "UNKNOWN": 0.20,
+        }
+        confidence = base_scores.get(intent, 0.20)
+
+        if target:
+            confidence += 0.18
+
+        if self._contains_any(normalized_message, self._FOLDER_NAMES):
+            confidence += 0.05
+
+        if self._extract_file_name(normalized_message) is not None:
+            confidence += 0.05
+
+        return round(min(confidence, 1.0), 2)
+
+    def _contains_any(self, text: str, phrases: tuple[str, ...]) -> bool:
+        """Checks whether any phrase is present in the text."""
+
+        return any(phrase in text for phrase in phrases)
+
+    def _extract_quoted_text(self, text: str) -> str | None:
+        """Extracts quoted text from a request."""
+
+        match = self._QUOTED_TEXT_PATTERN.search(text)
+        if match is None:
+            return None
+
+        quoted = match.group(1) or match.group(2)
+        if quoted is None:
+            return None
+
+        return quoted.strip()
+
+    def _extract_folder_name(self, text: str) -> str | None:
+        """Extracts a common folder name from the request."""
+
+        for folder_name in self._FOLDER_NAMES:
+            if re.search(rf"\b{re.escape(folder_name)}\b", text):
+                return folder_name.title()
+        return None
+
+    def _extract_file_name(self, text: str) -> str | None:
+        """Extracts a likely file name from the request."""
+
+        match = self._FILE_EXTENSION_PATTERN.search(text)
+        if match is None:
+            return None
+
+        return match.group(0).strip()
+
+    def _extract_tail_after_action(self, text: str) -> str | None:
+        """Extracts text after a common action phrase.
+
+        Args:
+            text: The normalized request text.
+
+        Returns:
+            The trailing target text, if any.
+        """
+
+        action_patterns = (
+            r"(?:open|list|show|find|search|go to|navigate to|look for|browse)\s+(?:the\s+)?(?:folder|file|directory|contents|files)?\s*(?:in|at|from|for)?\s*(.+)$",
+            r"(?:open|list|show|find|search)\s+(.+)$",
+        )
+
+        for pattern in action_patterns:
+            match = re.search(pattern, text)
+            if match is None:
+                continue
+
+            candidate = match.group(1).strip()
+            candidate = re.sub(r"^(?:the|a|an)\s+", "", candidate)
+            if candidate:
+                return candidate
+
+        return None
+
+    def _extract_search_phrase(self, text: str) -> str | None:
+        """Extracts the phrase likely being searched for.
+
+        Args:
+            text: The normalized request text.
+
+        Returns:
+            The extracted search phrase, if any.
+        """
+
+        match = re.search(
+            r"(?:search for|find|look for)\s+(?:the\s+)?(.+)$",
+            text,
+        )
+        if match is None:
+            return self._extract_tail_after_action(text)
+
+        candidate = match.group(1).strip()
+        candidate = re.sub(r"^(?:the|a|an)\s+", "", candidate)
+        return candidate or None
+
+    def _looks_like_file_request(self, text: str) -> bool:
+        """Checks for obvious file-oriented wording."""
+
+        return "file" in text or self._extract_file_name(text) is not None
+
+    def _looks_like_open_file_request(self, text: str) -> bool:
+        """Checks for an explicit open-file request."""
+
+        if self._contains_any(text, self._OPEN_FILE_HINTS):
+            return True
+
+        return text.startswith("open ") and self._looks_like_file_request(text)
+
+    def _looks_like_open_folder_request(self, text: str) -> bool:
+        """Checks for an explicit open-folder request."""
+
+        if self._contains_any(text, self._OPEN_FOLDER_HINTS):
+            return True
+
+        return text.startswith("open ") and self._contains_any(text, self._FOLDER_NAMES)
+
+    def _looks_like_directory_request(self, text: str) -> bool:
+        """Checks for obvious directory-oriented wording."""
+
+        return any(keyword in text for keyword in ("folder", "directory", "contents", "files in"))
 
 
-class ExecutionPlan:
-    """A sequence of steps generated to achieve a user goal."""
-    
-    def __init__(self, plan_id: str, goal: str) -> None:
-        self.plan_id: str = plan_id
-        self.goal: str = goal
-        self.steps: List[PlannedAction] = []
-        self.current_step_index: int = 0
-
-    def add_step(self, step: PlannedAction) -> None:
-        """Appends an execution step to the plan."""
-        self.steps.append(step)
-
-    def is_completed(self) -> bool:
-        """Returns True if all steps in the plan have been processed."""
-        return self.current_step_index >= len(self.steps)
-
-
-class Planner:
-    """Processes user requests into ExecutionPlans and publishes events."""
-    
-    def __init__(self, agent_brain: IAgentBrain, event_bus: IEventBus) -> None:
-        self.agent_brain: IAgentBrain = agent_brain
-        self.event_bus: IEventBus = event_bus
-
-    def create_plan(self, user_request: str, system_context: Dict[str, Any]) -> ExecutionPlan:
-        """Queries the AI Brain to build an ExecutionPlan and emits planning events."""
-        pass
-
-    def validate_plan(self, plan: ExecutionPlan, active_capabilities: List[str]) -> bool:
-        """Verifies that all steps in a plan are supported by active capabilities."""
-        pass
+__all__ = ["ExecutionPlan", "Planner"]
