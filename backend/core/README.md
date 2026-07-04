@@ -1,14 +1,43 @@
-# Core Contracts
+# Core Layer
 
-This package defines the shared contracts for Auralis core orchestration. The
-goal of Phase 1, Step 1 is to publish reusable data models, abstract service
-interfaces, and a small exception hierarchy without introducing assistant,
-planner, dispatcher, or capability business logic.
+This package contains the shared core contracts and the first orchestration
+implementations for Auralis. The current scope covers typed intents, request
+models, planner logic, dispatcher routing, and assistant coordination without
+introducing real file operations, OS interaction, voice, or AI behavior.
+
+## Current Package Surface
+
+- `intents.py` defines the strongly typed `Intent` enum used across planning,
+    dispatch, and assistant orchestration.
+- `models.py` defines the reusable Pydantic v2 data contracts.
+- `interfaces.py` defines the abstract boundaries for the assistant, planner,
+    dispatcher, and capability layers.
+- `planner.py` performs deterministic keyword parsing and returns an
+    `ExecutionPlan`.
+- `dispatcher.py` routes execution plans to a mock capability and returns an
+    `ExecutionResult`.
+- `assistant.py` orchestrates the planner and dispatcher and returns an
+    `AssistantResponse`.
+- `exceptions.py` defines the shared core exception hierarchy.
+
+## Typed Intent
+
+The core execution flow now uses `Intent` instead of raw string constants.
+`ExecutionPlan.intent` stores an `Intent` value internally, while serialization
+keeps the outward JSON shape string-compatible for backward compatibility.
+
+Supported values are:
+
+- `OPEN_FOLDER`
+- `OPEN_FILE`
+- `SEARCH_FILE`
+- `LIST_DIRECTORY`
+- `UNKNOWN`
 
 ## Models
 
-- `AssistantRequest` represents an incoming command or message with its source
-    and timestamp.
+- `AssistantRequest` represents an incoming command or message together with
+    its source and timestamp.
 - `ExecutionPlan` represents planner output: intent, optional target,
     structured parameters, and confidence.
 - `ExecutionResult` represents the outcome of a dispatch operation, including
@@ -30,8 +59,8 @@ stay consistent across the backend.
 - `IDispatcher` defines the contract for executing a validated plan.
 - `ICapability` defines the execution boundary for a single capability.
 
-Legacy interfaces remain available for the current codebase so the package can
-be imported safely while the rest of the system migrates to the new contracts.
+The package also keeps the legacy interface names available for compatibility
+with the current backend wiring.
 
 ## Exceptions
 
@@ -74,10 +103,12 @@ sequenceDiagram
 
 ## Future Extensibility
 
-The contract layer is intentionally narrow so it can grow without breaking the
+The core layer is intentionally narrow so it can grow without breaking the
 current architecture:
 
 - New request metadata can be added to `AssistantRequest` or `SessionContext`.
+- New intents can be added to the `Intent` enum without changing the overall
+    orchestration contract.
 - New dispatch metadata can be added to `ExecutionPlan` or `ExecutionResult`.
 - New execution layers can implement the same interfaces without changing API
     routes or package import paths.
