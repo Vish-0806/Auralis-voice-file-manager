@@ -14,6 +14,7 @@ from typing import Any
 
 from .exceptions import DispatchException, PlanningException, ValidationException
 from .interfaces import IAssistant, IDispatcher, IPlanner
+from .intents import Intent
 from .models import AssistantRequest, AssistantResponse, ExecutionPlan, ExecutionResult, SessionContext
 
 
@@ -65,7 +66,7 @@ class AuralisAssistant(IAssistant):
             response = self._build_response(plan, result)
             self._logger.info(
                 "Processed assistant request successfully",
-                extra={"intent": plan.intent, "success": result.success},
+                extra={"intent": plan.intent.value, "success": result.success},
             )
             return response
         except (ValidationException, PlanningException, DispatchException) as exc:
@@ -204,7 +205,7 @@ class AuralisAssistant(IAssistant):
         """
 
         fallback_plan = ExecutionPlan(
-            intent="UNKNOWN",
+            intent=Intent.UNKNOWN,
             target=None,
             parameters={
                 "message": request.message,

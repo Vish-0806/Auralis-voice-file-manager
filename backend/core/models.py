@@ -11,7 +11,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
+
+from .intents import Intent
 
 
 class AuralisBaseModel(BaseModel):
@@ -34,10 +36,16 @@ class AssistantRequest(AuralisBaseModel):
 class ExecutionPlan(AuralisBaseModel):
     """Represents the planner output for a request."""
 
-    intent: str
+    intent: Intent
     target: str | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
     confidence: float = Field(ge=0.0, le=1.0)
+
+    @field_serializer("intent")
+    def _serialize_intent(self, intent: Intent) -> str:
+        """Serializes the intent as its canonical string value."""
+
+        return intent.value
 
 
 class ExecutionResult(AuralisBaseModel):

@@ -14,18 +14,19 @@ from typing import Any
 
 from .exceptions import DispatchException, ValidationException
 from .interfaces import ICapability, IDispatcher
+from .intents import Intent
 from .models import ExecutionPlan, ExecutionResult
 
 
 class ActionDispatcher(IDispatcher):
     """Routes execution plans to registered capabilities."""
 
-    _SUPPORTED_INTENTS: set[str] = {
-        "OPEN_FOLDER",
-        "OPEN_FILE",
-        "SEARCH_FILE",
-        "LIST_DIRECTORY",
-        "UNKNOWN",
+    _SUPPORTED_INTENTS: set[Intent] = {
+        Intent.OPEN_FOLDER,
+        Intent.OPEN_FILE,
+        Intent.SEARCH_FILE,
+        Intent.LIST_DIRECTORY,
+        Intent.UNKNOWN,
     }
 
     def __init__(
@@ -85,11 +86,11 @@ class ActionDispatcher(IDispatcher):
         try:
             self._validate_plan(plan)
 
-            if plan.intent == "UNKNOWN":
+            if plan.intent == Intent.UNKNOWN:
                 return self._build_failure_result(
                     intent=plan.intent,
                     started_at=started_at,
-                    error_message="Unsupported intent: UNKNOWN",
+                    error_message=f"Unsupported intent: {plan.intent.value}",
                 )
 
             capability = self._resolve_capability(plan.intent)
@@ -100,7 +101,7 @@ class ActionDispatcher(IDispatcher):
                 success=True,
                 response=response_text,
                 data={
-                    "intent": plan.intent,
+                    "intent": plan.intent.value,
                     "target": plan.target,
                     "capability": capability.name,
                     "parameters": plan.parameters,
@@ -112,7 +113,7 @@ class ActionDispatcher(IDispatcher):
             self._logger.info(
                 "Dispatched execution plan",
                 extra={
-                    "intent": plan.intent,
+                    "intent": plan.intent.value,
                     "capability": capability.name,
                     "success": True,
                 },
@@ -146,12 +147,9 @@ class ActionDispatcher(IDispatcher):
             raise ValidationException("Plan must be an ExecutionPlan instance.")
 
         if plan.intent not in self._SUPPORTED_INTENTS:
-            raise ValidationException(f"Unsupported intent: {plan.intent}")
+            raise ValidationException(f"Unsupported intent: {plan.intent.value}")
 
-        if not plan.intent.strip():
-            raise ValidationException("Plan intent cannot be empty.")
-
-    def _resolve_capability(self, intent: str) -> ICapability:
+    def _resolve_capability(self, intent: Intent) -> ICapability:
         """Resolves the capability for a given intent.
 
         Args:
@@ -171,7 +169,7 @@ class ActionDispatcher(IDispatcher):
 
         return capability
 
-    def _intent_to_capability_name(self, intent: str) -> str:
+    def _intent_to_capability_name(self, intent: Intent) -> str:
         """Maps an intent to the expected capability name."""
 
         return "mock_file"
@@ -191,7 +189,7 @@ class ActionDispatcher(IDispatcher):
         """
 
         payload = capability.execute(
-            action=plan.intent,
+            action=plan.intent.value,
             arguments={
                 "target": plan.target,
                 "parameters": plan.parameters,
@@ -209,7 +207,7 @@ class ActionDispatcher(IDispatcher):
 
     def _build_failure_result(
         self,
-        intent: str | None,
+        intent: Intent | None,
         started_at: float,
         error_message: str,
     ) -> ExecutionResult:
@@ -228,7 +226,7 @@ class ActionDispatcher(IDispatcher):
         return ExecutionResult(
             success=False,
             response="",
-            data={"intent": intent},
+            data={"intent": intent.value if intent is not None else None},
             error=error_message,
             execution_time=execution_time,
         )

@@ -22,6 +22,7 @@ from .interfaces import (
 	IOSAdapter,
 	IPlanner,
 )
+from .intents import Intent
 from .models import (
 	AssistantRequest,
 	AssistantResponse,
@@ -49,6 +50,7 @@ __all__ = [
 	"IOSAdapter",
 	"IMemoryEngine",
 	"IAgentBrain",
+	"Intent",
 	"AssistantRequest",
 	"ExecutionPlan",
 	"ExecutionResult",

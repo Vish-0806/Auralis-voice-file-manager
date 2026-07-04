@@ -14,6 +14,7 @@ from typing import Any, Final
 
 from .exceptions import ValidationException
 from .interfaces import IPlanner
+from .intents import Intent
 from .models import AssistantRequest, ExecutionPlan as CoreExecutionPlan, SessionContext
 
 ExecutionPlan = CoreExecutionPlan
@@ -26,12 +27,12 @@ class Planner(IPlanner):
     unit-testable and independent from any language model or execution engine.
     """
 
-    SUPPORTED_INTENTS: Final[tuple[str, ...]] = (
-        "OPEN_FOLDER",
-        "OPEN_FILE",
-        "SEARCH_FILE",
-        "LIST_DIRECTORY",
-        "UNKNOWN",
+    SUPPORTED_INTENTS: Final[tuple[Intent, ...]] = (
+        Intent.OPEN_FOLDER,
+        Intent.OPEN_FILE,
+        Intent.SEARCH_FILE,
+        Intent.LIST_DIRECTORY,
+        Intent.UNKNOWN,
     )
 
     _FOLDER_NAMES: Final[tuple[str, ...]] = (
@@ -148,7 +149,7 @@ class Planner(IPlanner):
         self._logger.debug(
             "Created execution plan",
             extra={
-                "intent": intent,
+                "intent": intent.value,
                 "target": target,
                 "confidence": confidence,
             },
@@ -215,7 +216,7 @@ class Planner(IPlanner):
         normalized = re.sub(r"\s+", " ", normalized)
         return normalized
 
-    def _detect_intent(self, normalized_message: str) -> str:
+    def _detect_intent(self, normalized_message: str) -> Intent:
         """Detects the most likely supported intent.
 
         Args:
@@ -226,26 +227,26 @@ class Planner(IPlanner):
         """
 
         if self._looks_like_open_file_request(normalized_message):
-            return "OPEN_FILE"
+            return Intent.OPEN_FILE
 
         if self._looks_like_open_folder_request(normalized_message):
-            return "OPEN_FOLDER"
+            return Intent.OPEN_FOLDER
 
         if self._contains_any(normalized_message, self._LIST_DIRECTORY_HINTS):
-            return "LIST_DIRECTORY"
+            return Intent.LIST_DIRECTORY
 
         if self._contains_any(normalized_message, self._SEARCH_FILE_HINTS):
-            return "SEARCH_FILE"
+            return Intent.SEARCH_FILE
 
         if self._looks_like_file_request(normalized_message):
-            return "OPEN_FILE"
+            return Intent.OPEN_FILE
 
         if self._looks_like_directory_request(normalized_message):
-            return "LIST_DIRECTORY"
+            return Intent.LIST_DIRECTORY
 
-        return "UNKNOWN"
+        return Intent.UNKNOWN
 
-    def _extract_target(self, normalized_message: str, intent: str) -> str | None:
+    def _extract_target(self, normalized_message: str, intent: Intent) -> str | None:
         """Extracts a likely target from the normalized request.
 
         Args:
@@ -268,13 +269,13 @@ class Planner(IPlanner):
         if explicit_file:
             return explicit_file
 
-        if intent in {"OPEN_FOLDER", "LIST_DIRECTORY"}:
+        if intent in {Intent.OPEN_FOLDER, Intent.LIST_DIRECTORY}:
             return self._extract_tail_after_action(normalized_message)
 
-        if intent == "OPEN_FILE":
+        if intent == Intent.OPEN_FILE:
             return self._extract_tail_after_action(normalized_message)
 
-        if intent == "SEARCH_FILE":
+        if intent == Intent.SEARCH_FILE:
             return self._extract_search_phrase(normalized_message)
 
         return None
@@ -282,7 +283,7 @@ class Planner(IPlanner):
     def _calculate_confidence(
         self,
         normalized_message: str,
-        intent: str,
+        intent: Intent,
         target: str | None,
     ) -> float:
         """Calculates a confidence score for the detected plan.
@@ -297,11 +298,11 @@ class Planner(IPlanner):
         """
 
         base_scores = {
-            "OPEN_FOLDER": 0.72,
-            "OPEN_FILE": 0.74,
-            "SEARCH_FILE": 0.70,
-            "LIST_DIRECTORY": 0.68,
-            "UNKNOWN": 0.20,
+            Intent.OPEN_FOLDER: 0.72,
+            Intent.OPEN_FILE: 0.74,
+            Intent.SEARCH_FILE: 0.70,
+            Intent.LIST_DIRECTORY: 0.68,
+            Intent.UNKNOWN: 0.20,
         }
         confidence = base_scores.get(intent, 0.20)
 
