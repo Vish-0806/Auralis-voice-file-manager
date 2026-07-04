@@ -1,72 +1,85 @@
-# Core System Orchestration
+# Core Contracts
 
-## Why the Core Module Exists
-The `backend/core` module is the central orchestrator of the Auralis AI Operating System Assistant. It encapsulates the core workflow rules, coordination state, and execution plan lifecycles. By defining strict interfaces, the Core module separates orchestration logic from technical details like specific local LLM runtimes, database connections, speech libraries, and operating system platforms.
+This package defines the shared contracts for Auralis core orchestration. The
+goal of Phase 1, Step 1 is to publish reusable data models, abstract service
+interfaces, and a small exception hierarchy without introducing assistant,
+planner, dispatcher, or capability business logic.
 
-This decoupled structure ensures the system is:
-- **Scalable:** New capabilities or OS integrations can be added without modifying the core state machine.
-- **Maintainable:** Changes to external AI or speech APIs do not affect system execution rules.
-- **Testable:** All core workflows can be tested independently of hardware or model states using mocks.
+## Models
 
----
+- `AssistantRequest` represents an incoming command or message with its source
+    and timestamp.
+- `ExecutionPlan` represents planner output: intent, optional target,
+    structured parameters, and confidence.
+- `ExecutionResult` represents the outcome of a dispatch operation, including
+    success state, response text, structured data, and an optional error.
+- `AssistantResponse` wraps the final assistant response together with the
+    plan that was executed and the result that was produced.
+- `SessionContext` captures the shared session state needed across the core
+    layers.
 
-## How Requests Flow Through Core
-Every user query (voice command or chat input) runs through a structured request processing pipeline inside the Core module:
+All models use Pydantic v2 so validation, serialization, and future extension
+stay consistent across the backend.
+
+## Interfaces
+
+- `IAssistant` defines the orchestration boundary for processing a request and
+    returning a structured response.
+- `IPlanner` defines the contract for turning a request into an execution plan
+    and validating that plan before dispatch.
+- `IDispatcher` defines the contract for executing a validated plan.
+- `ICapability` defines the execution boundary for a single capability.
+
+Legacy interfaces remain available for the current codebase so the package can
+be imported safely while the rest of the system migrates to the new contracts.
+
+## Exceptions
+
+- `AuralisException` is the base exception for new core code.
+- `PlanningException` is raised for planning failures.
+- `DispatchException` is raised for dispatch failures.
+- `CapabilityException` is raised for capability contract or execution
+    failures.
+- `ValidationException` is raised when contract input fails validation.
+
+The legacy `AuralisCoreException` name is retained for compatibility with the
+existing modules under `backend/capabilities/` and `backend/os/`.
+
+## Execution Flow
+
+1. A caller creates an `AssistantRequest` from an incoming user message.
+2. The assistant implementation uses `IPlanner` to produce an `ExecutionPlan`.
+3. The dispatcher implementation validates and executes the plan.
+4. The execution outcome is captured in an `ExecutionResult`.
+5. The assistant returns an `AssistantResponse` containing the plan and result.
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor User as User Client
-    participant Service as Gateway Service
-    participant Assistant as Auralis Assistant
-    participant Context as Context Builder
-    participant Brain as AI Brain
-    participant Planner as Execution Planner
-    participant Dispatcher as Action Dispatcher
-    participant Cap as Capabilities
-    participant OS as OS Adapter
+        autonumber
+        actor User as User
+        participant Assistant as IAssistant
+        participant Planner as IPlanner
+        participant Dispatcher as IDispatcher
+        participant Capability as ICapability
 
-    User->>Service: Send Command ("organize my Downloads")
-    Service->>Assistant: process_request(session_id, command)
-    
-    Note over Assistant: StateManager -> PROCESSING
-    Assistant->>Context: build_current_context()
-    Context->>OS: Query current workspace path / active window
-    OS-->>Context: Context details (C:/Downloads, Explorer.exe)
-    Context-->>Assistant: SystemContext state
-    
-    Assistant->>Planner: create_plan(request, context)
-    Planner->>Brain: Parse intent and extract entities
-    Brain-->>Planner: Action parameters schema
-    Planner-->>Assistant: ExecutionPlan steps
-    
-    Assistant->>Dispatcher: dispatch(steps)
-    loop For each step in ExecutionPlan
-        Dispatcher->>Dispatcher: Validate permission boundaries
-        Dispatcher->>Cap: execute(action, arguments)
-        Cap->>OS: Execute system-level operation
-        OS-->>Cap: Operation outcome details
-        Cap-->>Dispatcher: ActionResult
-    end
-    
-    Dispatcher-->>Assistant: Aggregate execution outcome
-    Note over Assistant: StateManager -> IDLE
-    Assistant-->>Service: Structured Response JSON
-    Service-->>User: Display status update and speak feedback
+        User->>Assistant: AssistantRequest
+        Assistant->>Planner: create_plan(request, context)
+        Planner-->>Assistant: ExecutionPlan
+        Assistant->>Dispatcher: dispatch(plan, context)
+        Dispatcher->>Capability: execute(action, arguments)
+        Capability-->>Dispatcher: capability data
+        Dispatcher-->>Assistant: ExecutionResult
+        Assistant-->>User: AssistantResponse
 ```
 
----
+## Future Extensibility
 
-## Component Relationships & Responsibilities
+The contract layer is intentionally narrow so it can grow without breaking the
+current architecture:
 
-The Core module acts as the glue code mapping five primary subsystems together:
-
-| Component | Role in Core | Core Dependency / Interface Binding |
-| :--- | :--- | :--- |
-| **Assistant** | Central manager coordinating operations. | Instantiates `SessionManager`, `ContextBuilder`, `Planner`, and `ActionDispatcher`. |
-| **Planner** | Generates the steps needed to achieve a user goal. | Communicates via the `IAgentBrain` interface to parse user intents. |
-| **Dispatcher** | Runs the steps in the execution plan. | Iterates through registered instances of the `ICapability` interface. |
-| **Memory** | Stores historical context for planning. | Communicates via the `IMemoryEngine` interface to retrieve relevant context. |
-| **AI (Brain)** | Provides reasoning and tool selection logic. | Bound via the `IAgentBrain` interface. |
-| **Capabilities** | Performs actions (e.g. file moves, code analysis). | Dispatched via the `ICapability` interface. |
-| **OS Layer** | Interfaces with the host operating system. | Decoupled via the `IOSAdapter` interface. |
+- New request metadata can be added to `AssistantRequest` or `SessionContext`.
+- New dispatch metadata can be added to `ExecutionPlan` or `ExecutionResult`.
+- New execution layers can implement the same interfaces without changing API
+    routes or package import paths.
+- The exception hierarchy can be expanded with more specialized subclasses as
+    new subsystems appear.
