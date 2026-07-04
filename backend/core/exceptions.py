@@ -1,53 +1,74 @@
-"""
-Module: backend.core.exceptions
+"""Core exception contracts for Auralis.
 
-Responsibility:
-    Defines the structured exception hierarchy for Auralis Core orchestration.
-    Standardizes error propagation, logging categories, and recovery procedures.
-
-This module SHOULD:
-    - Define a base exception class (AuralisCoreException) inheriting from built-in Exception.
-    - Declare distinct exceptions for distinct phases (Sessions, Planning, Dispatches, Safety).
-    - Support details dictionaries for passing metadata (e.g., failed action names or session ids).
-
-This module should NEVER:
-    - Import external frameworks or application modules.
-    - Raise raw generic exceptions without context.
-    - Include recovery logic, handlers, or logs reporting.
+The exception hierarchy is intentionally small and reusable. It supports the
+new contract layer while preserving the legacy base exception name used by the
+current codebase.
 """
 
-from typing import Any, Dict, Optional
+from __future__ import annotations
+
+from typing import Any
 
 
-class AuralisCoreException(Exception):
-    """Base exception class for all Auralis Core errors."""
-    
-    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None) -> None:
+class AuralisException(Exception):
+    """Base exception for all Auralis core errors."""
+
+    def __init__(self, message: str, *, details: dict[str, Any] | None = None) -> None:
         super().__init__(message)
         self.message = message
         self.details = details or {}
 
 
+class AuralisCoreException(AuralisException):
+    """Compatibility alias for the legacy core exception base class."""
+
+
+class PlanningException(AuralisCoreException):
+    """Raised when planning fails or produces an invalid plan."""
+
+
+class DispatchException(AuralisCoreException):
+    """Raised when dispatching a plan fails."""
+
+
+class CapabilityException(AuralisCoreException):
+    """Raised when a capability contract is violated or execution fails."""
+
+
+class ValidationException(AuralisCoreException):
+    """Raised when input or contract validation fails."""
+
+
 class SessionException(AuralisCoreException):
     """Raised when session creation, loading, or synchronization fails."""
-    pass
 
 
-class PlannerException(AuralisCoreException):
-    """Raised when the AI Brain or Planner fails to construct a valid plan."""
-    pass
+class PlannerException(PlanningException):
+    """Legacy alias for planning failures."""
 
 
-class DispatcherException(AuralisCoreException):
-    """Raised when executing capability actions fails or times out."""
-    pass
+class DispatcherException(DispatchException):
+    """Legacy alias for dispatch failures."""
 
 
 class ContextException(AuralisCoreException):
-    """Raised when environment contexts or active profiles cannot be resolved."""
-    pass
+    """Raised when session or environment context cannot be resolved."""
 
 
 class SecurityException(AuralisCoreException):
-    """Raised when policy limits are violated or user confirmations are denied."""
-    pass
+    """Raised when a policy or permission boundary is violated."""
+
+
+__all__ = [
+    "AuralisException",
+    "AuralisCoreException",
+    "PlanningException",
+    "DispatchException",
+    "CapabilityException",
+    "ValidationException",
+    "SessionException",
+    "PlannerException",
+    "DispatcherException",
+    "ContextException",
+    "SecurityException",
+]

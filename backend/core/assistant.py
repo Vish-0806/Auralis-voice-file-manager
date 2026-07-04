@@ -1,174 +1,365 @@
-"""
-Module: backend.core.assistant
+"""Assistant orchestration for Auralis.
 
-Responsibility:
-    Acts as the main entry orchestrator for the Auralis AI Operating System Assistant.
-    Coordinates requests by connecting gateways, state observers, planners, and dispatchers.
-
-This module SHOULD:
-    - Inject IAgentBrain, IMemoryManager, IEventBus, and IOSAdapter in its constructor.
-    - Coordinate context gathering, planning, execution dispatching, and response cycles.
-    - Expose clean methods for API gateways to invoke operations.
-    - Implement lightweight legacy adapters to maintain backward compatibility during refactoring.
-
-This module should NEVER:
-    - Execute specific file operations, shell scripts, or databases operations directly (delegates to adapters).
-    - Hardcode specific model names or UI layouts.
+This module contains the assistant boundary only. The assistant validates the
+incoming request, asks the planner for an execution plan, sends that plan to
+the dispatcher, and returns a structured assistant response. It does not
+implement business logic, file operations, AI behavior, or voice handling.
 """
 
-from typing import Dict, Any, List, Optional
-from core.interfaces import IAgentBrain, IOSAdapter
-from memory.interfaces import IMemoryManager
-from events.interfaces import IEventBus
-from events.event_types import SystemEvents
-from core.session import SessionManager, UserSession
-from core.context import ContextBuilder, SystemContext
-from core.state import StateManager, SystemStatus
-from core.planner import Planner, ExecutionPlan
-from core.dispatcher import ActionDispatcher, ExecutionResult
+from __future__ import annotations
+
+import logging
+from datetime import UTC, datetime
+from typing import Any
+
+from .exceptions import DispatchException, PlanningException, ValidationException
+from .interfaces import IAssistant, IDispatcher, IPlanner
+from .intents import Intent
+from .models import AssistantRequest, AssistantResponse, ExecutionPlan, ExecutionResult, SessionContext
 
 
-# ===========================================================================
-# Lightweight Legacy Adapters to bridge Core to existing modules
-# ===========================================================================
+class AuralisAssistant(IAssistant):
+    """Coordinates planning and dispatch for a single assistant request."""
 
-class LegacyAgentBrain(IAgentBrain):
-    """Adapts legacy command parsing to the IAgentBrain interface."""
-    def reason(self, request: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        from ai_engine.command_parser import parse_command
-        return parse_command(request)
+    def __init__(
+        self,
+        planner: IPlanner,
+        dispatcher: IDispatcher,
+        logger: logging.Logger | None = None,
+    ) -> None:
+        """Initializes the assistant with injected collaborators.
 
+        Args:
+            planner: The injected planner implementation.
+            dispatcher: The injected dispatcher implementation.
+            logger: Optional logger used for orchestration diagnostics.
+        """
 
-class LegacyMemoryManager(IMemoryManager):
-    """Placeholder legacy memory manager adapter."""
-    def get_active_context(self, session_id: str, query: str) -> Dict[str, Any]:
-        return {}
-    def commit_interaction(self, session_id: str, prompt: str, response: str) -> None:
-        pass
+        self._planner = planner
+        self._dispatcher = dispatcher
+        self._logger = logger or logging.getLogger(__name__)
 
+    def process_request(
+        self,
+        request: AssistantRequest | str,
+        context: SessionContext | str | None = None,
+    ) -> AssistantResponse:
+        """Processes a request through planner and dispatcher collaborators.
 
-class LegacyEventBus(IEventBus):
-    """Placeholder legacy event bus adapter."""
-    def publish_envelope(self, envelope: Any) -> None:
-        pass
-    def subscribe(self, topic: str, subscriber: Any) -> None:
-        pass
-    def unsubscribe(self, topic: str, subscriber: Any) -> None:
-        pass
+        Args:
+            request: The assistant request or legacy session identifier.
+            context: The optional session context or legacy command string.
 
+        Returns:
+            A structured assistant response, including fallback error details
+            when orchestration fails.
+        """
 
-class LegacyOSAdapter(IOSAdapter):
-    """Adapts path resolving to the IOSAdapter interface."""
-    def execute_shell(self, command: str) -> str:
-        return ""
-    def resolve_path(self, path: str) -> str:
-        from file_engine.source_resolver import resolve_source
-        return resolve_source(path)
+        assistant_request, session_context = self._normalize_inputs(request, context)
 
+        try:
+            self._validate_request(assistant_request)
+            plan = self._planner.create_plan(assistant_request, session_context)
+            self._validate_plan(plan)
+            result = self._dispatcher.dispatch(plan, session_context)
+            self._validate_result(result)
+            response = self._build_response(plan, result)
+            self._logger.info(
+                "Processed assistant request successfully",
+                extra={"intent": plan.intent.value, "success": result.success},
+            )
+            return response
+        except (ValidationException, PlanningException, DispatchException) as exc:
+            self._logger.warning(
+                "Assistant orchestration failed",
+                extra={"error": str(exc)},
+            )
+            return self._build_failure_response(assistant_request, session_context, str(exc))
+        except Exception as exc:  # pragma: no cover - defensive guard
+            self._logger.exception("Unexpected assistant failure")
+            return self._build_failure_response(assistant_request, session_context, str(exc))
 
-# ===========================================================================
-# Main Orchestrator Definition
-# ===========================================================================
+    def _normalize_inputs(
+        self,
+        request: AssistantRequest | str,
+        context: SessionContext | str | None,
+    ) -> tuple[AssistantRequest, SessionContext | None]:
+        """Normalizes both modern and legacy call shapes.
 
-class AuralisAssistant:
-    """The central coordinator of the Auralis core pipeline, managing the request lifecycle."""
-    
-    def __init__(self,
-                 agent_brain: IAgentBrain,
-                 memory_manager: IMemoryManager,
-                 event_bus: IEventBus,
-                 os_adapter: IOSAdapter) -> None:
-        # Dependency Injection of Interfaces
-        self.agent_brain: IAgentBrain = agent_brain
-        self.memory_manager: IMemoryManager = memory_manager
-        self.event_bus: IEventBus = event_bus
-        self.os_adapter: IOSAdapter = os_adapter
+        Args:
+            request: The assistant request or legacy session identifier.
+            context: The optional session context or legacy command string.
 
-        # Core Components Initialization
-        self.session_manager: SessionManager = SessionManager()
-        self.context_builder: ContextBuilder = ContextBuilder(os_adapter)
-        self.state_manager: StateManager = StateManager()
-        
-        # Inject dependencies into Planner and Dispatcher
-        self.planner: Planner = Planner(agent_brain, event_bus)
-        self.dispatcher: ActionDispatcher = ActionDispatcher(event_bus)
+        Returns:
+            A normalized assistant request and optional session context.
+        """
 
-    def process_request(self, session_id: str, request: str) -> Dict[str, Any]:
-        """Processes a command request by delegating to parser and execution logic."""
-        parsed_action = self.parse_command(request)
-        result = self.execute_action(parsed_action)
-        return {
-            "status": "success",
-            "command": request,
-            "parsed_action": parsed_action,
-            "result": result
-        }
+        if isinstance(request, AssistantRequest):
+            if context is None or isinstance(context, SessionContext):
+                return request, context
 
-    # =======================================================================
-    # Legacy Gateway Routing Methods
-    # =======================================================================
+            return request, SessionContext(session_id=request.source)
+
+        if isinstance(context, str):
+            legacy_request = AssistantRequest(
+                message=context,
+                source="legacy",
+                timestamp=datetime.now(UTC),
+            )
+            legacy_context = SessionContext(session_id=request)
+            self._logger.debug("Normalized legacy assistant request")
+            return legacy_request, legacy_context
+
+        legacy_request = AssistantRequest(
+            message="",
+            source="legacy",
+            timestamp=datetime.now(UTC),
+        )
+        legacy_context = SessionContext(session_id=str(request))
+        return legacy_request, legacy_context
+
+    def _validate_request(self, request: AssistantRequest) -> None:
+        """Validates the incoming request payload.
+
+        Args:
+            request: The request to validate.
+
+        Raises:
+            ValidationException: If the request is not usable.
+        """
+
+        if not isinstance(request, AssistantRequest):
+            raise ValidationException("Request must be an AssistantRequest instance.")
+
+        if not request.message or not request.message.strip():
+            raise ValidationException("Request message cannot be empty.")
+
+        if not request.source or not request.source.strip():
+            raise ValidationException("Request source cannot be empty.")
+
+    def _validate_plan(self, plan: ExecutionPlan) -> None:
+        """Validates the planner output before dispatch.
+
+        Args:
+            plan: The execution plan to validate.
+
+        Raises:
+            PlanningException: If the plan is invalid.
+        """
+
+        if not isinstance(plan, ExecutionPlan):
+            raise PlanningException("Planner must return an ExecutionPlan instance.")
+
+        if not self._planner.validate_plan(plan):
+            raise PlanningException("Planner returned an invalid execution plan.")
+
+    def _validate_result(self, result: ExecutionResult) -> None:
+        """Validates the dispatcher result.
+
+        Args:
+            result: The execution result to validate.
+
+        Raises:
+            DispatchException: If the dispatcher returns an invalid result.
+        """
+
+        if not isinstance(result, ExecutionResult):
+            raise DispatchException("Dispatcher must return an ExecutionResult instance.")
+
+        if result.execution_time < 0:
+            raise DispatchException("Execution time cannot be negative.")
+
+    def _build_response(self, plan: ExecutionPlan, result: ExecutionResult) -> AssistantResponse:
+        """Builds the success response envelope.
+
+        Args:
+            plan: The execution plan that was dispatched.
+            result: The resulting execution outcome.
+
+        Returns:
+            A structured assistant response.
+        """
+
+        response_text = result.response.strip() if result.response else ""
+        return AssistantResponse(
+            response=response_text,
+            plan=plan,
+            result=result,
+        )
+
+    def _build_failure_response(
+        self,
+        request: AssistantRequest,
+        context: SessionContext | None,
+        error_message: str,
+    ) -> AssistantResponse:
+        """Builds a failure response when orchestration cannot complete.
+
+        Args:
+            request: The normalized assistant request.
+            context: The optional session context.
+            error_message: The failure message to return.
+
+        Returns:
+            A structured assistant response with a fallback plan and result.
+        """
+
+        fallback_plan = ExecutionPlan(
+            intent=Intent.UNKNOWN,
+            target=None,
+            parameters={
+                "message": request.message,
+                "source": request.source,
+                "session_id": context.session_id if context is not None else None,
+            },
+            confidence=0.0,
+        )
+        failure_result = ExecutionResult(
+            success=False,
+            response="",
+            data={},
+            error=error_message,
+            execution_time=0.0,
+        )
+        return AssistantResponse(
+            response=error_message,
+            plan=fallback_plan,
+            result=failure_result,
+        )
+
+    # ------------------------------------------------------------------
+    # Compatibility helpers retained for existing API routes.
+    # ------------------------------------------------------------------
 
     def listen_voice(self) -> str:
-        """Captures microphone input and converts speech to text."""
-        from voice.speech_to_text import listen
-        return listen()
+        """Legacy voice hook preserved for compatibility.
 
-    def detect_wake_word(self, text: str) -> Dict[str, Any]:
-        """Detects the wake word in the recognized text."""
-        from voice.wake_word import detect_wake_word
-        return detect_wake_word(text)
+        Raises:
+            NotImplementedError: Voice is intentionally out of scope for this phase.
+        """
+
+        raise NotImplementedError("Voice interaction is not implemented in this phase.")
+
+    def detect_wake_word(self, text: str) -> dict[str, Any]:
+        """Legacy wake-word hook preserved for compatibility.
+
+        Raises:
+            NotImplementedError: Voice is intentionally out of scope for this phase.
+        """
+
+        raise NotImplementedError("Voice interaction is not implemented in this phase.")
 
     def speak(self, text: str) -> None:
-        """Plays speech feedback using text-to-speech."""
-        from voice.text_to_speech import speak
-        speak(text)
+        """Legacy speech hook preserved for compatibility.
+
+        Raises:
+            NotImplementedError: Voice is intentionally out of scope for this phase.
+        """
+
+        raise NotImplementedError("Voice interaction is not implemented in this phase.")
 
     def get_voice_listener(self) -> Any:
-        """Retrieves the continuous listener singleton."""
-        from voice.continuous_listener import get_listener
-        return get_listener()
+        """Legacy listener hook preserved for compatibility.
 
-    def search_files(self, query: str) -> List[Dict[str, str]]:
-        """Searches recursively for files matching the query."""
-        from file_engine.search_engine import search_files
-        return search_files(query)
+        Raises:
+            NotImplementedError: Voice is intentionally out of scope for this phase.
+        """
 
-    def get_pending_action(self) -> Optional[Dict[str, Any]]:
-        """Retrieves the current pending operation from the state manager."""
-        from file_engine.file_operations import get_pending_action
-        return get_pending_action()
+        raise NotImplementedError("Voice interaction is not implemented in this phase.")
+
+    def search_files(self, query: str) -> list[dict[str, str]]:
+        """Legacy search hook preserved for compatibility.
+
+        Raises:
+            NotImplementedError: File operations are intentionally out of scope.
+        """
+
+        raise NotImplementedError("File search is not implemented in this phase.")
+
+    def get_pending_action(self) -> dict[str, Any] | None:
+        """Legacy pending-action hook preserved for compatibility.
+
+        Raises:
+            NotImplementedError: Execution state handling is intentionally out of scope.
+        """
+
+        raise NotImplementedError("Pending action inspection is not implemented in this phase.")
 
     def classify_intent(self, command: str) -> str:
-        """Classifies the user intent string."""
-        from ai_engine.intent_classifier import classify_intent
-        return classify_intent(command)
+        """Legacy intent helper preserved for compatibility.
 
-    def parse_command(self, command: str) -> Dict[str, Any]:
-        """Parses a text command into action and target parameters."""
-        return self.agent_brain.reason(command, {})
+        Raises:
+            NotImplementedError: AI-driven intent classification is intentionally out of scope.
+        """
 
-    def execute_action(self, parsed_action: Dict[str, Any]) -> Any:
-        """Executes a parsed file action using the file engine."""
-        from file_engine.file_operations import execute_action
-        return execute_action(parsed_action)
+        raise NotImplementedError("Intent classification is not implemented in this phase.")
 
-    def format_speak_message(self, result: Any, parsed_action: Dict[str, Any]) -> str:
-        """Formats the result message for speech playback."""
-        from utils.helpers import format_speak_message
-        return format_speak_message(result, parsed_action)
+    def parse_command(self, command: str) -> dict[str, Any]:
+        """Legacy parser hook preserved for compatibility.
+
+        Raises:
+            NotImplementedError: Parsing is now handled by the planner contract.
+        """
+
+        raise NotImplementedError("Command parsing is handled by the planner contract.")
+
+    def execute_action(self, parsed_action: dict[str, Any]) -> Any:
+        """Legacy execution hook preserved for compatibility.
+
+        Raises:
+            NotImplementedError: Direct execution is intentionally out of scope.
+        """
+
+        raise NotImplementedError("Direct execution is not implemented in this phase.")
+
+    def format_speak_message(self, result: Any, parsed_action: dict[str, Any]) -> str:
+        """Legacy formatting hook preserved for compatibility.
+
+        Raises:
+            NotImplementedError: Voice formatting is intentionally out of scope.
+        """
+
+        raise NotImplementedError("Speech formatting is not implemented in this phase.")
 
 
-# Singleton getter/manager for API and listener gateways
-_assistant_instance = None
+Assistant = AuralisAssistant
+
+_assistant_instance: AuralisAssistant | None = None
+
+
+def set_assistant_instance(assistant: AuralisAssistant) -> None:
+    """Registers the assistant singleton used by legacy callers.
+
+    Args:
+        assistant: The assistant instance to expose through ``get_assistant``.
+    """
+
+    global _assistant_instance
+    _assistant_instance = assistant
+
 
 def get_assistant() -> AuralisAssistant:
-    """Retrieves or instantiates the singleton AuralisAssistant orchestrator."""
-    global _assistant_instance
+    """Returns the configured assistant singleton.
+
+    Returns:
+        The configured assistant instance.
+
+    Raises:
+        RuntimeError: If no assistant instance has been configured yet.
+    """
+
     if _assistant_instance is None:
-        # Initialize legacy adapters
-        brain = LegacyAgentBrain()
-        memory = LegacyMemoryManager()
-        bus = LegacyEventBus()
-        os_adapter = LegacyOSAdapter()
-        _assistant_instance = AuralisAssistant(brain, memory, bus, os_adapter)
+        raise RuntimeError(
+            "AuralisAssistant has not been configured. Inject Planner and Dispatcher "
+            "and register the instance with set_assistant_instance()."
+        )
+
     return _assistant_instance
+
+
+__all__ = [
+    "AuralisAssistant",
+    "Assistant",
+    "get_assistant",
+    "set_assistant_instance",
+]
