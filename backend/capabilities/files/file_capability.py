@@ -21,6 +21,7 @@ from .path_resolver import PathResolver
 from .search_engine import SearchEngine
 from .file_operation_service import FileOperationService
 from .transfer_service import TransferService
+from .folder_service import FolderService
 
 
 class FileCapability(ICapability):
@@ -34,7 +35,12 @@ class FileCapability(ICapability):
     contract.
     """
 
-    _SUPPORTED_INTENTS: frozenset[Intent] = frozenset({Intent.OPEN_FOLDER, Intent.SEARCH_FILE})
+    _SUPPORTED_INTENTS: frozenset[Intent] = frozenset({
+        Intent.OPEN_FOLDER,
+        Intent.SEARCH_FILE,
+        Intent.CREATE_FOLDER,
+        Intent.DELETE_FOLDER,
+    })
     _CAPABILITY_NAME = "mock_file"
 
     def __init__(self, logger: logging.Logger | None = None) -> None:
@@ -49,6 +55,7 @@ class FileCapability(ICapability):
         self._search_engine = SearchEngine(logger=self._logger, path_resolver=self._path_resolver)
         self._file_operation_service = FileOperationService(logger=self._logger)
         self._transfer_service = TransferService(logger=self._logger)
+        self._folder_service = FolderService(logger=self._logger)
 
     @property
     def name(self) -> str:
@@ -125,6 +132,77 @@ class FileCapability(ICapability):
 
         if plan.intent == Intent.SEARCH_FILE:
             return self._search_files(plan, target, execution_started_at)
+
+        if plan.intent == Intent.CREATE_FOLDER:
+            folder_name = plan.parameters.get("folder_name") or target
+            destination_folder = plan.parameters.get("destination_folder")
+
+            if destination_folder:
+                resolved_dest = self._path_resolver.resolve(destination_folder)
+                if resolved_dest is None:
+                    return ExecutionResult(
+                        success=False,
+                        response="",
+                        data={
+                            "intent": plan.intent.value,
+                            "target": target,
+                            "parameters": plan.parameters,
+                        },
+                        error=f"Unable to resolve destination folder '{destination_folder}'",
+                        execution_time=time.perf_counter() - execution_started_at,
+                    )
+            else:
+                from pathlib import Path
+                resolved_dest = str(Path.home())
+
+            res = self._folder_service.create_folder(folder_name, resolved_dest)
+            success = res.get("status") == "success"
+            return ExecutionResult(
+                success=success,
+                response=res.get("message", "") if success else "",
+                data={
+                    "intent": plan.intent.value,
+                    "target": target,
+                    "folder_name": folder_name,
+                    "destination": res.get("path"),
+                    "operation": "create_folder",
+                    "parameters": plan.parameters,
+                },
+                error=res.get("message") if not success else None,
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if plan.intent == Intent.DELETE_FOLDER:
+            folder_hint = plan.parameters.get("folder_name") or target
+            resolved_path = self._resolve_source_path(folder_hint, expect_directory=True)
+            if resolved_path is None:
+                return ExecutionResult(
+                    success=False,
+                    response="",
+                    data={
+                        "intent": plan.intent.value,
+                        "target": target,
+                        "parameters": plan.parameters,
+                    },
+                    error=f"Unable to locate folder '{folder_hint}'",
+                    execution_time=time.perf_counter() - execution_started_at,
+                )
+
+            res = self._folder_service.delete_folder(resolved_path)
+            success = res.get("status") == "success"
+            return ExecutionResult(
+                success=success,
+                response=res.get("message", "") if success else "",
+                data={
+                    "intent": plan.intent.value,
+                    "target": target,
+                    "resolved_path": resolved_path,
+                    "operation": "delete_folder",
+                    "parameters": plan.parameters,
+                },
+                error=res.get("message") if not success else None,
+                execution_time=time.perf_counter() - execution_started_at,
+            )
 
         resolved_path = self._path_resolver.resolve(target)
         if resolved_path is None:
@@ -310,7 +388,10 @@ class FileCapability(ICapability):
             )
 
         try:
-            operation_result = self._file_operation_service.delete(target_path)
+            if action == "DELETE_FOLDER":
+                operation_result = self._folder_service.delete_folder(target_path)
+            else:
+                operation_result = self._file_operation_service.delete(target_path)
         except Exception as exc:  # pragma: no cover - defensive guard
             self._logger.exception(
                 "Delete failed",

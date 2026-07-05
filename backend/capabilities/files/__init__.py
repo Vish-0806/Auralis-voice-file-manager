@@ -5,5 +5,13 @@ from .file_operation_service import FileOperationService
 from .path_resolver import PathResolver
 from .search_engine import SearchEngine
 from .transfer_service import TransferService
+from .folder_service import FolderService
 
-__all__ = ["FileCapability", "FileOperationService", "PathResolver", "SearchEngine", "TransferService"]
+__all__ = [
+    "FileCapability",
+    "FileOperationService",
+    "PathResolver",
+    "SearchEngine",
+    "TransferService",
+    "FolderService",
+]
