@@ -32,6 +32,10 @@ class Planner(IPlanner):
         Intent.OPEN_FILE,
         Intent.SEARCH_FILE,
         Intent.LIST_DIRECTORY,
+        Intent.CREATE_FOLDER,
+        Intent.DELETE_FOLDER,
+        Intent.ORGANIZE_FOLDER,
+        Intent.GET_FILE_INFO,
         Intent.UNKNOWN,
     )
 
@@ -75,6 +79,41 @@ class Planner(IPlanner):
         "list files in",
         "show contents",
         "list contents",
+    )
+
+    _CREATE_FOLDER_HINTS: Final[tuple[str, ...]] = (
+        "create folder",
+        "create a folder",
+        "make folder",
+        "make a folder",
+        "new folder",
+        "create directory",
+        "make directory",
+    )
+
+    _DELETE_FOLDER_HINTS: Final[tuple[str, ...]] = (
+        "delete folder",
+        "delete the folder",
+        "remove folder",
+        "remove the folder",
+        "trash folder",
+        "discard folder",
+    )
+
+    _ORGANIZE_FOLDER_HINTS: Final[tuple[str, ...]] = (
+        "organize",
+        "clean",
+        "sort",
+    )
+
+    _GET_FILE_INFO_HINTS: Final[tuple[str, ...]] = (
+        "show information about",
+        "show info about",
+        "file info",
+        "folder info",
+        "properties of",
+        "information about",
+        "get info for",
     )
 
     _FILE_EXTENSION_PATTERN: Final[re.Pattern[str]] = re.compile(
@@ -127,7 +166,18 @@ class Planner(IPlanner):
 
         normalized_message = self._normalize_text(request.message)
         intent = self._detect_intent(normalized_message)
-        target = self._extract_target(normalized_message, intent)
+
+        folder_name = None
+        destination_folder = None
+        if intent == Intent.CREATE_FOLDER:
+            folder_name, destination_folder = self._extract_folder_info_from_message(request.message)
+            target = folder_name
+        elif intent == Intent.DELETE_FOLDER:
+            folder_name = self._extract_delete_folder_info_from_message(request.message)
+            target = folder_name
+        else:
+            target = self._extract_target(normalized_message, intent)
+
         confidence = self._calculate_confidence(normalized_message, intent, target)
 
         parameters: dict[str, Any] = {
@@ -138,6 +188,12 @@ class Planner(IPlanner):
             parameters["session_context"] = context.model_dump()
         if target is not None:
             parameters["target"] = target
+
+        if intent == Intent.CREATE_FOLDER:
+            parameters["folder_name"] = folder_name
+            parameters["destination_folder"] = destination_folder
+        elif intent == Intent.DELETE_FOLDER:
+            parameters["folder_name"] = folder_name
 
         plan = ExecutionPlan(
             intent=intent,
@@ -226,11 +282,23 @@ class Planner(IPlanner):
             One of the supported intent labels.
         """
 
-        if self._looks_like_open_file_request(normalized_message):
-            return Intent.OPEN_FILE
+        if self._contains_any(normalized_message, self._CREATE_FOLDER_HINTS):
+            return Intent.CREATE_FOLDER
+
+        if self._contains_any(normalized_message, self._DELETE_FOLDER_HINTS):
+            return Intent.DELETE_FOLDER
+
+        if self._contains_any(normalized_message, self._ORGANIZE_FOLDER_HINTS):
+            return Intent.ORGANIZE_FOLDER
+
+        if self._contains_any(normalized_message, self._GET_FILE_INFO_HINTS):
+            return Intent.GET_FILE_INFO
 
         if self._looks_like_open_folder_request(normalized_message):
             return Intent.OPEN_FOLDER
+
+        if self._looks_like_open_file_request(normalized_message):
+            return Intent.OPEN_FILE
 
         if self._contains_any(normalized_message, self._LIST_DIRECTORY_HINTS):
             return Intent.LIST_DIRECTORY
@@ -278,6 +346,16 @@ class Planner(IPlanner):
         if intent == Intent.SEARCH_FILE:
             return self._extract_search_phrase(normalized_message)
 
+        if intent == Intent.CREATE_FOLDER:
+            folder_name, _ = self._extract_folder_info_from_message(normalized_message)
+            return folder_name
+
+        if intent == Intent.DELETE_FOLDER:
+            return self._extract_delete_folder_info_from_message(normalized_message)
+
+        if intent == Intent.GET_FILE_INFO:
+            return self._extract_file_info_phrase(normalized_message)
+
         return None
 
     def _calculate_confidence(
@@ -302,6 +380,9 @@ class Planner(IPlanner):
             Intent.OPEN_FILE: 0.74,
             Intent.SEARCH_FILE: 0.70,
             Intent.LIST_DIRECTORY: 0.68,
+            Intent.CREATE_FOLDER: 0.75,
+            Intent.DELETE_FOLDER: 0.75,
+            Intent.ORGANIZE_FOLDER: 0.75,
             Intent.UNKNOWN: 0.20,
         }
         confidence = base_scores.get(intent, 0.20)
@@ -425,6 +506,79 @@ class Planner(IPlanner):
         """Checks for obvious directory-oriented wording."""
 
         return any(keyword in text for keyword in ("folder", "directory", "contents", "files in"))
+
+    def _extract_folder_info_from_message(self, message: str) -> tuple[str | None, str | None]:
+        """Extracts case-preserved folder name and destination from the original message."""
+
+        # Pattern 1: Create folder [folder_name] in [destination]
+        p1 = re.compile(
+            r"(?:create|make|new)\s+(?:a\s+)?(?:folder|directory)\s+(?:called\s+)?(.+?)(?:\s+(?:in|on|inside|at|into)\s+(.+))?$",
+            re.IGNORECASE
+        )
+        # Pattern 2: Create folder in/on/inside [destination] called [folder_name]
+        p2 = re.compile(
+            r"(?:create|make|new)\s+(?:a\s+)?(?:folder|directory)\s+(?:in|on|inside|at|into)\s+(.+?)\s+(?:called\s+)?(.+)",
+            re.IGNORECASE
+        )
+
+        m2 = p2.search(message)
+        if m2:
+            destination = m2.group(1).strip().strip("\"'")
+            folder_name = m2.group(2).strip().strip("\"'")
+            return folder_name, destination
+
+        m1 = p1.search(message)
+        if m1:
+            folder_name = m1.group(1).strip().strip("\"'")
+            destination = m1.group(2).strip().strip("\"'") if m1.group(2) else None
+            return folder_name, destination
+
+        return None, None
+
+    def _extract_delete_folder_info_from_message(self, message: str) -> str | None:
+        """Extracts case-preserved folder name to delete from the original message."""
+
+        p = re.compile(
+            r"(?:delete|remove|trash|discard)\s+(?:the\s+)?(?:folder|directory)\s+(.+)",
+            re.IGNORECASE
+        )
+        m = p.search(message)
+        if m:
+            return m.group(1).strip().strip("\"'")
+        return None
+
+    def _extract_file_info_phrase(self, text: str) -> str | None:
+        """Extracts the target file name/path from a file information request."""
+
+        # Match "show information about <file>" or "information about <file>"
+        match = re.search(
+            r"(?:show\s+)?(?:information|info)\s+about\s+(.+)$",
+            text,
+            re.IGNORECASE
+        )
+        if match:
+            return match.group(1).strip().strip("\"'")
+
+        # Match "properties of <file>"
+        match_prop = re.search(
+            r"properties\s+of\s+(.+)$",
+            text,
+            re.IGNORECASE
+        )
+        if match_prop:
+            return match_prop.group(1).strip().strip("\"'")
+
+        # Match "get info for <file>"
+        match_info = re.search(
+            r"(?:get\s+)?info\s+for\s+(.+)$",
+            text,
+            re.IGNORECASE
+        )
+        if match_info:
+            return match_info.group(1).strip().strip("\"'")
+
+        # Fallback
+        return self._extract_tail_after_action(text)
 
 
 __all__ = ["ExecutionPlan", "Planner"]

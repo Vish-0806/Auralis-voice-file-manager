@@ -13,6 +13,7 @@ if os.path.isdir(local_os_path):
 
 
 from fastapi import FastAPI
+from api.assistant_routes import router as assistant_router
 from api.routes import router
 from api.voice_routes import router as voice_router
 from api.listener_routes import router as listener_router
@@ -24,6 +25,7 @@ app = FastAPI(
 )
 
 app.include_router(router)
+app.include_router(assistant_router)
 app.include_router(voice_router)
 app.include_router(listener_router)
 app.include_router(file_router)
