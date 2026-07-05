@@ -8,6 +8,7 @@ operations prefer moving items to the recycle bin via ``send2trash``.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -199,6 +200,149 @@ class FileOperationService:
             "error": error,
             "operation": operation,
         }
+
+    def get_file_info(self, file_path: str) -> dict[str, Any]:
+        """Retrieves detailed information and metadata for a file or folder.
+
+        Args:
+            file_path: Absolute path to the file or folder.
+
+        Returns:
+            A dictionary containing status, metadata fields, and formatted report if successful.
+        """
+
+        target = self._normalize_path(file_path)
+        if target is None:
+            return self._error_result(
+                operation="get_file_info",
+                message="File path must be a valid non-empty value.",
+                error_class="ValueError",
+            )
+
+        if not target.exists():
+            return self._error_result(
+                operation="get_file_info",
+                message=f"File path '{target}' does not exist.",
+                error_class="FileNotFoundError",
+            )
+
+        try:
+            st = target.stat()
+            from datetime import datetime
+
+            raw_size = st.st_size
+            if raw_size < 1024:
+                size_str = f"{raw_size} bytes"
+            elif raw_size < 1024 * 1024:
+                size_str = f"{raw_size / 1024:.1f} KB ({raw_size:,} bytes)"
+            else:
+                size_str = f"{raw_size / (1024 * 1024):.1f} MB ({raw_size:,} bytes)"
+
+            if target.is_dir():
+                type_desc = "Directory"
+                ext = ""
+            else:
+                ext = target.suffix
+                type_map = {
+                    ".pdf": "PDF Document",
+                    ".txt": "Text Document",
+                    ".md": "Markdown Document",
+                    ".py": "Python Script",
+                    ".exe": "Executable Application",
+                    ".zip": "ZIP Archive",
+                    ".rar": "RAR Archive",
+                    ".7z": "7-Zip Archive",
+                    ".xlsx": "Excel Spreadsheet",
+                    ".xls": "Excel Spreadsheet",
+                    ".csv": "CSV Spreadsheet",
+                    ".pptx": "PowerPoint Presentation",
+                    ".docx": "Word Document",
+                    ".png": "PNG Image",
+                    ".jpg": "JPEG Image",
+                    ".jpeg": "JPEG Image",
+                    ".gif": "GIF Image",
+                    ".mp4": "MP4 Video",
+                    ".mp3": "MP3 Audio",
+                }
+                type_desc = type_map.get(ext.lower(), f"{ext.upper()[1:]} File" if ext else "File")
+
+            created_date = datetime.fromtimestamp(st.st_ctime).strftime("%Y-%m-%d %H:%M:%S")
+            modified_date = datetime.fromtimestamp(st.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+
+            mode = st.st_mode
+            perms = []
+            if os.access(target, os.R_OK):
+                perms.append("Read")
+            if os.access(target, os.W_OK):
+                perms.append("Write")
+            if os.access(target, os.X_OK):
+                perms.append("Execute")
+            perms_str = ", ".join(perms) if perms else "None"
+
+            hidden = self._is_hidden_file(target)
+
+            info = {
+                "name": target.name,
+                "extension": ext,
+                "type": type_desc,
+                "size": size_str,
+                "created_date": created_date,
+                "modified_date": modified_date,
+                "absolute_path": str(target.resolve()),
+                "permissions": perms_str,
+                "hidden_status": str(hidden),
+            }
+
+            report_lines = [
+                f"File Information for {target.name}:",
+                f"- File Name: {target.name}",
+                f"- Extension: {ext if ext else 'None'}",
+                f"- Type: {type_desc}",
+                f"- Size: {size_str}",
+                f"- Created Date: {created_date}",
+                f"- Modified Date: {modified_date}",
+                f"- Absolute Path: {info['absolute_path']}",
+                f"- Permissions: {perms_str}",
+                f"- Hidden Status: {info['hidden_status']}",
+            ]
+            report = "\n".join(report_lines)
+
+            return {
+                "status": "success",
+                "message": report,
+                "info": info,
+                "operation": "get_file_info",
+            }
+        except PermissionError as exc:
+            self._logger.exception("Permission error reading file info", extra={"target": str(target)})
+            return self._error_result(
+                operation="get_file_info",
+                message=f"Permission denied while reading information for '{target.name}'.",
+                error_class="PermissionError",
+                error=str(exc),
+            )
+        except Exception as exc:
+            self._logger.exception("Unexpected error reading file info", extra={"target": str(target)})
+            return self._error_result(
+                operation="get_file_info",
+                message=f"An error occurred while reading information for '{target.name}'.",
+                error_class=exc.__class__.__name__,
+                error=str(exc),
+            )
+
+    def _is_hidden_file(self, path: Path) -> bool:
+        """Checks if a file is hidden."""
+
+        if path.name.startswith("."):
+            return True
+        try:
+            import ctypes
+            attrs = ctypes.windll.kernel32.GetFileAttributesW(str(path))
+            if attrs != -1:
+                return bool(attrs & 2)
+        except Exception:
+            pass
+        return False
 
 
 __all__ = ["FileOperationService"]

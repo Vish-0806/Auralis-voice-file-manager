@@ -42,6 +42,7 @@ class FileCapability(ICapability):
         Intent.CREATE_FOLDER,
         Intent.DELETE_FOLDER,
         Intent.ORGANIZE_FOLDER,
+        Intent.GET_FILE_INFO,
     })
     _CAPABILITY_NAME = "mock_file"
 
@@ -232,6 +233,41 @@ class FileCapability(ICapability):
                     "target": target,
                     "resolved_path": resolved_path,
                     "operation": "organize_folder",
+                    "parameters": plan.parameters,
+                },
+                error=res.get("message") if not success else None,
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if plan.intent == Intent.GET_FILE_INFO:
+            resolved_path = self._resolve_source_path(target, expect_directory=False)
+            if resolved_path is None:
+                resolved_path = self._resolve_source_path(target, expect_directory=True)
+
+            if resolved_path is None:
+                return ExecutionResult(
+                    success=False,
+                    response="",
+                    data={
+                        "intent": plan.intent.value,
+                        "target": target,
+                        "parameters": plan.parameters,
+                    },
+                    error=f"Unable to locate target file or folder '{target}'",
+                    execution_time=time.perf_counter() - execution_started_at,
+                )
+
+            res = self._file_operation_service.get_file_info(resolved_path)
+            success = res.get("status") == "success"
+            return ExecutionResult(
+                success=success,
+                response=res.get("message", "") if success else "",
+                data={
+                    "intent": plan.intent.value,
+                    "target": target,
+                    "resolved_path": resolved_path,
+                    "info": res.get("info"),
+                    "operation": "get_file_info",
                     "parameters": plan.parameters,
                 },
                 error=res.get("message") if not success else None,

@@ -35,6 +35,7 @@ class Planner(IPlanner):
         Intent.CREATE_FOLDER,
         Intent.DELETE_FOLDER,
         Intent.ORGANIZE_FOLDER,
+        Intent.GET_FILE_INFO,
         Intent.UNKNOWN,
     )
 
@@ -103,6 +104,16 @@ class Planner(IPlanner):
         "organize",
         "clean",
         "sort",
+    )
+
+    _GET_FILE_INFO_HINTS: Final[tuple[str, ...]] = (
+        "show information about",
+        "show info about",
+        "file info",
+        "folder info",
+        "properties of",
+        "information about",
+        "get info for",
     )
 
     _FILE_EXTENSION_PATTERN: Final[re.Pattern[str]] = re.compile(
@@ -280,11 +291,14 @@ class Planner(IPlanner):
         if self._contains_any(normalized_message, self._ORGANIZE_FOLDER_HINTS):
             return Intent.ORGANIZE_FOLDER
 
-        if self._looks_like_open_file_request(normalized_message):
-            return Intent.OPEN_FILE
+        if self._contains_any(normalized_message, self._GET_FILE_INFO_HINTS):
+            return Intent.GET_FILE_INFO
 
         if self._looks_like_open_folder_request(normalized_message):
             return Intent.OPEN_FOLDER
+
+        if self._looks_like_open_file_request(normalized_message):
+            return Intent.OPEN_FILE
 
         if self._contains_any(normalized_message, self._LIST_DIRECTORY_HINTS):
             return Intent.LIST_DIRECTORY
@@ -338,6 +352,9 @@ class Planner(IPlanner):
 
         if intent == Intent.DELETE_FOLDER:
             return self._extract_delete_folder_info_from_message(normalized_message)
+
+        if intent == Intent.GET_FILE_INFO:
+            return self._extract_file_info_phrase(normalized_message)
 
         return None
 
@@ -529,6 +546,39 @@ class Planner(IPlanner):
         if m:
             return m.group(1).strip().strip("\"'")
         return None
+
+    def _extract_file_info_phrase(self, text: str) -> str | None:
+        """Extracts the target file name/path from a file information request."""
+
+        # Match "show information about <file>" or "information about <file>"
+        match = re.search(
+            r"(?:show\s+)?(?:information|info)\s+about\s+(.+)$",
+            text,
+            re.IGNORECASE
+        )
+        if match:
+            return match.group(1).strip().strip("\"'")
+
+        # Match "properties of <file>"
+        match_prop = re.search(
+            r"properties\s+of\s+(.+)$",
+            text,
+            re.IGNORECASE
+        )
+        if match_prop:
+            return match_prop.group(1).strip().strip("\"'")
+
+        # Match "get info for <file>"
+        match_info = re.search(
+            r"(?:get\s+)?info\s+for\s+(.+)$",
+            text,
+            re.IGNORECASE
+        )
+        if match_info:
+            return match_info.group(1).strip().strip("\"'")
+
+        # Fallback
+        return self._extract_tail_after_action(text)
 
 
 __all__ = ["ExecutionPlan", "Planner"]
