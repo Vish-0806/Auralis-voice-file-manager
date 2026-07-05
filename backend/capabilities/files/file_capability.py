@@ -1,8 +1,8 @@
 """File capability for Auralis.
 
 This module validates incoming execution plans, resolves supported user folder
-targets, opens the resolved folder in Windows Explorer, and returns a
-structured execution result for the dispatcher.
+targets, searches supported folders, opens the resolved folder in Windows
+Explorer, and returns a structured execution result for the dispatcher.
 """
 
 from __future__ import annotations
@@ -17,18 +17,19 @@ from core.intents import Intent
 from core.models import ExecutionPlan, ExecutionResult
 
 from .path_resolver import PathResolver
+from .search_engine import SearchEngine
 
 
 class FileCapability(ICapability):
     """Handles file-related execution plans for the dispatcher.
 
-    The capability currently supports only folder opening. It validates the
-    incoming plan, resolves the target path, opens the folder using
-    ``os.startfile()``, and keeps the payload compatible with the dispatcher
-    contract.
+    The capability currently supports folder opening and recursive file search.
+    It validates the incoming plan, resolves the target path, searches known
+    folders, opens folders using ``os.startfile()``, and keeps the payload
+    compatible with the dispatcher contract.
     """
 
-    _SUPPORTED_INTENTS: frozenset[Intent] = frozenset({Intent.OPEN_FOLDER})
+    _SUPPORTED_INTENTS: frozenset[Intent] = frozenset({Intent.OPEN_FOLDER, Intent.SEARCH_FILE})
     _CAPABILITY_NAME = "mock_file"
 
     def __init__(self, logger: logging.Logger | None = None) -> None:
@@ -40,6 +41,7 @@ class FileCapability(ICapability):
 
         self._logger = logger or logging.getLogger(__name__)
         self._path_resolver = PathResolver(logger=self._logger)
+        self._search_engine = SearchEngine(logger=self._logger, path_resolver=self._path_resolver)
 
     @property
     def name(self) -> str:
@@ -101,6 +103,10 @@ class FileCapability(ICapability):
 
         execution_started_at = started_at if started_at is not None else time.perf_counter()
         target = self._resolve_target(plan.target)
+
+        if plan.intent == Intent.SEARCH_FILE:
+            return self._search_files(plan, target, execution_started_at)
+
         resolved_path = self._path_resolver.resolve(target)
         if resolved_path is None:
             error_message = f"Unable to resolve folder path for {target}"
@@ -141,6 +147,63 @@ class FileCapability(ICapability):
             extra={
                 "intent": plan.intent.value,
                 "target": target,
+                "success": True,
+            },
+        )
+        return result
+
+    def _search_files(
+        self,
+        plan: ExecutionPlan,
+        target: str,
+        execution_started_at: float,
+    ) -> ExecutionResult:
+        """Executes a recursive search across the supported file scopes."""
+
+        try:
+            matches = self._search_engine.search(target)
+        except Exception as exc:  # pragma: no cover - defensive guard
+            self._logger.exception(
+                "File search failed",
+                extra={"intent": plan.intent.value, "query": target},
+            )
+            return ExecutionResult(
+                success=False,
+                response="",
+                data={
+                    "intent": plan.intent.value,
+                    "target": target,
+                    "parameters": plan.parameters,
+                },
+                error=str(exc),
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if matches:
+            response = f"Found {len(matches)} matching path(s) for {target}: {', '.join(matches)}"
+        else:
+            response = f"No files or folders found matching {target}"
+
+        result = ExecutionResult(
+            success=True,
+            response=response,
+            data={
+                "intent": plan.intent.value,
+                "target": target,
+                "matches": matches,
+                "match_count": len(matches),
+                "parameters": plan.parameters,
+            },
+            error=None,
+            execution_time=time.perf_counter() - execution_started_at,
+        )
+
+        self._logger.info(
+            "Processed file search plan",
+            extra={
+                "intent": plan.intent.value,
+                "query": target,
+                "match_count": len(matches),
                 "success": True,
             },
         )
