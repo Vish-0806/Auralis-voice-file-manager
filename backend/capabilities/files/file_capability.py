@@ -1,14 +1,14 @@
-"""Foundation file capability for Auralis.
+"""File capability for Auralis.
 
-This module provides the first executable file capability surface for the
-backend. It validates incoming execution plans, supports the OPEN_FOLDER
-intent, and returns a structured core execution result without performing any
-operating system interaction yet.
+This module validates incoming execution plans, resolves supported user folder
+targets, opens the resolved folder in Windows Explorer, and returns a
+structured execution result for the dispatcher.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any
 
@@ -16,13 +16,16 @@ from core.interfaces import ICapability
 from core.intents import Intent
 from core.models import ExecutionPlan, ExecutionResult
 
+from .path_resolver import PathResolver
+
 
 class FileCapability(ICapability):
     """Handles file-related execution plans for the dispatcher.
 
-    The current foundation only supports OPEN_FOLDER requests. The capability
-    validates the incoming plan, builds a non-destructive response, and keeps
-    the payload compatible with the dispatcher contract.
+    The capability currently supports only folder opening. It validates the
+    incoming plan, resolves the target path, opens the folder using
+    ``os.startfile()``, and keeps the payload compatible with the dispatcher
+    contract.
     """
 
     _SUPPORTED_INTENTS: frozenset[Intent] = frozenset({Intent.OPEN_FOLDER})
@@ -36,6 +39,7 @@ class FileCapability(ICapability):
         """
 
         self._logger = logger or logging.getLogger(__name__)
+        self._path_resolver = PathResolver(logger=self._logger)
 
     @property
     def name(self) -> str:
@@ -90,12 +94,33 @@ class FileCapability(ICapability):
 
         Raises:
             ValueError: If the plan is invalid or unsupported.
+            OSError: If the folder cannot be opened.
         """
 
         self._validate_plan(plan)
 
         execution_started_at = started_at if started_at is not None else time.perf_counter()
         target = self._resolve_target(plan.target)
+        resolved_path = self._path_resolver.resolve(target)
+        if resolved_path is None:
+            error_message = f"Unable to resolve folder path for {target}"
+            self._logger.warning(
+                "Folder resolution failed",
+                extra={"intent": plan.intent.value, "target": target},
+            )
+            return ExecutionResult(
+                success=False,
+                response="",
+                data={
+                    "intent": plan.intent.value,
+                    "target": target,
+                    "parameters": plan.parameters,
+                },
+                error=error_message,
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        self._open_folder(resolved_path)
         message = f"FileCapability received OPEN_FOLDER request for {target}"
 
         result = ExecutionResult(
@@ -104,6 +129,7 @@ class FileCapability(ICapability):
             data={
                 "intent": plan.intent.value,
                 "target": target,
+                "resolved_path": resolved_path,
                 "parameters": plan.parameters,
             },
             error=None,
@@ -119,6 +145,28 @@ class FileCapability(ICapability):
             },
         )
         return result
+
+    def _open_folder(self, resolved_path: str) -> None:
+        """Opens the resolved folder in the native Windows file explorer.
+
+        Args:
+            resolved_path: The absolute path to the folder to open.
+
+        Raises:
+            OSError: If ``os.startfile`` is unavailable or the launch fails.
+        """
+
+        if not hasattr(os, "startfile"):
+            raise OSError("os.startfile is not available on this platform")
+
+        try:
+            os.startfile(resolved_path)
+        except OSError as exc:
+            self._logger.exception(
+                "Failed to open folder",
+                extra={"path": resolved_path},
+            )
+            raise OSError(f"Failed to open folder: {resolved_path}") from exc
 
     def _build_execution_plan(self, action: str, arguments: dict[str, Any]) -> ExecutionPlan:
         """Builds an execution plan from dispatcher inputs.
