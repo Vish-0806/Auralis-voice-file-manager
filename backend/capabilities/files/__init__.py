@@ -6,6 +6,7 @@ from .path_resolver import PathResolver
 from .search_engine import SearchEngine
 from .transfer_service import TransferService
 from .folder_service import FolderService
+from .organizer.download_organizer import DownloadOrganizer
 
 __all__ = [
     "FileCapability",
@@ -14,4 +15,5 @@ __all__ = [
     "SearchEngine",
     "TransferService",
     "FolderService",
+    "DownloadOrganizer",
 ]

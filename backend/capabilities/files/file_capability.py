@@ -22,6 +22,7 @@ from .search_engine import SearchEngine
 from .file_operation_service import FileOperationService
 from .transfer_service import TransferService
 from .folder_service import FolderService
+from .organizer.download_organizer import DownloadOrganizer
 
 
 class FileCapability(ICapability):
@@ -40,6 +41,7 @@ class FileCapability(ICapability):
         Intent.SEARCH_FILE,
         Intent.CREATE_FOLDER,
         Intent.DELETE_FOLDER,
+        Intent.ORGANIZE_FOLDER,
     })
     _CAPABILITY_NAME = "mock_file"
 
@@ -56,6 +58,7 @@ class FileCapability(ICapability):
         self._file_operation_service = FileOperationService(logger=self._logger)
         self._transfer_service = TransferService(logger=self._logger)
         self._folder_service = FolderService(logger=self._logger)
+        self._download_organizer = DownloadOrganizer(logger=self._logger)
 
     @property
     def name(self) -> str:
@@ -198,6 +201,37 @@ class FileCapability(ICapability):
                     "target": target,
                     "resolved_path": resolved_path,
                     "operation": "delete_folder",
+                    "parameters": plan.parameters,
+                },
+                error=res.get("message") if not success else None,
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if plan.intent == Intent.ORGANIZE_FOLDER:
+            resolved_path = self._path_resolver.resolve(target)
+            if resolved_path is None:
+                return ExecutionResult(
+                    success=False,
+                    response="",
+                    data={
+                        "intent": plan.intent.value,
+                        "target": target,
+                        "parameters": plan.parameters,
+                    },
+                    error=f"Unable to resolve folder path for '{target}'",
+                    execution_time=time.perf_counter() - execution_started_at,
+                )
+
+            res = self._download_organizer.organize(resolved_path)
+            success = res.get("status") == "success"
+            return ExecutionResult(
+                success=success,
+                response=res.get("report", "") if success else "",
+                data={
+                    "intent": plan.intent.value,
+                    "target": target,
+                    "resolved_path": resolved_path,
+                    "operation": "organize_folder",
                     "parameters": plan.parameters,
                 },
                 error=res.get("message") if not success else None,

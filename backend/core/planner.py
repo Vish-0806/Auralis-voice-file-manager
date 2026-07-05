@@ -34,6 +34,7 @@ class Planner(IPlanner):
         Intent.LIST_DIRECTORY,
         Intent.CREATE_FOLDER,
         Intent.DELETE_FOLDER,
+        Intent.ORGANIZE_FOLDER,
         Intent.UNKNOWN,
     )
 
@@ -96,6 +97,12 @@ class Planner(IPlanner):
         "remove the folder",
         "trash folder",
         "discard folder",
+    )
+
+    _ORGANIZE_FOLDER_HINTS: Final[tuple[str, ...]] = (
+        "organize",
+        "clean",
+        "sort",
     )
 
     _FILE_EXTENSION_PATTERN: Final[re.Pattern[str]] = re.compile(
@@ -270,6 +277,9 @@ class Planner(IPlanner):
         if self._contains_any(normalized_message, self._DELETE_FOLDER_HINTS):
             return Intent.DELETE_FOLDER
 
+        if self._contains_any(normalized_message, self._ORGANIZE_FOLDER_HINTS):
+            return Intent.ORGANIZE_FOLDER
+
         if self._looks_like_open_file_request(normalized_message):
             return Intent.OPEN_FILE
 
@@ -355,6 +365,7 @@ class Planner(IPlanner):
             Intent.LIST_DIRECTORY: 0.68,
             Intent.CREATE_FOLDER: 0.75,
             Intent.DELETE_FOLDER: 0.75,
+            Intent.ORGANIZE_FOLDER: 0.75,
             Intent.UNKNOWN: 0.20,
         }
         confidence = base_scores.get(intent, 0.20)

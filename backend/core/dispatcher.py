@@ -28,6 +28,7 @@ class ActionDispatcher(IDispatcher):
         Intent.LIST_DIRECTORY,
         Intent.CREATE_FOLDER,
         Intent.DELETE_FOLDER,
+        Intent.ORGANIZE_FOLDER,
         Intent.UNKNOWN,
     }
 
