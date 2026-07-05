@@ -20,6 +20,7 @@ class PathResolver:
         "desktop": "Desktop",
         "downloads": "Downloads",
         "documents": "Documents",
+        "pictures": "Pictures",
     }
 
     def __init__(self, logger: logging.Logger | None = None) -> None:
@@ -41,14 +42,25 @@ class PathResolver:
             The absolute system path for the folder, or ``None`` if unresolved.
         """
 
-        normalized_folder = self._normalize_folder_name(folder_name)
+        if not isinstance(folder_name, str):
+            return None
+
+        cleaned_folder = folder_name.strip()
+        if not cleaned_folder:
+            return None
+
+        direct_path = Path(cleaned_folder).expanduser()
+        if direct_path.exists() and direct_path.is_dir():
+            return str(direct_path.resolve())
+
+        normalized_folder = self._normalize_folder_name(cleaned_folder)
         if normalized_folder is None:
             self._logger.debug("Unsupported folder name received", extra={"folder_name": folder_name})
             return None
 
         base_path = Path.home()
         resolved_path = base_path / self._SUPPORTED_FOLDERS[normalized_folder]
-        if not resolved_path.exists():
+        if not resolved_path.exists() or not resolved_path.is_dir():
             self._logger.debug(
                 "Resolved folder does not exist",
                 extra={"folder_name": folder_name, "path": str(resolved_path)},
