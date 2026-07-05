@@ -1,9 +1,9 @@
 """File capability for Auralis.
 
 This module validates incoming execution plans, resolves supported user folder
-targets, searches supported folders, transfers files, opens the resolved folder
-in Windows Explorer, and returns a structured execution result for the
-dispatcher.
+targets, searches supported folders, transfers files, renames items, deletes
+items into the Recycle Bin, opens the resolved folder in Windows Explorer,
+and returns a structured execution result for the dispatcher.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from core.models import ExecutionPlan, ExecutionResult
 
 from .path_resolver import PathResolver
 from .search_engine import SearchEngine
+from .file_operation_service import FileOperationService
 from .transfer_service import TransferService
 
 
@@ -26,8 +27,9 @@ class FileCapability(ICapability):
     """Handles file-related execution plans for the dispatcher.
 
     The capability currently supports folder opening, recursive file search,
-    and file transfer operations. It validates the incoming plan, resolves the
-    target path, searches known folders, transfers files, opens folders using
+    file transfer, rename, and delete operations. It validates the incoming
+    plan, resolves the target path, searches known folders, transfers files,
+    renames items, moves items to the Recycle Bin, opens folders using
     ``os.startfile()``, and keeps the payload compatible with the dispatcher
     contract.
     """
@@ -45,6 +47,7 @@ class FileCapability(ICapability):
         self._logger = logger or logging.getLogger(__name__)
         self._path_resolver = PathResolver(logger=self._logger)
         self._search_engine = SearchEngine(logger=self._logger, path_resolver=self._path_resolver)
+        self._file_operation_service = FileOperationService(logger=self._logger)
         self._transfer_service = TransferService(logger=self._logger)
 
     @property
@@ -67,6 +70,14 @@ class FileCapability(ICapability):
         started_at = time.perf_counter()
 
         try:
+            if action in {"RENAME_FILE", "RENAME_FOLDER"}:
+                result = self._handle_rename_action(action, arguments, started_at)
+                return self._serialize_result(result)
+
+            if action in {"DELETE_FILE", "DELETE_FOLDER"}:
+                result = self._handle_delete_action(action, arguments, started_at)
+                return self._serialize_result(result)
+
             if action in {"COPY_FILE", "MOVE_FILE"}:
                 result = self._handle_transfer_action(action, arguments, started_at)
                 return self._serialize_result(result)
@@ -225,6 +236,107 @@ class FileCapability(ICapability):
             execution_time=time.perf_counter() - started_at,
         )
 
+    def _handle_rename_action(
+        self,
+        action: str,
+        arguments: dict[str, Any],
+        started_at: float,
+    ) -> ExecutionResult:
+        """Handles file and folder rename requests."""
+
+        target_hint, new_name = self._extract_rename_arguments(arguments)
+        source_path = self._resolve_source_path(target_hint, expect_directory=action.endswith("_FOLDER"))
+        if source_path is None:
+            return self._build_operation_failure(
+                operation="rename",
+                target=target_hint,
+                message=f"Unable to locate target '{target_hint}'",
+                started_at=started_at,
+            )
+
+        if not new_name:
+            return self._build_operation_failure(
+                operation="rename",
+                target=target_hint,
+                message="A valid new name is required for rename operations.",
+                started_at=started_at,
+            )
+
+        try:
+            operation_result = self._file_operation_service.rename(source_path, new_name)
+        except Exception as exc:  # pragma: no cover - defensive guard
+            self._logger.exception(
+                "Rename failed",
+                extra={"source": source_path, "new_name": new_name},
+            )
+            return self._build_operation_failure(
+                operation="rename",
+                target=target_hint,
+                message=str(exc),
+                started_at=started_at,
+            )
+
+        success = operation_result.get("status") == "success"
+        return ExecutionResult(
+            success=success,
+            response=operation_result.get("message", "") if success else "",
+            data={
+                "intent": action,
+                "source": source_path,
+                "destination": operation_result.get("destination"),
+                "operation": "rename",
+                "parameters": arguments.get("parameters", {}),
+            },
+            error=operation_result.get("error") if not success else None,
+            execution_time=time.perf_counter() - started_at,
+        )
+
+    def _handle_delete_action(
+        self,
+        action: str,
+        arguments: dict[str, Any],
+        started_at: float,
+    ) -> ExecutionResult:
+        """Handles file and folder delete requests."""
+
+        target_hint = self._extract_delete_target(arguments)
+        target_path = self._resolve_source_path(target_hint, expect_directory=action.endswith("_FOLDER"))
+        if target_path is None:
+            return self._build_operation_failure(
+                operation="delete",
+                target=target_hint,
+                message=f"Unable to locate target '{target_hint}'",
+                started_at=started_at,
+            )
+
+        try:
+            operation_result = self._file_operation_service.delete(target_path)
+        except Exception as exc:  # pragma: no cover - defensive guard
+            self._logger.exception(
+                "Delete failed",
+                extra={"target": target_path},
+            )
+            return self._build_operation_failure(
+                operation="delete",
+                target=target_hint,
+                message=str(exc),
+                started_at=started_at,
+            )
+
+        success = operation_result.get("status") == "success"
+        return ExecutionResult(
+            success=success,
+            response=operation_result.get("message", "") if success else "",
+            data={
+                "intent": action,
+                "target": target_path,
+                "operation": "delete",
+                "parameters": arguments.get("parameters", {}),
+            },
+            error=operation_result.get("error") if not success else None,
+            execution_time=time.perf_counter() - started_at,
+        )
+
     def _search_files(
         self,
         plan: ExecutionPlan,
@@ -295,8 +407,35 @@ class FileCapability(ICapability):
         )
         return source_hint, destination_hint
 
-    def _resolve_source_path(self, source_hint: str) -> str | None:
-        """Resolves a source file path using direct lookup and search."""
+    def _extract_rename_arguments(self, arguments: dict[str, Any]) -> tuple[str, str]:
+        """Extracts rename source and new name hints from dispatcher arguments."""
+
+        parameters = arguments.get("parameters") if isinstance(arguments.get("parameters"), dict) else {}
+        target_hint = self._resolve_target(
+            arguments.get("target") or parameters.get("target") or parameters.get("source")
+        )
+        new_name = self._resolve_target(
+            parameters.get("new_name") or parameters.get("name") or parameters.get("destination")
+        )
+        return target_hint, new_name
+
+    def _extract_delete_target(self, arguments: dict[str, Any]) -> str:
+        """Extracts the delete target hint from dispatcher arguments."""
+
+        parameters = arguments.get("parameters") if isinstance(arguments.get("parameters"), dict) else {}
+        return self._resolve_target(arguments.get("target") or parameters.get("target") or parameters.get("source"))
+
+    def _resolve_source_path(self, source_hint: str, expect_directory: bool = False) -> str | None:
+        """Resolves a source path using direct lookup and search.
+
+        Args:
+            source_hint: The user-provided source name or path.
+            expect_directory: Whether the caller expects a folder target.
+
+        Returns:
+            The resolved absolute path, or ``None`` when it cannot be
+            resolved uniquely.
+        """
 
         if not source_hint or source_hint == "unknown target":
             return None
@@ -309,7 +448,27 @@ class FileCapability(ICapability):
             return None
 
         exact_matches = [match for match in matches if os.path.basename(match).lower() == source_hint.lower()]
-        file_matches = [match for match in exact_matches if os.path.isfile(match)] or [match for match in matches if os.path.isfile(match)]
+
+        if expect_directory:
+            directory_matches = [match for match in exact_matches if os.path.isdir(match)] or [
+                match for match in matches if os.path.isdir(match)
+            ]
+
+            if len(directory_matches) == 1:
+                return os.path.abspath(directory_matches[0])
+
+            if len(directory_matches) > 1:
+                self._logger.warning(
+                    "Multiple folder matches found",
+                    extra={"source_hint": source_hint, "matches": directory_matches},
+                )
+                return None
+
+            return None
+
+        file_matches = [match for match in exact_matches if os.path.isfile(match)] or [
+            match for match in matches if os.path.isfile(match)
+        ]
 
         if len(file_matches) == 1:
             return os.path.abspath(file_matches[0])
@@ -349,6 +508,27 @@ class FileCapability(ICapability):
 
         self._logger.warning(
             "File transfer validation failed",
+            extra={"operation": operation, "target": target, "message": message},
+        )
+        return ExecutionResult(
+            success=False,
+            response="",
+            data={"operation": operation, "target": target},
+            error=message,
+            execution_time=time.perf_counter() - started_at,
+        )
+
+    def _build_operation_failure(
+        self,
+        operation: str,
+        target: str,
+        message: str,
+        started_at: float,
+    ) -> ExecutionResult:
+        """Builds a failure result for rename and delete operations."""
+
+        self._logger.warning(
+            "File operation validation failed",
             extra={"operation": operation, "target": target, "message": message},
         )
         return ExecutionResult(
