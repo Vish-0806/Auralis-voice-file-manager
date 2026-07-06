@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
-import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 from pathlib import Path
 
 from utils.logger import get_logger
@@ -80,7 +79,7 @@ def get_location_path(location: str | None) -> str:
     return HOME_DIR
 
 
-def search_files(query: str) -> List[Dict[str, str]]:
+def search_files(query: str) -> list[dict[str, str]]:
     """Searches recursively for files matching query, with fallback for mock tests."""
 
     if not isinstance(query, str) or not query.strip():
@@ -141,7 +140,7 @@ def search_files(query: str) -> List[Dict[str, str]]:
     return results
 
 
-def resolve_source(target: str) -> Dict[str, Any]:
+def resolve_source(target: str) -> dict[str, Any]:
     """Resolves target source name/path using capabilities SourceResolver."""
 
     resolver = SourceResolver(search_fn=search_files)
