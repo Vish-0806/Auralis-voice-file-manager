@@ -19,7 +19,7 @@ python --version
 echo ""
 
 echo "Checking __init__.py files..."
-for dir in api ai voice utils automation tests app capabilities; do
+for dir in api ai voice utils tests app capabilities; do
     if [ -f "$dir/__init__.py" ]; then
         echo "  OK: $dir/__init__.py exists"
     else

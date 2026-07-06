@@ -21,7 +21,7 @@ echo OK: Python found
 echo.
 
 echo Checking __init__.py files...
-for %%D in (api ai voice utils automation tests app capabilities) do (
+for %%D in (api ai voice utils tests app capabilities) do (
     if exist %%D\__init__.py (
         echo OK: %%D/__init__.py exists
     ) else (

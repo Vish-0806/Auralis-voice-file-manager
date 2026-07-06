@@ -33,8 +33,10 @@ PACKAGES = {
     "capabilities": {
         "description": "Clean-architecture capabilities registry",
         "modules": [
-            "files/file_operations.py - Facade to route legacy actions",
+            "files/file_operations.py - Facade to route legacy file actions",
             "files/file_capability.py - Structured file execution capability",
+            "automation/task_runner.py - Task automation run pipeline",
+            "automation/workflow_manager.py - Workflow execution pipeline",
         ],
         "exports": ["execute_action"],
     },
@@ -62,14 +64,6 @@ PACKAGES = {
         "modules": [
             "controller.py - Application controller",
             "state_manager.py - Manage app state",
-        ],
-        "exports": [],
-    },
-    "automation": {
-        "description": "Task automation and workflows",
-        "modules": [
-            "task_runner.py - Run automated tasks",
-            "workflow_manager.py - Manage workflows",
         ],
         "exports": [],
     },
