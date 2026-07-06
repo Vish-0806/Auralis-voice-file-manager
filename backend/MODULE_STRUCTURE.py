@@ -30,13 +30,11 @@ PACKAGES = {
         ],
         "exports": ["parse_command"],
     },
-    "file_engine": {
-        "description": "File system operations",
+    "capabilities": {
+        "description": "Clean-architecture capabilities registry",
         "modules": [
-            "file_operations.py - Execute open/create/delete actions",
-            "path_resolver.py - Resolve target paths",
-            "permissions.py - Check file permissions",
-            "search_engine.py - Search files and folders",
+            "files/file_operations.py - Facade to route legacy actions",
+            "files/file_capability.py - Structured file execution capability",
         ],
         "exports": ["execute_action"],
     },
@@ -91,7 +89,7 @@ PACKAGES = {
 
 IMPORT_EXAMPLES = {
     "Parse a command": "from ai_engine.command_parser import parse_command",
-    "Execute file action": "from file_engine.file_operations import execute_action",
+    "Execute file action": "from capabilities.files.file_operations import execute_action",
     "Listen to voice": "from voice_engine.speech_to_text import listen",
     "Get logger": "from utils.logger import get_logger",
     "API routes": "from api.routes import router",

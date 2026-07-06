@@ -1,7 +1,7 @@
 import os
 import pytest
 from unittest.mock import patch, MagicMock
-from file_engine.search_engine import search_files
+from capabilities.files.file_operations import search_files
 
 
 def test_search_files_empty_query():
@@ -125,9 +125,9 @@ def test_search_files_permission_error(mock_walk, mock_exists):
     assert results[0]["path"] == "C:\\Users\\User\\Documents\\secret.txt"
 
 
-@patch("file_engine.file_operations.search_files")
+@patch("capabilities.files.file_operations.search_files")
 def test_execute_action_search(mock_search_files):
-    from file_engine.file_operations import execute_action
+    from capabilities.files.file_operations import execute_action
 
     # Case 1: Results found
     mock_search_files.return_value = [

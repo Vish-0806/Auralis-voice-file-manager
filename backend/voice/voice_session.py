@@ -22,7 +22,7 @@ class VoiceSessionManager(IVoiceSessionManager):
 
     def get_pending_action(self) -> Optional[Dict[str, Any]]:
         """Bridges retrieval of pending action state from the application's core manager."""
-        from file_engine.file_operations import get_pending_action
+        from capabilities.files.file_operations import get_pending_action
         return get_pending_action()
 
     def set_pending_action(self, action: str, target: str, destination: Optional[str] = None) -> None:

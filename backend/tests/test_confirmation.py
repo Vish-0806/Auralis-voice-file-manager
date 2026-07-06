@@ -2,7 +2,7 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 from ai_engine.intent_classifier import classify_intent
-from file_engine.file_operations import execute_action, set_pending_action, get_pending_action
+from capabilities.files.file_operations import execute_action, set_pending_action, get_pending_action
 from utils.helpers import format_speak_message
 
 
@@ -98,9 +98,9 @@ def test_delete_cancel_flow(tmp_path):
     assert format_speak_message(cancel_res, {"action": "cancel"}) == "Action cancelled."
 
 
-@patch("file_engine.source_resolver.search_files")
-@patch("file_engine.file_operations.get_location_path")
-@patch("file_engine.transfer.move_item")
+@patch("capabilities.files.file_operations.search_files")
+@patch("capabilities.files.file_operations.get_location_path")
+@patch("capabilities.files.file_operations.move_item")
 def test_move_confirmation_flow(mock_move_item, mock_get_location, mock_search):
     # Ensure no pending action
     set_pending_action(None)
@@ -137,7 +137,7 @@ def test_move_confirmation_flow(mock_move_item, mock_get_location, mock_search):
     assert get_pending_action() is None
 
 
-@patch("file_engine.source_resolver.search_files")
+@patch("capabilities.files.file_operations.search_files")
 def test_move_cancel_flow(mock_search):
     # Ensure no pending action
     set_pending_action(None)
@@ -179,7 +179,7 @@ def test_organize_confirmation_flow(tmp_path):
     }
 
     # Mock get_target_path to return our temp downloads_dir
-    with patch("file_engine.file_operations.get_target_path", return_value=str(downloads_dir)):
+    with patch("capabilities.files.file_operations.get_target_path", return_value=str(downloads_dir)):
         # Step 1: Initial organize request
         res = execute_action(action_data)
         assert isinstance(res, dict)
@@ -212,7 +212,7 @@ def test_organize_cancel_flow(tmp_path):
     }
 
     # Mock get_target_path to return our temp downloads_dir
-    with patch("file_engine.file_operations.get_target_path", return_value=str(downloads_dir)):
+    with patch("capabilities.files.file_operations.get_target_path", return_value=str(downloads_dir)):
         # Step 1: Initial organize request
         res = execute_action(action_data)
         assert isinstance(res, dict)

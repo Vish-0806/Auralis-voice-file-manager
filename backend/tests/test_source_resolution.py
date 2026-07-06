@@ -1,8 +1,7 @@
 import os
 import pytest
 from unittest.mock import patch, MagicMock
-from file_engine.source_resolver import resolve_source
-from file_engine.file_operations import execute_action
+from capabilities.files.file_operations import resolve_source, execute_action
 from utils.helpers import format_speak_message
 
 
@@ -22,7 +21,7 @@ def test_resolve_source_exists_on_disk(tmp_path):
     assert "exists on disk" in res["message"]
 
 
-@patch("file_engine.source_resolver.search_files")
+@patch("capabilities.files.file_operations.search_files")
 def test_resolve_source_single_match(mock_search):
     mock_search.return_value = [
         {"name": "unique.txt", "path": "/mock/unique.txt", "type": ".txt"}
@@ -34,7 +33,7 @@ def test_resolve_source_single_match(mock_search):
     assert "exactly one" in res["message"]
 
 
-@patch("file_engine.source_resolver.search_files")
+@patch("capabilities.files.file_operations.search_files")
 def test_resolve_source_multiple_matches(mock_search):
     mock_search.return_value = [
         {"name": "match.txt", "path": "/mock/1/match.txt", "type": ".txt"},
@@ -47,7 +46,7 @@ def test_resolve_source_multiple_matches(mock_search):
     assert res["results"][0]["path"] == "/mock/1/match.txt"
 
 
-@patch("file_engine.source_resolver.search_files")
+@patch("capabilities.files.file_operations.search_files")
 def test_resolve_source_no_match(mock_search):
     mock_search.return_value = []
 
@@ -57,9 +56,9 @@ def test_resolve_source_no_match(mock_search):
     assert "not found" in res["message"]
 
 
-@patch("file_engine.source_resolver.search_files")
-@patch("file_engine.file_operations.get_location_path")
-@patch("file_engine.transfer.move_item")
+@patch("capabilities.files.file_operations.search_files")
+@patch("capabilities.files.file_operations.get_location_path")
+@patch("capabilities.files.file_operations.move_item")
 def test_execute_action_move_single_match(mock_move_item, mock_get_location, mock_search):
     mock_search.return_value = [
         {"name": "report.pdf", "path": "/mock/report.pdf", "type": ".pdf"}
@@ -87,9 +86,9 @@ def test_execute_action_move_single_match(mock_move_item, mock_get_location, moc
     mock_move_item.assert_called_once_with("/mock/report.pdf", "/mock/documents")
 
 
-@patch("file_engine.source_resolver.search_files")
-@patch("file_engine.file_operations.get_location_path")
-@patch("file_engine.transfer.copy_item")
+@patch("capabilities.files.file_operations.search_files")
+@patch("capabilities.files.file_operations.get_location_path")
+@patch("capabilities.files.file_operations.copy_item")
 def test_execute_action_copy_single_match(mock_copy_item, mock_get_location, mock_search):
     mock_search.return_value = [
         {"name": "resume.pdf", "path": "/mock/resume.pdf", "type": ".pdf"}
@@ -116,7 +115,7 @@ def test_execute_action_copy_single_match(mock_copy_item, mock_get_location, moc
     mock_copy_item.assert_called_once_with("/mock/resume.pdf", "/mock/desktop")
 
 
-@patch("file_engine.source_resolver.search_files")
+@patch("capabilities.files.file_operations.search_files")
 def test_execute_action_move_multiple_matches(mock_search):
     mock_search.return_value = [
         {"name": "report.pdf", "path": "/mock/1/report.pdf", "type": ".pdf"},
@@ -135,7 +134,7 @@ def test_execute_action_move_multiple_matches(mock_search):
     assert len(res["results"]) == 2
 
 
-@patch("file_engine.source_resolver.search_files")
+@patch("capabilities.files.file_operations.search_files")
 def test_execute_action_copy_no_match(mock_search):
     mock_search.return_value = []
 

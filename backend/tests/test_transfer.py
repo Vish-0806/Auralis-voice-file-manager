@@ -1,7 +1,7 @@
 import os
 import pytest
 from unittest.mock import patch
-from file_engine.transfer import copy_item, move_item
+from capabilities.files.file_operations import copy_item, move_item
 
 
 def test_invalid_parameters():
