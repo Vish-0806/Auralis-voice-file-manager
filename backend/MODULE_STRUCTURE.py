@@ -20,13 +20,13 @@ PACKAGES = {
         ],
         "exports": ["router", "voice_router"],
     },
-    "ai_engine": {
-        "description": "Natural language processing and command parsing",
+    "ai": {
+        "description": "Natural language processing, rule-based command parsing, and agentic loops",
         "modules": [
             "command_parser.py - Parse text commands into action + target",
             "intent_classifier.py - Classify command intent",
             "entity_extractor.py - Extract entities from commands",
-            "response_generator.py - Generate response text",
+            "agent.py - Main agentic loop orchestrator",
         ],
         "exports": ["parse_command"],
     },
@@ -88,7 +88,7 @@ PACKAGES = {
 # ====================================
 
 IMPORT_EXAMPLES = {
-    "Parse a command": "from ai_engine.command_parser import parse_command",
+    "Parse a command": "from ai.command_parser import parse_command",
     "Execute file action": "from capabilities.files.file_operations import execute_action",
     "Listen to voice": "from voice_engine.speech_to_text import listen",
     "Get logger": "from utils.logger import get_logger",
