@@ -1,4 +1,6 @@
+"""Backward compatibility wrapper delegating to backend/capabilities.
+
+TODO: This legacy package can be removed once all references to automation are deleted.
 """
-Auralis Automation Package
-Contains task automation and workflow management.
-"""
+
+from capabilities.automation import *
