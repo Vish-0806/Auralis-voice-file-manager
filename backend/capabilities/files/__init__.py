@@ -7,6 +7,7 @@ from .search_engine import SearchEngine
 from .transfer_service import TransferService
 from .folder_service import FolderService
 from .organizer.download_organizer import DownloadOrganizer
+from .source_resolver import SourceResolver
 
 __all__ = [
     "FileCapability",
@@ -16,4 +17,5 @@ __all__ = [
     "TransferService",
     "FolderService",
     "DownloadOrganizer",
+    "SourceResolver",
 ]

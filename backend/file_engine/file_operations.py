@@ -1,3 +1,4 @@
+# TODO: Legacy file_engine version can later be removed.
 import os
 import shutil
 from file_engine.search_engine import search_files
