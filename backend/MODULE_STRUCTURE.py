@@ -63,7 +63,7 @@ PACKAGES = {
         "description": "Application state and control",
         "modules": [
             "controller.py - Application controller",
-            "state_manager.py - Manage app state",
+            "confirmation_manager.py - Manage app confirmation state",
         ],
         "exports": [],
     },

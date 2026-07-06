@@ -27,12 +27,12 @@ class VoiceSessionManager(IVoiceSessionManager):
 
     def set_pending_action(self, action: str, target: str, destination: Optional[str] = None) -> None:
         """Saves a pending state action."""
-        from app.state_manager import StateManager
-        StateManager.set_pending_action(action, target, destination)
+        from app.confirmation_manager import ConfirmationManager
+        ConfirmationManager.set_pending_action(action, target, destination)
         self.session.last_active_time = time.time()
 
     def clear_pending_action(self) -> None:
         """Clears out currently stored pending state actions."""
-        from app.state_manager import StateManager
-        StateManager.clear_pending_action()
+        from app.confirmation_manager import ConfirmationManager
+        ConfirmationManager.clear_pending_action()
         self.session.last_active_time = time.time()
