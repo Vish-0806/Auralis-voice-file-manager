@@ -21,7 +21,7 @@ echo OK: Python found
 echo.
 
 echo Checking __init__.py files...
-for %%D in (api ai_engine voice utils automation tests app capabilities) do (
+for %%D in (api ai voice utils automation tests app capabilities) do (
     if exist %%D\__init__.py (
         echo OK: %%D/__init__.py exists
     ) else (
@@ -35,7 +35,7 @@ echo Testing module imports...
 python -c "from api.routes import router; print('  OK: api.routes')" || (echo   ERROR: api.routes & exit /b 1)
 python -c "from api.voice_routes import router as voice_router; print('  OK: api.voice_routes')" || (echo   ERROR: api.voice_routes & exit /b 1)
 python -c "from api.listener_routes import router as listener_router; print('  OK: api.listener_routes')" || (echo   ERROR: api.listener_routes & exit /b 1)
-python -c "from ai_engine.command_parser import parse_command; print('  OK: ai_engine.command_parser')" || (echo   ERROR: ai_engine.command_parser & exit /b 1)
+python -c "from ai.command_parser import parse_command; print('  OK: ai.command_parser')" || (echo   ERROR: ai.command_parser & exit /b 1)
 python -c "from capabilities.files.file_operations import execute_action; print('  OK: capabilities.files.file_operations')" || (echo   ERROR: capabilities.files.file_operations & exit /b 1)
 python -c "from voice.speech_to_text import listen; print('  OK: voice.speech_to_text')" || (echo   ERROR: voice.speech_to_text & exit /b 1)
 python -c "from utils.logger import get_logger; print('  OK: utils.logger')" || (echo   ERROR: utils.logger & exit /b 1)

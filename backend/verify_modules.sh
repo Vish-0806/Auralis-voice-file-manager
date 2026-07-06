@@ -19,7 +19,7 @@ python --version
 echo ""
 
 echo "Checking __init__.py files..."
-for dir in api ai_engine voice utils automation tests app capabilities; do
+for dir in api ai voice utils automation tests app capabilities; do
     if [ -f "$dir/__init__.py" ]; then
         echo "  OK: $dir/__init__.py exists"
     else
@@ -38,8 +38,8 @@ try:
     print('  OK: api.voice_routes')
     from api.listener_routes import router as listener_router
     print('  OK: api.listener_routes')
-    from ai_engine.command_parser import parse_command
-    print('  OK: ai_engine.command_parser')
+    from ai.command_parser import parse_command
+    print('  OK: ai.command_parser')
     from capabilities.files.file_operations import execute_action
     print('  OK: capabilities.files.file_operations')
     from voice.speech_to_text import listen

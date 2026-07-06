@@ -1,20 +1,26 @@
-"""
-Auralis AI Engine Package
-Contains natural language processing and command parsing logic.
+"""Backward compatibility wrapper delegating to backend/ai.
+
+TODO: This legacy package can be removed once all references to ai_engine are deleted.
 """
 
-from ai_engine.command_parser import parse_command
-from ai_engine.command_normalizer import normalize_command, normalize_target
-from ai_engine.entity_extractor import extract_file_names, extract_folder_location, extract_folder_names, extract_targets
-from ai_engine.intent_classifier import classify_intent
+from ai import (
+    parse_command,
+    normalize_command,
+    normalize_target,
+    classify_intent,
+    extract_file_names,
+    extract_folder_location,
+    extract_folder_names,
+    extract_targets,
+)
 
 __all__ = [
-	"parse_command",
-	"normalize_command",
-	"normalize_target",
-	"classify_intent",
-	"extract_file_names",
-	"extract_folder_location",
-	"extract_folder_names",
-	"extract_targets",
+    "parse_command",
+    "normalize_command",
+    "normalize_target",
+    "classify_intent",
+    "extract_file_names",
+    "extract_folder_location",
+    "extract_folder_names",
+    "extract_targets",
 ]

@@ -1,7 +1,7 @@
 import os
 import pytest
 from unittest.mock import patch, MagicMock
-from ai_engine.intent_classifier import classify_intent
+from ai.intent_classifier import classify_intent
 from capabilities.files.file_operations import execute_action, set_pending_action, get_pending_action
 from utils.helpers import format_speak_message
 
