@@ -91,8 +91,8 @@ class ContinuousListener(IVoiceListener):
                     continue
 
                 # Step 4: Parse or handle pending action
-                from file_engine.file_operations import get_pending_action
-                from ai_engine.intent_classifier import classify_intent
+                from capabilities.files.file_operations import get_pending_action
+                from ai.intent_classifier import classify_intent
 
                 pending = get_pending_action()
                 if pending:

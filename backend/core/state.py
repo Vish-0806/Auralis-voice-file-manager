@@ -7,7 +7,7 @@ Responsibility:
 
 This module SHOULD:
     - Define a SystemState enum or class identifying valid operational phases.
-    - Provide a StateManager class that manages transitions thread-safely.
+    - Provide a SystemStateManager class that manages transitions thread-safely.
     - Implement an Observer interface for dispatching state update signals.
 
 This module should NEVER:
@@ -16,7 +16,7 @@ This module should NEVER:
     - Hardcode business logic actions inside state transition events.
 """
 
-from typing import List, Callable, Dict, Any, Optional
+from typing import List, Callable
 import enum
 import threading
 
@@ -31,7 +31,7 @@ class SystemStatus(enum.Enum):
     ERROR = "error"
 
 
-class StateManager:
+class SystemStateManager:
     """Tracks and modifies system-wide execution states thread-safely."""
     
     def __init__(self) -> None:

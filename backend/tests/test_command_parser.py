@@ -1,10 +1,10 @@
 # pyrefly: ignore [missing-import]
 import pytest
 
-from ai_engine.command_normalizer import normalize_command, normalize_target
-from ai_engine.command_parser import parse_command
-from ai_engine.entity_extractor import extract_file_names, extract_folder_names, extract_targets, extract_folder_location
-from ai_engine.intent_classifier import classify_intent
+from ai.command_normalizer import normalize_command, normalize_target
+from ai.command_parser import parse_command
+from ai.entity_extractor import extract_file_names, extract_folder_names, extract_targets, extract_folder_location
+from ai.intent_classifier import classify_intent
 
 
 @pytest.mark.parametrize(

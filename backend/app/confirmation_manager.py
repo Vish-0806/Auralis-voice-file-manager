@@ -1,5 +1,5 @@
 """
-Auralis Application State Manager
+Auralis Application Confirmation State Manager
 Manages application state, specifically pending actions for confirmation workflows
 and support for future multi-step workflows.
 """
@@ -8,7 +8,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 
-class StateManager:
+class ConfirmationManager:
     """Manages application state, specifically pending actions for confirmation workflows
 
     and future multi-step automation workflows.

@@ -56,8 +56,27 @@ class TransferService:
 
         return self._transfer(source_path, destination_path, operation="move")
 
+    def _get_unique_destination(self, source: Path, destination: Path) -> Path:
+        """Determines a unique destination path to avoid collisions."""
+        basename = source.name
+        if source.is_file():
+            name, ext = source.stem, source.suffix
+        else:
+            name, ext = basename, ""
+
+        dest_path = destination / basename
+        counter = 1
+        while dest_path.exists():
+            if ext:
+                new_name = f"{name}_{counter}{ext}"
+            else:
+                new_name = f"{name}_{counter}"
+            dest_path = destination / new_name
+            counter += 1
+        return dest_path
+
     def _transfer(self, source_path: str, destination_path: str, operation: str) -> dict[str, Any]:
-        """Validates and performs a safe file transfer."""
+        """Validates and performs a safe copy or move transfer."""
 
         source = self._normalize_path(source_path)
         destination = self._normalize_path(destination_path)
@@ -72,22 +91,19 @@ class TransferService:
         if not source.exists():
             return self._error_result(
                 operation=operation,
-                message=f"Source file '{source}' does not exist.",
+                message=f"Source path '{source}' does not exist.",
                 error_class="FileNotFoundError",
             )
 
-        if not source.is_file():
+        # Create destination directory if it does not exist (migrated from legacy)
+        try:
+            destination.mkdir(parents=True, exist_ok=True)
+        except Exception as exc:
             return self._error_result(
                 operation=operation,
-                message=f"Source path '{source}' is not a file.",
-                error_class="IsADirectoryError",
-            )
-
-        if not destination.exists():
-            return self._error_result(
-                operation=operation,
-                message=f"Destination folder '{destination}' does not exist.",
-                error_class="FileNotFoundError",
+                message=f"Failed to create destination folder '{destination}': {exc}",
+                error_class="PermissionError",
+                error=str(exc),
             )
 
         if not destination.is_dir():
@@ -97,23 +113,20 @@ class TransferService:
                 error_class="NotADirectoryError",
             )
 
-        target_path = destination / source.name
-        if target_path.exists():
-            return self._error_result(
-                operation=operation,
-                message=f"Destination file '{target_path}' already exists.",
-                error_class="FileExistsError",
-            )
+        target_path = self._get_unique_destination(source, destination)
 
         try:
             self._logger.info(
-                "Transferring file",
+                "Transferring item",
                 extra={"operation": operation, "source": str(source), "destination": str(target_path)},
             )
             if operation == "copy":
-                shutil.copy2(source, target_path)
+                if source.is_dir():
+                    shutil.copytree(str(source), str(target_path))
+                else:
+                    shutil.copy2(str(source), str(target_path))
             else:
-                shutil.move(source, target_path)
+                shutil.move(str(source), str(target_path))
 
             return {
                 "status": "success",
@@ -124,7 +137,7 @@ class TransferService:
             }
         except PermissionError as exc:
             self._logger.exception(
-                "Permission error during file transfer",
+                "Permission error during transfer",
                 extra={"operation": operation, "source": str(source), "destination": str(target_path)},
             )
             return self._error_result(
@@ -135,12 +148,12 @@ class TransferService:
             )
         except Exception as exc:  # pragma: no cover - defensive guard
             self._logger.exception(
-                "Unexpected error during file transfer",
+                "Unexpected error during transfer",
                 extra={"operation": operation, "source": str(source), "destination": str(target_path)},
             )
             return self._error_result(
                 operation=operation,
-                message=f"An error occurred while attempting to {operation} '{source.name}'.",
+                message=f"An error occurred while attempting to {operation} '{source.name}': {exc}",
                 error_class=exc.__class__.__name__,
                 error=str(exc),
             )

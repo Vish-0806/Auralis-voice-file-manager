@@ -20,23 +20,23 @@ PACKAGES = {
         ],
         "exports": ["router", "voice_router"],
     },
-    "ai_engine": {
-        "description": "Natural language processing and command parsing",
+    "ai": {
+        "description": "Natural language processing, rule-based command parsing, and agentic loops",
         "modules": [
             "command_parser.py - Parse text commands into action + target",
             "intent_classifier.py - Classify command intent",
             "entity_extractor.py - Extract entities from commands",
-            "response_generator.py - Generate response text",
+            "agent.py - Main agentic loop orchestrator",
         ],
         "exports": ["parse_command"],
     },
-    "file_engine": {
-        "description": "File system operations",
+    "capabilities": {
+        "description": "Clean-architecture capabilities registry",
         "modules": [
-            "file_operations.py - Execute open/create/delete actions",
-            "path_resolver.py - Resolve target paths",
-            "permissions.py - Check file permissions",
-            "search_engine.py - Search files and folders",
+            "files/file_operations.py - Facade to route legacy file actions",
+            "files/file_capability.py - Structured file execution capability",
+            "automation/task_runner.py - Task automation run pipeline",
+            "automation/workflow_manager.py - Workflow execution pipeline",
         ],
         "exports": ["execute_action"],
     },
@@ -63,15 +63,7 @@ PACKAGES = {
         "description": "Application state and control",
         "modules": [
             "controller.py - Application controller",
-            "state_manager.py - Manage app state",
-        ],
-        "exports": [],
-    },
-    "automation": {
-        "description": "Task automation and workflows",
-        "modules": [
-            "task_runner.py - Run automated tasks",
-            "workflow_manager.py - Manage workflows",
+            "confirmation_manager.py - Manage app confirmation state",
         ],
         "exports": [],
     },
@@ -90,8 +82,8 @@ PACKAGES = {
 # ====================================
 
 IMPORT_EXAMPLES = {
-    "Parse a command": "from ai_engine.command_parser import parse_command",
-    "Execute file action": "from file_engine.file_operations import execute_action",
+    "Parse a command": "from ai.command_parser import parse_command",
+    "Execute file action": "from capabilities.files.file_operations import execute_action",
     "Listen to voice": "from voice_engine.speech_to_text import listen",
     "Get logger": "from utils.logger import get_logger",
     "API routes": "from api.routes import router",

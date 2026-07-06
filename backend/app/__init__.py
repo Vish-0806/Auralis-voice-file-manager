@@ -3,7 +3,7 @@ Auralis Application Package
 Contains application state and controller logic.
 """
 
-from app.state_manager import StateManager
+from app.confirmation_manager import ConfirmationManager
 
-__all__ = ["StateManager"]
+__all__ = ["ConfirmationManager"]
 

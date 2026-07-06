@@ -1,6 +1,6 @@
 import sys
 sys.path.insert(0, 'backend')
-from ai_engine.command_parser import parse_command
+from ai.command_parser import parse_command
 
 def assert_parsed(cmd, action, target, location=None):
     res = parse_command(cmd)

@@ -1,14 +1,11 @@
-"""
-Compatibility parser that orchestrates the NLP pipeline.
-"""
+"""Compatibility parser that orchestrates the NLP pipeline."""
 
 from typing import Dict
 
-from ai_engine.command_normalizer import normalize_command
-from ai_engine.entity_extractor import extract_folder_location, extract_targets
-from ai_engine.intent_classifier import classify_intent
+from ai.command_normalizer import normalize_command
+from ai.entity_extractor import extract_folder_location, extract_targets
+from ai.intent_classifier import classify_intent
 from utils.logger import get_logger
-
 
 logger = get_logger(__name__)
 

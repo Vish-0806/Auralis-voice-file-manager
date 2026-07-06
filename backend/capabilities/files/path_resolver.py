@@ -21,6 +21,8 @@ class PathResolver:
         "downloads": "Downloads",
         "documents": "Documents",
         "pictures": "Pictures",
+        "music": "Music",
+        "videos": "Videos",
     }
 
     def __init__(self, logger: logging.Logger | None = None) -> None:
@@ -50,7 +52,7 @@ class PathResolver:
             return None
 
         direct_path = Path(cleaned_folder).expanduser()
-        if direct_path.exists() and direct_path.is_dir():
+        if os.path.exists(str(direct_path)) and os.path.isdir(str(direct_path)):
             return str(direct_path.resolve())
 
         normalized_folder = self._normalize_folder_name(cleaned_folder)
@@ -60,7 +62,7 @@ class PathResolver:
 
         base_path = Path.home()
         resolved_path = base_path / self._SUPPORTED_FOLDERS[normalized_folder]
-        if not resolved_path.exists() or not resolved_path.is_dir():
+        if not os.path.exists(str(resolved_path)):
             self._logger.debug(
                 "Resolved folder does not exist",
                 extra={"folder_name": folder_name, "path": str(resolved_path)},

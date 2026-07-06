@@ -1,14 +1,10 @@
-"""
-Rule-based text normalization helpers for Auralis commands.
-"""
+"""Rule-based text normalization helpers for Auralis commands."""
 
 import re
 
 from utils.logger import get_logger
 
-
 logger = get_logger(__name__)
-
 
 FILLER_PHRASES = [
     r"please",

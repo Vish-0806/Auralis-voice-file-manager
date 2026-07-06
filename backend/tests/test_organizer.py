@@ -2,8 +2,7 @@ import os
 import shutil
 import pytest
 from unittest.mock import patch, MagicMock
-from file_engine.organizer import get_category_for_file, organize_directory
-from file_engine.file_operations import execute_action
+from capabilities.files.file_operations import get_category_for_file, organize_directory, execute_action
 from utils.helpers import format_speak_message
 
 
@@ -133,7 +132,7 @@ def test_execute_action_organize(tmp_path):
     txt_file.write_text("some notes")
 
     # Mock get_target_path to return our temp dir
-    with patch("file_engine.file_operations.get_target_path", return_value=str(tmp_path)):
+    with patch("capabilities.files.file_operations.get_target_path", return_value=str(tmp_path)):
         action_data = {"action": "organize", "target": "downloads"}
         
         # Step 1: Initial organize request (requires confirmation)

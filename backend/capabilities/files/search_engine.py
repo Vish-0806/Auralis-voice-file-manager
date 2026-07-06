@@ -76,23 +76,32 @@ class SearchEngine:
     def _search_scope(self, root: Path, query: str) -> list[str]:
         """Searches a single root recursively for matching files and folders."""
 
+        import os
         matches: list[str] = []
-        stack: list[Path] = [root]
 
-        while stack:
-            current = stack.pop()
-            try:
-                for entry in current.iterdir():
-                    if self._entry_matches(entry, query):
-                        matches.append(str(entry.resolve()))
+        def handle_walk_error(err: OSError):
+            self._logger.warning(
+                "Unable to access directory during search",
+                extra={"path": err.filename, "error": str(err)},
+            )
 
-                    if entry.is_dir():
-                        stack.append(entry)
-            except (PermissionError, OSError) as exc:
-                self._logger.warning(
-                    "Unable to access directory during search",
-                    extra={"path": str(current), "error": str(exc)},
-                )
+        try:
+            for r, dirs, files in os.walk(str(root), topdown=True, onerror=handle_walk_error):
+                # Search files
+                for f in files:
+                    f_path = Path(r) / f
+                    if self._entry_matches(f_path, query):
+                        matches.append(str(f_path.resolve()))
+                # Search dirs
+                for d in dirs:
+                    d_path = Path(r) / d
+                    if self._entry_matches(d_path, query):
+                        matches.append(str(d_path.resolve()))
+        except Exception as exc:
+            self._logger.exception(
+                "Unexpected error walking directory during search",
+                extra={"path": str(root), "error": str(exc)},
+            )
 
         return matches
 
