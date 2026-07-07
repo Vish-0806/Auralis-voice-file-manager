@@ -225,10 +225,14 @@ Auralis/
 │   │   ├── constants.py
 │   │   ├── helpers.py
 │   │   └── logger.py
-│   ├── voice_engine/          # Audio stream handling and wake word logic
-│   │   ├── speech_to_text.py
-│   │   ├── text_to_speech.py
-│   │   └── wake_word.py
+│   ├── voice/                 # Modular Voice Engine subsystems
+│   │   ├── speech/            # Microphone capture, DSP audio processing, and STT transcribers
+│   │   ├── conversation/      # Conversation state machine and inactivity timers
+│   │   ├── tts/               # Text-to-Speech synthesis and Windows play queue workers
+│   │   ├── ux/                # UX status tracking and winsound audio transition chimes
+│   │   ├── context/           # Conversational memory and pronoun/ordinal reference resolvers
+│   │   ├── integration/       # End-to-end pipeline coordination and error recovery loops
+│   │   └── wake_word/         # Local pattern-matching wake word detector and listener
 │   ├── tests/                 # Unit and integration test suites
 │   ├── main.py                # Backend entry point
 │   └── requirements.txt       # Python package dependencies
@@ -259,10 +263,9 @@ Auralis/
 Track the development stages of Auralis:
 
 * [x] **Core Pipeline:** Create the modular FastAPI backend structure and link to Vitest-proxied React dashboard.
-* [x] **Voice Recognition:** Integrate SpeechRecognition engine with PyAudio fallback loops.
-* [x] **State Machine:** Implement state managers to handle double-confirmation steps for deletion and moves.
+* [x] **Voice Subsystems (Phase 3):** Implement modular Speech-to-Text (Whisper), Text-to-Speech (Edge-TTS), Session Manager state-machine, Inactivity timers, Voice UX (status tracks, sound chimes), and Context reference resolvers.
+* [x] **Pipeline Integration:** Stitch all voice subsystems into a thread-safe, continuous execution pipeline with robust error recovery (mic reconnects, STT fallbacks, planner/capability exceptions, speech interruption).
 * [ ] **Current Development:**
-  * [ ] Build out the wake word detection module using local lightweight models.
   * [ ] Implement basic document intelligence parser using local PyMuPDF extraction.
   * [ ] Refactor the system monitoring panel to display real-time CPU/RAM graphs in the dashboard.
 * [ ] **Future Objectives:**
