@@ -68,6 +68,16 @@ class ActionDispatcher(IDispatcher):
         Intent.SAVE_SCREENSHOT,
         Intent.START_RECORDING,
         Intent.STOP_RECORDING,
+        Intent.TYPE_TEXT,
+        Intent.PRESS_KEY,
+        Intent.PRESS_SHORTCUT,
+        Intent.MOVE_MOUSE,
+        Intent.CLICK_MOUSE,
+        Intent.DOUBLE_CLICK,
+        Intent.RIGHT_CLICK,
+        Intent.SCROLL,
+        Intent.DRAG_DROP,
+        Intent.RUN_MACRO,
         Intent.UNKNOWN,
     }
 
@@ -253,6 +263,16 @@ class ActionDispatcher(IDispatcher):
             Intent.SAVE_SCREENSHOT,
             Intent.START_RECORDING,
             Intent.STOP_RECORDING,
+            Intent.TYPE_TEXT,
+            Intent.PRESS_KEY,
+            Intent.PRESS_SHORTCUT,
+            Intent.MOVE_MOUSE,
+            Intent.CLICK_MOUSE,
+            Intent.DOUBLE_CLICK,
+            Intent.RIGHT_CLICK,
+            Intent.SCROLL,
+            Intent.DRAG_DROP,
+            Intent.RUN_MACRO,
         }:
             return "desktop"
 

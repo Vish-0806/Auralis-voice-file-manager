@@ -74,6 +74,16 @@ class Planner(IPlanner):
         Intent.SAVE_SCREENSHOT,
         Intent.START_RECORDING,
         Intent.STOP_RECORDING,
+        Intent.TYPE_TEXT,
+        Intent.PRESS_KEY,
+        Intent.PRESS_SHORTCUT,
+        Intent.MOVE_MOUSE,
+        Intent.CLICK_MOUSE,
+        Intent.DOUBLE_CLICK,
+        Intent.RIGHT_CLICK,
+        Intent.SCROLL,
+        Intent.DRAG_DROP,
+        Intent.RUN_MACRO,
         Intent.UNKNOWN,
     )
 
@@ -346,6 +356,46 @@ class Planner(IPlanner):
         elif intent == Intent.DELETE_FOLDER:
             folder_name = self._extract_delete_folder_info_from_message(request.message)
             target = folder_name
+        elif intent == Intent.TYPE_TEXT:
+            orig = request.message
+            if orig.lower().startswith("type "):
+                target = orig[len("type "):].strip()
+            else:
+                target = orig
+        elif intent == Intent.MOVE_MOUSE:
+            import re
+            m = re.search(r'\(?\s*(-?\d+)\s*,\s*(-?\d+)\s*\)?', request.message)
+            if m:
+                target = f"{m.group(1)},{m.group(2)}"
+            else:
+                target = self._extract_target(normalized_message, intent)
+        elif intent == Intent.RUN_MACRO:
+            orig = request.message
+            val = orig
+            if val.lower().startswith("run "):
+                val = val[len("run "):]
+            if val.lower().endswith(" macro"):
+                val = val[:-len(" macro")]
+            target = val.strip()
+        elif intent == Intent.PRESS_SHORTCUT:
+            orig = request.message
+            val = orig
+            if val.lower().startswith("press "):
+                val = val[len("press "):]
+            target = val.strip()
+        elif intent == Intent.PRESS_KEY:
+            orig = request.message
+            val = orig
+            if val.lower().startswith("press "):
+                val = val[len("press "):]
+            target = val.strip()
+        elif intent == Intent.SCROLL:
+            if "down" in normalized_message:
+                target = "down"
+            elif "up" in normalized_message:
+                target = "up"
+            else:
+                target = self._extract_target(normalized_message, intent)
         else:
             target = self._extract_target(normalized_message, intent)
 
@@ -558,6 +608,36 @@ class Planner(IPlanner):
         if normalized_message in {"stop recording screen", "stop screen recording", "stop recording", "stop record"}:
             return Intent.STOP_RECORDING
 
+        if normalized_message.startswith("type "):
+            return Intent.TYPE_TEXT
+
+        if normalized_message.startswith("press "):
+            shortcut_indicators = {"ctrl", "shift", "alt", "win", "+"}
+            if any(indicator in normalized_message for indicator in shortcut_indicators):
+                return Intent.PRESS_SHORTCUT
+            return Intent.PRESS_KEY
+
+        if normalized_message.startswith("move mouse ") or normalized_message.startswith("move mouse to "):
+            return Intent.MOVE_MOUSE
+
+        if normalized_message in {"click", "click mouse", "left click"}:
+            return Intent.CLICK_MOUSE
+
+        if normalized_message in {"double click", "double click mouse"}:
+            return Intent.DOUBLE_CLICK
+
+        if normalized_message in {"right click", "right click mouse"}:
+            return Intent.RIGHT_CLICK
+
+        if normalized_message.startswith("scroll "):
+            return Intent.SCROLL
+
+        if normalized_message.startswith("drag ") or normalized_message.startswith("drag and drop "):
+            return Intent.DRAG_DROP
+
+        if (normalized_message.startswith("run ") and normalized_message.endswith(" macro")) or "macro" in normalized_message:
+            return Intent.RUN_MACRO
+
         if any(normalized_message.startswith(hint) for hint in self._MINIMIZE_WINDOW_HINTS):
             return Intent.MINIMIZE_WINDOW
 
@@ -674,6 +754,9 @@ class Planner(IPlanner):
             Intent.COPY_SCREENSHOT,
             Intent.START_RECORDING,
             Intent.STOP_RECORDING,
+            Intent.CLICK_MOUSE,
+            Intent.DOUBLE_CLICK,
+            Intent.RIGHT_CLICK,
         }:
             return None
 
@@ -772,6 +855,16 @@ class Planner(IPlanner):
             Intent.SAVE_SCREENSHOT: 0.75,
             Intent.START_RECORDING: 0.75,
             Intent.STOP_RECORDING: 0.75,
+            Intent.TYPE_TEXT: 0.75,
+            Intent.PRESS_KEY: 0.75,
+            Intent.PRESS_SHORTCUT: 0.75,
+            Intent.MOVE_MOUSE: 0.75,
+            Intent.CLICK_MOUSE: 0.75,
+            Intent.DOUBLE_CLICK: 0.75,
+            Intent.RIGHT_CLICK: 0.75,
+            Intent.SCROLL: 0.75,
+            Intent.DRAG_DROP: 0.75,
+            Intent.RUN_MACRO: 0.75,
             Intent.UNKNOWN: 0.20,
         }
         confidence = base_scores.get(intent, 0.20)

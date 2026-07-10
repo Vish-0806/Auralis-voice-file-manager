@@ -28,3 +28,4 @@ pygetwindow==0.0.9
 pycaw==20251023
 mss==10.2.0
 Pillow==12.3.0
+pyautogui==0.9.54

@@ -16,6 +16,7 @@ from .system.system_service import SystemService
 from .clipboard.clipboard_service import ClipboardService
 from .screenshot.screenshot_service import ScreenshotService
 from .screenshot.screen_recorder import ScreenRecorder
+from .input.input_service import InputService
 
 
 class DesktopCapability(ICapability):
@@ -64,6 +65,16 @@ class DesktopCapability(ICapability):
         Intent.SAVE_SCREENSHOT,
         Intent.START_RECORDING,
         Intent.STOP_RECORDING,
+        Intent.TYPE_TEXT,
+        Intent.PRESS_KEY,
+        Intent.PRESS_SHORTCUT,
+        Intent.MOVE_MOUSE,
+        Intent.CLICK_MOUSE,
+        Intent.DOUBLE_CLICK,
+        Intent.RIGHT_CLICK,
+        Intent.SCROLL,
+        Intent.DRAG_DROP,
+        Intent.RUN_MACRO,
     })
     _CAPABILITY_NAME = "desktop"
 
@@ -75,6 +86,7 @@ class DesktopCapability(ICapability):
         clipboard_service: ClipboardService | None = None,
         screenshot_service: ScreenshotService | None = None,
         screen_recorder: ScreenRecorder | None = None,
+        input_service: InputService | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """Initializes the DesktopCapability.
@@ -86,6 +98,7 @@ class DesktopCapability(ICapability):
             clipboard_service: Preconfigured ClipboardService instance.
             screenshot_service: Preconfigured ScreenshotService instance.
             screen_recorder: Preconfigured ScreenRecorder instance.
+            input_service: Preconfigured InputService instance.
             logger: Optional logger for capability diagnostics.
         """
 
@@ -96,6 +109,7 @@ class DesktopCapability(ICapability):
         self._clipboard_service = clipboard_service or ClipboardService(logger=self._logger)
         self._screenshot_service = screenshot_service or ScreenshotService(logger=self._logger)
         self._screen_recorder = screen_recorder or ScreenRecorder(logger=self._logger)
+        self._input_service = input_service or InputService(logger=self._logger)
 
     @property
     def name(self) -> str:
@@ -598,6 +612,119 @@ class DesktopCapability(ICapability):
                 success=success,
                 response=response,
                 data={},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.TYPE_TEXT:
+            if not target:
+                raise ValueError("Text to type is required.")
+            self._input_service.type_text(target)
+            return ExecutionResult(
+                success=True,
+                response="Typed text successfully.",
+                data={"typed_text": target},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.PRESS_KEY:
+            if not target:
+                raise ValueError("Key to press is required.")
+            self._input_service.press_key(target)
+            return ExecutionResult(
+                success=True,
+                response=f"Pressed key '{target}' successfully.",
+                data={"key": target},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.PRESS_SHORTCUT:
+            if not target:
+                raise ValueError("Shortcut combination is required.")
+            self._input_service.press_shortcut(target)
+            return ExecutionResult(
+                success=True,
+                response=f"Pressed shortcut '{target}' successfully.",
+                data={"shortcut": target},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.MOVE_MOUSE:
+            if not target:
+                raise ValueError("Target coordinates are required.")
+            parts = target.split(",")
+            x = int(parts[0].strip())
+            y = int(parts[1].strip())
+            self._input_service.move_mouse(x, y)
+            return ExecutionResult(
+                success=True,
+                response=f"Moved mouse to ({x}, {y}) successfully.",
+                data={"x": x, "y": y},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.CLICK_MOUSE:
+            btn = target or "left"
+            self._input_service.click(btn)
+            return ExecutionResult(
+                success=True,
+                response="Clicked mouse successfully.",
+                data={"button": btn},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.DOUBLE_CLICK:
+            btn = target or "left"
+            self._input_service.double_click(btn)
+            return ExecutionResult(
+                success=True,
+                response="Double clicked mouse successfully.",
+                data={"button": btn},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.RIGHT_CLICK:
+            self._input_service.right_click()
+            return ExecutionResult(
+                success=True,
+                response="Right clicked mouse successfully.",
+                data={},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.SCROLL:
+            direction = target or "down"
+            self._input_service.scroll(direction)
+            return ExecutionResult(
+                success=True,
+                response=f"Scrolled {direction} successfully.",
+                data={"direction": direction},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.DRAG_DROP:
+            if not target:
+                raise ValueError("Drag coordinates target string 'x1,y1,x2,y2' is required.")
+            parts = target.split(",")
+            x1 = int(parts[0].strip())
+            y1 = int(parts[1].strip())
+            x2 = int(parts[2].strip())
+            y2 = int(parts[3].strip())
+            self._input_service.drag_and_drop(x1, y1, x2, y2)
+            return ExecutionResult(
+                success=True,
+                response="Dragged and dropped successfully.",
+                data={"from": (x1, y1), "to": (x2, y2)},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.RUN_MACRO:
+            if not target:
+                raise ValueError("Macro name is required.")
+            self._input_service.run_macro(target)
+            return ExecutionResult(
+                success=True,
+                response=f"Successfully executed macro '{target}'.",
+                data={"macro": target},
                 execution_time=time.perf_counter() - execution_started_at,
             )
 
