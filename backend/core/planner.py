@@ -84,6 +84,8 @@ class Planner(IPlanner):
         Intent.SCROLL,
         Intent.DRAG_DROP,
         Intent.RUN_MACRO,
+        Intent.RUN_WORKFLOW,
+        Intent.LIST_WORKFLOWS,
         Intent.UNKNOWN,
     )
 
@@ -396,6 +398,14 @@ class Planner(IPlanner):
                 target = "up"
             else:
                 target = self._extract_target(normalized_message, intent)
+        elif intent == Intent.RUN_WORKFLOW:
+            orig = request.message
+            val = orig
+            if val.lower().startswith("run workflow "):
+                val = val[len("run workflow "):]
+            elif val.lower().startswith("start workflow "):
+                val = val[len("start workflow "):]
+            target = val.strip()
         else:
             target = self._extract_target(normalized_message, intent)
 
@@ -638,6 +648,12 @@ class Planner(IPlanner):
         if (normalized_message.startswith("run ") and normalized_message.endswith(" macro")) or "macro" in normalized_message:
             return Intent.RUN_MACRO
 
+        if normalized_message in {"start coding", "study mode", "meeting mode", "movie mode", "clean workspace"} or normalized_message.startswith("run workflow ") or normalized_message.startswith("start workflow "):
+            return Intent.RUN_WORKFLOW
+
+        if normalized_message in {"list workflows", "show workflows", "what workflows do you have"}:
+            return Intent.LIST_WORKFLOWS
+
         if any(normalized_message.startswith(hint) for hint in self._MINIMIZE_WINDOW_HINTS):
             return Intent.MINIMIZE_WINDOW
 
@@ -757,6 +773,8 @@ class Planner(IPlanner):
             Intent.CLICK_MOUSE,
             Intent.DOUBLE_CLICK,
             Intent.RIGHT_CLICK,
+            Intent.RUN_WORKFLOW,
+            Intent.LIST_WORKFLOWS,
         }:
             return None
 
@@ -865,6 +883,8 @@ class Planner(IPlanner):
             Intent.SCROLL: 0.75,
             Intent.DRAG_DROP: 0.75,
             Intent.RUN_MACRO: 0.75,
+            Intent.RUN_WORKFLOW: 0.75,
+            Intent.LIST_WORKFLOWS: 0.75,
             Intent.UNKNOWN: 0.20,
         }
         confidence = base_scores.get(intent, 0.20)

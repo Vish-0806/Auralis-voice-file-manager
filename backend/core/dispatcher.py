@@ -78,6 +78,8 @@ class ActionDispatcher(IDispatcher):
         Intent.SCROLL,
         Intent.DRAG_DROP,
         Intent.RUN_MACRO,
+        Intent.RUN_WORKFLOW,
+        Intent.LIST_WORKFLOWS,
         Intent.UNKNOWN,
     }
 
@@ -275,6 +277,12 @@ class ActionDispatcher(IDispatcher):
             Intent.RUN_MACRO,
         }:
             return "desktop"
+
+        if intent in {
+            Intent.RUN_WORKFLOW,
+            Intent.LIST_WORKFLOWS,
+        }:
+            return "workflow"
 
         return "mock_file"
 
