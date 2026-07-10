@@ -72,6 +72,15 @@ class WorkflowEngine(ICapability):
         plan = self._build_execution_plan(action, arguments)
         self._validate_plan(plan)
         result = self.execute_plan(plan)
+        self._logger.info(
+            "Workflow capability action completed",
+            extra={
+                "action": action,
+                "target": plan.target,
+                "success": result.success,
+                "execution_time_ms": int(result.execution_time * 1000),
+            },
+        )
         return self._serialize_result(result)
 
     def execute_plan(self, plan: ExecutionPlan, started_at: float | None = None) -> ExecutionResult:

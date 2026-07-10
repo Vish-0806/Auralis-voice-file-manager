@@ -133,6 +133,15 @@ class DesktopCapability(ICapability):
         try:
             plan = self._build_execution_plan(action, arguments)
             result = self.execute_plan(plan, started_at=started_at)
+            self._logger.info(
+                "Desktop capability action completed",
+                extra={
+                    "action": action,
+                    "target": plan.target,
+                    "success": result.success,
+                    "execution_time_ms": int(result.execution_time * 1000),
+                },
+            )
             return self._serialize_result(result)
         except Exception as exc:
             self._logger.exception(

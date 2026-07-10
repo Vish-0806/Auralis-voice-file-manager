@@ -64,6 +64,38 @@ Auralis offers a broad set of capabilities designed for productivity and ease of
 
 ---
 
+## Desktop Automation & Workflow Engine (v0.4.0)
+
+Auralis Version 0.4.0 implements a modular, high-performance Desktop Automation and sequential Workflow Engine. It integrates with the core AI Planner and Dispatcher to support voice and text control of applications, windows, OS settings, clipboard, screen captures, inputs, and multi-step workflows.
+
+### 1. Module Capabilities
+- **Application Management**: Launch and terminate applications safely.
+- **Window Management**: Minimize, maximize, restore, focus, list, or close windows.
+- **System Controls**: Control master audio volume levels, screen brightness, Wi-Fi, Bluetooth, and system power states.
+- **Clipboard Automation**: Copy text, paste selection, clear history, and export paths.
+- **Screenshot & Capture Utilities**: Fullscreen captures, active window captures, timed delays, clipboard copying, and screen recording.
+- **Input Automation**: Synthesized keyboard typing, keystrokes, shortcuts, coordinate-based mouse moves, clicks, scrolls, drag-and-drop, and custom macros.
+- **Sequential Workflow Engine**: Orchestrates multiple capability operations sequentially. Includes default registry modes:
+  - **Start Coding**: Opens VS Code and Terminal; sets audio volume.
+  - **Study Mode**: Opens Edge; mutes system; enables Wi-Fi.
+  - **Meeting Mode**: Opens Notepad; mutes system; minimizes active windows.
+  - **Movie Mode**: Opens Spotify; raises system volume.
+  - **Clean Workspace**: Closes browser and code editor windows; displays desktop.
+
+### 2. Supported Command Syntax Examples
+- `open VS Code` / `close Chrome`
+- `minimize notepad` / `focus edge`
+- `set volume to 60%` / `mute` / `unmute` / `turn on wifi`
+- `copy selected text` / `paste` / `clear clipboard`
+- `take a screenshot` / `capture the active window`
+- `type hello world` / `press enter` / `press Ctrl+S` / `move mouse to 500, 300` / `double click` / `scroll down`
+- `Start Coding` / `run workflow Study Mode` / `list workflows`
+
+### 3. Latency Profiling & Structured Logs
+All desktop actions are tracked for execution time and logged with detailed JSON context objects, enabling future telemetry analysis and audit log tracing.
+
+---
+
 ## Architecture
 
 Auralis uses a modular architecture that separates voice capture, natural language understanding, execution planning, and OS operations:
