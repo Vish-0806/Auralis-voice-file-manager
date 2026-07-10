@@ -952,3 +952,45 @@ The roadmap is divided into five phases, ensuring that each phase produces a sta
 ### Phase 5: Voice Pipelines & UI Redesign (Weeks 13-15)
 * **Goal:** Deploy the offline speech engines and launch the redesigned floating UI.
 * **Testing:** Run end-to-end integration tests (from audio input to OS execution) and verify UI performance.
+
+---
+
+## 23. Desktop Automation & Workflow Engine (v0.4.0)
+
+Version 0.4.0 implements Phase 4 Desktop Control and Automation capabilities. It extends the core Auralis pipeline by introducing the `DesktopCapability` routing engine and a sequential `WorkflowEngine`.
+
+### Architecture & Design Pattern
+```mermaid
+graph TD
+    WS[Voice / Text Command] --> Planner[Planner]
+    Planner --> Dispatcher[Action Dispatcher]
+    
+    Dispatcher -->|Desktop Intent| DesktopCap[Desktop Capability]
+    Dispatcher -->|Workflow Intent| WorkflowEngine[Workflow Engine]
+    
+    DesktopCap --> AppSvc[Application Service]
+    DesktopCap --> WinSvc[Window Service]
+    DesktopCap --> SysSvc[System Service]
+    DesktopCap --> ClipSvc[Clipboard Service]
+    DesktopCap --> ScreenSvc[Screenshot Service]
+    DesktopCap --> InputSvc[Input Service]
+    
+    WorkflowEngine --> Parser[Workflow Parser]
+    WorkflowEngine --> Registry[Workflow Registry]
+    WorkflowEngine --> Validator[Workflow Validator]
+    WorkflowEngine --> Executor[Workflow Executor]
+    
+    Executor -->|Sequential Sub-Steps| Dispatcher
+```
+
+### Key Subsystems
+1. **Desktop Capability (`capabilities/desktop/`)**: 
+   - A single cohesive capability wrapper exposed to the dispatcher. Coordinates and delegates requests to specialized services.
+   - Enforces execution latency logging, structured JSON event logging, and telemetry profiling metrics.
+2. **Sequential Workflow Engine (`automation/workflow/`)**:
+   - Manages pre-registered multi-step workflows.
+   - **Parser**: Translates user phrases into normalized mode triggers.
+   - **Registry**: Configures default modes (Start Coding, Study Mode, Meeting Mode, Movie Mode, Clean Workspace).
+   - **Validator**: Runs dependency validation on targets (folders and apps) to verify availability.
+   - **Executor**: Executes sub-steps sequentially via the core `ActionDispatcher`, logging execution status for rollback readiness.
+

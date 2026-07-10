@@ -15,6 +15,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from capabilities.desktop import DesktopCapability
 from capabilities.files import FileCapability
 from core.assistant import AuralisAssistant, get_assistant, set_assistant_instance
 from core.dispatcher import ActionDispatcher
@@ -78,7 +79,11 @@ def _build_default_assistant() -> AuralisAssistant:
 
     planner = Planner()
     file_capability = FileCapability()
-    dispatcher = ActionDispatcher(capabilities={file_capability.name: file_capability})
+    desktop_capability = DesktopCapability()
+    dispatcher = ActionDispatcher(capabilities={
+        file_capability.name: file_capability,
+        desktop_capability.name: desktop_capability,
+    })
     return AuralisAssistant(planner=planner, dispatcher=dispatcher)
 
 

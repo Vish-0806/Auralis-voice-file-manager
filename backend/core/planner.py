@@ -36,6 +36,56 @@ class Planner(IPlanner):
         Intent.DELETE_FOLDER,
         Intent.ORGANIZE_FOLDER,
         Intent.GET_FILE_INFO,
+        Intent.OPEN_APPLICATION,
+        Intent.CLOSE_APPLICATION,
+        Intent.RESTART_APPLICATION,
+        Intent.LIST_RUNNING_APPLICATIONS,
+        Intent.MINIMIZE_WINDOW,
+        Intent.MAXIMIZE_WINDOW,
+        Intent.RESTORE_WINDOW,
+        Intent.FOCUS_WINDOW,
+        Intent.CLOSE_WINDOW,
+        Intent.SHOW_DESKTOP,
+        Intent.LIST_WINDOWS,
+        Intent.SET_VOLUME,
+        Intent.MUTE,
+        Intent.UNMUTE,
+        Intent.SET_BRIGHTNESS,
+        Intent.LOCK_PC,
+        Intent.SLEEP_PC,
+        Intent.SHUTDOWN_PC,
+        Intent.RESTART_PC,
+        Intent.HIBERNATE_PC,
+        Intent.ENABLE_WIFI,
+        Intent.DISABLE_WIFI,
+        Intent.ENABLE_BLUETOOTH,
+        Intent.DISABLE_BLUETOOTH,
+        Intent.COPY_SELECTION,
+        Intent.PASTE,
+        Intent.CLEAR_CLIPBOARD,
+        Intent.SHOW_CLIPBOARD,
+        Intent.SAVE_CLIPBOARD,
+        Intent.COPY_FILE_PATH,
+        Intent.TAKE_SCREENSHOT,
+        Intent.CAPTURE_WINDOW,
+        Intent.CAPTURE_MONITOR,
+        Intent.DELAYED_SCREENSHOT,
+        Intent.COPY_SCREENSHOT,
+        Intent.SAVE_SCREENSHOT,
+        Intent.START_RECORDING,
+        Intent.STOP_RECORDING,
+        Intent.TYPE_TEXT,
+        Intent.PRESS_KEY,
+        Intent.PRESS_SHORTCUT,
+        Intent.MOVE_MOUSE,
+        Intent.CLICK_MOUSE,
+        Intent.DOUBLE_CLICK,
+        Intent.RIGHT_CLICK,
+        Intent.SCROLL,
+        Intent.DRAG_DROP,
+        Intent.RUN_MACRO,
+        Intent.RUN_WORKFLOW,
+        Intent.LIST_WORKFLOWS,
         Intent.UNKNOWN,
     )
 
@@ -116,6 +166,139 @@ class Planner(IPlanner):
         "get info for",
     )
 
+    _OPEN_APP_HINTS: Final[tuple[str, ...]] = (
+        "open application ",
+        "open app ",
+        "launch application ",
+        "launch app ",
+        "start application ",
+        "start app ",
+        "run application ",
+        "run app ",
+        "open ",
+        "launch ",
+        "start ",
+        "run ",
+    )
+
+    _CLOSE_APP_HINTS: Final[tuple[str, ...]] = (
+        "close application ",
+        "close app ",
+        "exit application ",
+        "exit app ",
+        "terminate application ",
+        "terminate app ",
+        "kill application ",
+        "kill app ",
+        "stop application ",
+        "stop app ",
+        "close ",
+        "exit ",
+        "terminate ",
+        "kill ",
+        "stop ",
+    )
+
+    _RESTART_APP_HINTS: Final[tuple[str, ...]] = (
+        "restart application ",
+        "restart app ",
+        "relaunch application ",
+        "relaunch app ",
+        "restart ",
+        "relaunch ",
+    )
+
+    _LIST_RUNNING_APPS_HINTS: Final[tuple[str, ...]] = (
+        "list running applications",
+        "list running apps",
+        "show running applications",
+        "show running apps",
+        "list active applications",
+        "list active apps",
+        "show active applications",
+        "show active apps",
+        "running applications",
+        "running apps",
+        "list applications",
+        "list apps",
+        "show applications",
+        "show apps",
+    )
+
+    _MINIMIZE_WINDOW_HINTS: Final[tuple[str, ...]] = (
+        "minimize window ",
+        "minimize app ",
+        "minimize application ",
+        "minimize ",
+    )
+
+    _MAXIMIZE_WINDOW_HINTS: Final[tuple[str, ...]] = (
+        "maximize window ",
+        "maximize app ",
+        "maximize application ",
+        "maximize ",
+    )
+
+    _RESTORE_WINDOW_HINTS: Final[tuple[str, ...]] = (
+        "restore window ",
+        "restore app ",
+        "restore application ",
+        "restore ",
+    )
+
+    _FOCUS_WINDOW_HINTS: Final[tuple[str, ...]] = (
+        "focus window ",
+        "focus app ",
+        "focus application ",
+        "switch to ",
+        "focus ",
+    )
+
+    _CLOSE_WINDOW_HINTS: Final[tuple[str, ...]] = (
+        "close window ",
+        "close app ",
+        "close application ",
+    )
+
+    _SHOW_DESKTOP_HINTS: Final[tuple[str, ...]] = (
+        "show desktop",
+        "go to desktop",
+        "minimize all windows",
+        "minimize all",
+        "hide all windows",
+    )
+
+    _LIST_WINDOWS_HINTS: Final[tuple[str, ...]] = (
+        "list open windows",
+        "list windows",
+        "show open windows",
+        "show windows",
+    )
+
+    _SET_VOLUME_HINTS: Final[tuple[str, ...]] = (
+        "set volume to ",
+        "set volume ",
+        "increase volume to ",
+        "increase volume ",
+        "decrease volume to ",
+        "decrease volume ",
+        "change volume to ",
+        "change volume ",
+        "volume to ",
+        "volume ",
+    )
+
+    _SET_BRIGHTNESS_HINTS: Final[tuple[str, ...]] = (
+        "set brightness to ",
+        "set brightness ",
+        "increase brightness to ",
+        "increase brightness ",
+        "decrease brightness to ",
+        "decrease brightness ",
+        "brightness to ",
+        "brightness ",
+    )
+
     _FILE_EXTENSION_PATTERN: Final[re.Pattern[str]] = re.compile(
         r"\b[^\s<>:\"'|?*]+\.(?:txt|md|pdf|docx|doc|csv|xlsx|xls|json|yaml|yml|png|jpg|jpeg|gif|mp3|wav|mp4|zip)\b",
         re.IGNORECASE,
@@ -175,6 +358,54 @@ class Planner(IPlanner):
         elif intent == Intent.DELETE_FOLDER:
             folder_name = self._extract_delete_folder_info_from_message(request.message)
             target = folder_name
+        elif intent == Intent.TYPE_TEXT:
+            orig = request.message
+            if orig.lower().startswith("type "):
+                target = orig[len("type "):].strip()
+            else:
+                target = orig
+        elif intent == Intent.MOVE_MOUSE:
+            import re
+            m = re.search(r'\(?\s*(-?\d+)\s*,\s*(-?\d+)\s*\)?', request.message)
+            if m:
+                target = f"{m.group(1)},{m.group(2)}"
+            else:
+                target = self._extract_target(normalized_message, intent)
+        elif intent == Intent.RUN_MACRO:
+            orig = request.message
+            val = orig
+            if val.lower().startswith("run "):
+                val = val[len("run "):]
+            if val.lower().endswith(" macro"):
+                val = val[:-len(" macro")]
+            target = val.strip()
+        elif intent == Intent.PRESS_SHORTCUT:
+            orig = request.message
+            val = orig
+            if val.lower().startswith("press "):
+                val = val[len("press "):]
+            target = val.strip()
+        elif intent == Intent.PRESS_KEY:
+            orig = request.message
+            val = orig
+            if val.lower().startswith("press "):
+                val = val[len("press "):]
+            target = val.strip()
+        elif intent == Intent.SCROLL:
+            if "down" in normalized_message:
+                target = "down"
+            elif "up" in normalized_message:
+                target = "up"
+            else:
+                target = self._extract_target(normalized_message, intent)
+        elif intent == Intent.RUN_WORKFLOW:
+            orig = request.message
+            val = orig
+            if val.lower().startswith("run workflow "):
+                val = val[len("run workflow "):]
+            elif val.lower().startswith("start workflow "):
+                val = val[len("start workflow "):]
+            target = val.strip()
         else:
             target = self._extract_target(normalized_message, intent)
 
@@ -300,6 +531,159 @@ class Planner(IPlanner):
         if self._looks_like_open_file_request(normalized_message):
             return Intent.OPEN_FILE
 
+        if self._contains_any(normalized_message, self._LIST_WINDOWS_HINTS):
+            return Intent.LIST_WINDOWS
+
+        if self._contains_any(normalized_message, self._SHOW_DESKTOP_HINTS):
+            return Intent.SHOW_DESKTOP
+
+        if normalized_message in {"mute", "mute system", "mute audio", "mute sound"}:
+            return Intent.MUTE
+
+        if normalized_message in {"unmute", "unmute system", "unmute audio", "unmute sound"}:
+            return Intent.UNMUTE
+
+        if any(normalized_message.startswith(hint) for hint in self._SET_VOLUME_HINTS):
+            return Intent.SET_VOLUME
+
+        if any(normalized_message.startswith(hint) for hint in self._SET_BRIGHTNESS_HINTS):
+            return Intent.SET_BRIGHTNESS
+
+        if normalized_message in {"lock my computer", "lock pc", "lock computer", "lock screen", "lock workstation"}:
+            return Intent.LOCK_PC
+
+        if normalized_message == "sleep" or normalized_message in {"put the computer to sleep", "put computer to sleep", "put pc to sleep", "sleep computer", "sleep pc"}:
+            return Intent.SLEEP_PC
+
+        if normalized_message == "shutdown" or normalized_message in {"shutdown my computer", "shutdown computer", "shutdown pc"}:
+            return Intent.SHUTDOWN_PC
+
+        if normalized_message in {"restart", "reboot", "restart my computer", "restart computer", "restart pc", "reboot computer", "reboot pc"}:
+            return Intent.RESTART_PC
+
+        if normalized_message == "hibernate" or normalized_message in {"hibernate my computer", "hibernate computer", "hibernate pc"}:
+            return Intent.HIBERNATE_PC
+
+        if normalized_message in {"disable wi-fi", "disable wifi", "turn off wi-fi", "turn off wifi", "wifi off"}:
+            return Intent.DISABLE_WIFI
+
+        if normalized_message in {"enable wi-fi", "enable wifi", "turn on wi-fi", "turn on wifi", "wifi on"}:
+            return Intent.ENABLE_WIFI
+
+        if normalized_message in {"disable bluetooth", "turn off bluetooth", "bluetooth off"}:
+            return Intent.DISABLE_BLUETOOTH
+
+        if normalized_message in {"enable bluetooth", "turn on bluetooth", "bluetooth on"}:
+            return Intent.ENABLE_BLUETOOTH
+
+        if normalized_message in {"copy selected text", "copy selection", "copy selected"}:
+            return Intent.COPY_SELECTION
+
+        if normalized_message in {"paste", "paste clipboard", "paste contents"}:
+            return Intent.PASTE
+
+        if normalized_message in {"clear clipboard", "empty clipboard", "clear my clipboard"}:
+            return Intent.CLEAR_CLIPBOARD
+
+        if normalized_message in {"show clipboard contents", "show clipboard", "what is on my clipboard", "view clipboard"}:
+            return Intent.SHOW_CLIPBOARD
+
+        if normalized_message == "save clipboard" or normalized_message.startswith("save clipboard as ") or normalized_message.startswith("save clipboard to "):
+            return Intent.SAVE_CLIPBOARD
+
+        if normalized_message in {"copy the current file path", "copy current file path", "copy file path"}:
+            return Intent.COPY_FILE_PATH
+
+        if normalized_message in {"take a screenshot", "take screenshot", "capture screen", "screenshot"}:
+            return Intent.TAKE_SCREENSHOT
+
+        if normalized_message in {"capture the active window", "capture active window", "screenshot active window"}:
+            return Intent.CAPTURE_WINDOW
+
+        if normalized_message.startswith("capture monitor ") or normalized_message.startswith("capture display ") or normalized_message.startswith("screenshot monitor "):
+            return Intent.CAPTURE_MONITOR
+
+        if normalized_message.startswith("take a screenshot in ") or normalized_message.startswith("take screenshot in ") or normalized_message.startswith("screenshot in "):
+            return Intent.DELAYED_SCREENSHOT
+
+        if normalized_message in {"copy screenshot to clipboard", "copy screenshot", "copy capture"}:
+            return Intent.COPY_SCREENSHOT
+
+        if normalized_message == "save screenshot" or normalized_message.startswith("save screenshot to ") or normalized_message.startswith("save screenshot as "):
+            return Intent.SAVE_SCREENSHOT
+
+        if normalized_message in {"start recording screen", "start screen recording", "start recording", "record screen"}:
+            return Intent.START_RECORDING
+
+        if normalized_message in {"stop recording screen", "stop screen recording", "stop recording", "stop record"}:
+            return Intent.STOP_RECORDING
+
+        if normalized_message.startswith("type "):
+            return Intent.TYPE_TEXT
+
+        if normalized_message.startswith("press "):
+            shortcut_indicators = {"ctrl", "shift", "alt", "win", "+"}
+            if any(indicator in normalized_message for indicator in shortcut_indicators):
+                return Intent.PRESS_SHORTCUT
+            return Intent.PRESS_KEY
+
+        if normalized_message.startswith("move mouse ") or normalized_message.startswith("move mouse to "):
+            return Intent.MOVE_MOUSE
+
+        if normalized_message in {"click", "click mouse", "left click"}:
+            return Intent.CLICK_MOUSE
+
+        if normalized_message in {"double click", "double click mouse"}:
+            return Intent.DOUBLE_CLICK
+
+        if normalized_message in {"right click", "right click mouse"}:
+            return Intent.RIGHT_CLICK
+
+        if normalized_message.startswith("scroll "):
+            return Intent.SCROLL
+
+        if normalized_message.startswith("drag ") or normalized_message.startswith("drag and drop "):
+            return Intent.DRAG_DROP
+
+        if (normalized_message.startswith("run ") and normalized_message.endswith(" macro")) or "macro" in normalized_message:
+            return Intent.RUN_MACRO
+
+        if normalized_message in {"start coding", "study mode", "meeting mode", "movie mode", "clean workspace"} or normalized_message.startswith("run workflow ") or normalized_message.startswith("start workflow "):
+            return Intent.RUN_WORKFLOW
+
+        if normalized_message in {"list workflows", "show workflows", "what workflows do you have"}:
+            return Intent.LIST_WORKFLOWS
+
+        if any(normalized_message.startswith(hint) for hint in self._MINIMIZE_WINDOW_HINTS):
+            return Intent.MINIMIZE_WINDOW
+
+        if any(normalized_message.startswith(hint) for hint in self._MAXIMIZE_WINDOW_HINTS):
+            return Intent.MAXIMIZE_WINDOW
+
+        if any(normalized_message.startswith(hint) for hint in self._RESTORE_WINDOW_HINTS):
+            return Intent.RESTORE_WINDOW
+
+        if any(normalized_message.startswith(hint) for hint in self._FOCUS_WINDOW_HINTS):
+            return Intent.FOCUS_WINDOW
+
+        if normalized_message.startswith("close window ") or normalized_message.startswith("close app ") or normalized_message.startswith("close application "):
+            return Intent.CLOSE_WINDOW
+
+        if self._contains_any(normalized_message, self._LIST_RUNNING_APPS_HINTS):
+            return Intent.LIST_RUNNING_APPLICATIONS
+
+        if any(normalized_message.startswith(hint) for hint in self._RESTART_APP_HINTS):
+            return Intent.RESTART_APPLICATION
+
+        if any(normalized_message.startswith(hint) for hint in self._CLOSE_APP_HINTS):
+            target = normalized_message[len("close "):].strip()
+            if target in {"calculator", "calc"}:
+                return Intent.CLOSE_WINDOW
+            return Intent.CLOSE_APPLICATION
+
+        if any(normalized_message.startswith(hint) for hint in self._OPEN_APP_HINTS):
+            return Intent.OPEN_APPLICATION
+
         if self._contains_any(normalized_message, self._LIST_DIRECTORY_HINTS):
             return Intent.LIST_DIRECTORY
 
@@ -343,6 +727,74 @@ class Planner(IPlanner):
         if intent == Intent.OPEN_FILE:
             return self._extract_tail_after_action(normalized_message)
 
+        if intent == Intent.LIST_RUNNING_APPLICATIONS:
+            return None
+
+        if intent in {Intent.OPEN_APPLICATION, Intent.CLOSE_APPLICATION, Intent.RESTART_APPLICATION}:
+            return self._extract_app_name(normalized_message, intent)
+
+        if intent in {
+            Intent.MINIMIZE_WINDOW,
+            Intent.MAXIMIZE_WINDOW,
+            Intent.RESTORE_WINDOW,
+            Intent.FOCUS_WINDOW,
+            Intent.CLOSE_WINDOW,
+        }:
+            return self._extract_window_target(normalized_message, intent)
+
+        if intent in {Intent.SHOW_DESKTOP, Intent.LIST_WINDOWS}:
+            return None
+
+        if intent in {Intent.SET_VOLUME, Intent.SET_BRIGHTNESS}:
+            return self._extract_number(normalized_message)
+
+        if intent in {
+            Intent.MUTE,
+            Intent.UNMUTE,
+            Intent.LOCK_PC,
+            Intent.SLEEP_PC,
+            Intent.SHUTDOWN_PC,
+            Intent.RESTART_PC,
+            Intent.HIBERNATE_PC,
+            Intent.ENABLE_WIFI,
+            Intent.DISABLE_WIFI,
+            Intent.ENABLE_BLUETOOTH,
+            Intent.DISABLE_BLUETOOTH,
+            Intent.COPY_SELECTION,
+            Intent.PASTE,
+            Intent.CLEAR_CLIPBOARD,
+            Intent.SHOW_CLIPBOARD,
+            Intent.COPY_FILE_PATH,
+            Intent.TAKE_SCREENSHOT,
+            Intent.CAPTURE_WINDOW,
+            Intent.COPY_SCREENSHOT,
+            Intent.START_RECORDING,
+            Intent.STOP_RECORDING,
+            Intent.CLICK_MOUSE,
+            Intent.DOUBLE_CLICK,
+            Intent.RIGHT_CLICK,
+            Intent.RUN_WORKFLOW,
+            Intent.LIST_WORKFLOWS,
+        }:
+            return None
+
+        if intent in {Intent.CAPTURE_MONITOR, Intent.DELAYED_SCREENSHOT}:
+            return self._extract_number(normalized_message)
+
+        if intent == Intent.SAVE_SCREENSHOT:
+            for prefix in ("save screenshot to ", "save screenshot as "):
+                if normalized_message.startswith(prefix):
+                    return normalized_message[len(prefix):].strip()
+            return None
+
+        if intent == Intent.SAVE_CLIPBOARD:
+            for prefix in ("save clipboard to ", "save clipboard as "):
+                if normalized_message.startswith(prefix):
+                    val = normalized_message[len(prefix):].strip()
+                    if val not in {"a text file", "text file", "file"}:
+                        return val
+            return None
+
         if intent == Intent.SEARCH_FILE:
             return self._extract_search_phrase(normalized_message)
 
@@ -383,6 +835,56 @@ class Planner(IPlanner):
             Intent.CREATE_FOLDER: 0.75,
             Intent.DELETE_FOLDER: 0.75,
             Intent.ORGANIZE_FOLDER: 0.75,
+            Intent.OPEN_APPLICATION: 0.75,
+            Intent.CLOSE_APPLICATION: 0.75,
+            Intent.RESTART_APPLICATION: 0.75,
+            Intent.LIST_RUNNING_APPLICATIONS: 0.75,
+            Intent.MINIMIZE_WINDOW: 0.75,
+            Intent.MAXIMIZE_WINDOW: 0.75,
+            Intent.RESTORE_WINDOW: 0.75,
+            Intent.FOCUS_WINDOW: 0.75,
+            Intent.CLOSE_WINDOW: 0.75,
+            Intent.SHOW_DESKTOP: 0.75,
+            Intent.LIST_WINDOWS: 0.75,
+            Intent.SET_VOLUME: 0.75,
+            Intent.MUTE: 0.75,
+            Intent.UNMUTE: 0.75,
+            Intent.SET_BRIGHTNESS: 0.75,
+            Intent.LOCK_PC: 0.75,
+            Intent.SLEEP_PC: 0.75,
+            Intent.SHUTDOWN_PC: 0.75,
+            Intent.RESTART_PC: 0.75,
+            Intent.HIBERNATE_PC: 0.75,
+            Intent.ENABLE_WIFI: 0.75,
+            Intent.DISABLE_WIFI: 0.75,
+            Intent.ENABLE_BLUETOOTH: 0.75,
+            Intent.DISABLE_BLUETOOTH: 0.75,
+            Intent.COPY_SELECTION: 0.75,
+            Intent.PASTE: 0.75,
+            Intent.CLEAR_CLIPBOARD: 0.75,
+            Intent.SHOW_CLIPBOARD: 0.75,
+            Intent.SAVE_CLIPBOARD: 0.75,
+            Intent.COPY_FILE_PATH: 0.75,
+            Intent.TAKE_SCREENSHOT: 0.75,
+            Intent.CAPTURE_WINDOW: 0.75,
+            Intent.CAPTURE_MONITOR: 0.75,
+            Intent.DELAYED_SCREENSHOT: 0.75,
+            Intent.COPY_SCREENSHOT: 0.75,
+            Intent.SAVE_SCREENSHOT: 0.75,
+            Intent.START_RECORDING: 0.75,
+            Intent.STOP_RECORDING: 0.75,
+            Intent.TYPE_TEXT: 0.75,
+            Intent.PRESS_KEY: 0.75,
+            Intent.PRESS_SHORTCUT: 0.75,
+            Intent.MOVE_MOUSE: 0.75,
+            Intent.CLICK_MOUSE: 0.75,
+            Intent.DOUBLE_CLICK: 0.75,
+            Intent.RIGHT_CLICK: 0.75,
+            Intent.SCROLL: 0.75,
+            Intent.DRAG_DROP: 0.75,
+            Intent.RUN_MACRO: 0.75,
+            Intent.RUN_WORKFLOW: 0.75,
+            Intent.LIST_WORKFLOWS: 0.75,
             Intent.UNKNOWN: 0.20,
         }
         confidence = base_scores.get(intent, 0.20)
@@ -579,6 +1081,83 @@ class Planner(IPlanner):
 
         # Fallback
         return self._extract_tail_after_action(text)
+
+    def _extract_app_name(self, text: str, intent: Intent) -> str | None:
+        """Extracts the application name from the request message."""
+
+        if intent == Intent.OPEN_APPLICATION:
+            hints = sorted(self._OPEN_APP_HINTS, key=len, reverse=True)
+        elif intent == Intent.CLOSE_APPLICATION:
+            hints = sorted(self._CLOSE_APP_HINTS, key=len, reverse=True)
+        elif intent == Intent.RESTART_APPLICATION:
+            hints = sorted(self._RESTART_APP_HINTS, key=len, reverse=True)
+        else:
+            return None
+
+        for hint in hints:
+            if text.startswith(hint):
+                app_name = text[len(hint):].strip()
+                known_casings = {
+                    "chrome": "Chrome",
+                    "microsoft edge": "Microsoft Edge",
+                    "edge": "Microsoft Edge",
+                    "firefox": "Firefox",
+                    "vs code": "VS Code",
+                    "vscode": "VS Code",
+                    "notepad": "Notepad",
+                    "calculator": "Calculator",
+                    "spotify": "Spotify",
+                    "terminal": "Terminal",
+                }
+                if app_name in known_casings:
+                    return known_casings[app_name]
+                return app_name.title()
+
+        return text.title()
+
+    def _extract_window_target(self, text: str, intent: Intent) -> str | None:
+        """Extracts the target window/app name from the request."""
+
+        if intent == Intent.MINIMIZE_WINDOW:
+            hints = sorted(self._MINIMIZE_WINDOW_HINTS, key=len, reverse=True)
+        elif intent == Intent.MAXIMIZE_WINDOW:
+            hints = sorted(self._MAXIMIZE_WINDOW_HINTS, key=len, reverse=True)
+        elif intent == Intent.RESTORE_WINDOW:
+            hints = sorted(self._RESTORE_WINDOW_HINTS, key=len, reverse=True)
+        elif intent == Intent.FOCUS_WINDOW:
+            hints = sorted(self._FOCUS_WINDOW_HINTS, key=len, reverse=True)
+        elif intent == Intent.CLOSE_WINDOW:
+            hints = ["close window ", "close app ", "close application ", "close "]
+        else:
+            return None
+
+        for hint in hints:
+            if text.startswith(hint):
+                target = text[len(hint):].strip()
+                known_casings = {
+                    "chrome": "Chrome",
+                    "microsoft edge": "Microsoft Edge",
+                    "edge": "Microsoft Edge",
+                    "firefox": "Firefox",
+                    "vs code": "VS Code",
+                    "vscode": "VS Code",
+                    "notepad": "Notepad",
+                    "calculator": "Calculator",
+                    "spotify": "Spotify",
+                    "terminal": "Terminal",
+                }
+                if target in known_casings:
+                    return known_casings[target]
+                return target.title()
+
+        return text.title()
+
+    def _extract_number(self, text: str) -> str | None:
+        """Extracts a percentage or numeric value from text."""
+        match = re.search(r"(\d+)\s*%?", text)
+        if match:
+            return match.group(0).strip()
+        return None
 
 
 __all__ = ["ExecutionPlan", "Planner"]

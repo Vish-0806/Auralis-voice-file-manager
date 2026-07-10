@@ -2,8 +2,8 @@
 
 import sys
 from unittest.mock import MagicMock, patch
-# Mock edge_tts module since it is not installed in the test environment
-sys.modules["edge_tts"] = MagicMock()
+if "edge_tts" not in sys.modules:
+    sys.modules["edge_tts"] = MagicMock()
 
 import time
 import pytest

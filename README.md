@@ -64,6 +64,38 @@ Auralis offers a broad set of capabilities designed for productivity and ease of
 
 ---
 
+## Desktop Automation & Workflow Engine (v0.4.0)
+
+Auralis Version 0.4.0 implements a modular, high-performance Desktop Automation and sequential Workflow Engine. It integrates with the core AI Planner and Dispatcher to support voice and text control of applications, windows, OS settings, clipboard, screen captures, inputs, and multi-step workflows.
+
+### 1. Module Capabilities
+- **Application Management**: Launch and terminate applications safely.
+- **Window Management**: Minimize, maximize, restore, focus, list, or close windows.
+- **System Controls**: Control master audio volume levels, screen brightness, Wi-Fi, Bluetooth, and system power states.
+- **Clipboard Automation**: Copy text, paste selection, clear history, and export paths.
+- **Screenshot & Capture Utilities**: Fullscreen captures, active window captures, timed delays, clipboard copying, and screen recording.
+- **Input Automation**: Synthesized keyboard typing, keystrokes, shortcuts, coordinate-based mouse moves, clicks, scrolls, drag-and-drop, and custom macros.
+- **Sequential Workflow Engine**: Orchestrates multiple capability operations sequentially. Includes default registry modes:
+  - **Start Coding**: Opens VS Code and Terminal; sets audio volume.
+  - **Study Mode**: Opens Edge; mutes system; enables Wi-Fi.
+  - **Meeting Mode**: Opens Notepad; mutes system; minimizes active windows.
+  - **Movie Mode**: Opens Spotify; raises system volume.
+  - **Clean Workspace**: Closes browser and code editor windows; displays desktop.
+
+### 2. Supported Command Syntax Examples
+- `open VS Code` / `close Chrome`
+- `minimize notepad` / `focus edge`
+- `set volume to 60%` / `mute` / `unmute` / `turn on wifi`
+- `copy selected text` / `paste` / `clear clipboard`
+- `take a screenshot` / `capture the active window`
+- `type hello world` / `press enter` / `press Ctrl+S` / `move mouse to 500, 300` / `double click` / `scroll down`
+- `Start Coding` / `run workflow Study Mode` / `list workflows`
+
+### 3. Latency Profiling & Structured Logs
+All desktop actions are tracked for execution time and logged with detailed JSON context objects, enabling future telemetry analysis and audit log tracing.
+
+---
+
 ## Architecture
 
 Auralis uses a modular architecture that separates voice capture, natural language understanding, execution planning, and OS operations:
@@ -94,17 +126,15 @@ The project is structured into independent packages to ensure separation of conc
 
 | Module | Namespace | Function & Responsibility |
 | :--- | :--- | :--- |
-| **Voice Engine** | `voice_engine/` | Captures microphone input, processes wake word detection, converts speech to text, and runs text-to-speech feedback. |
-| **Conversation Engine** | `ai_engine/` | Handles NLP parsing, command normalization, and formats conversational agent responses. |
-| **Memory Engine** | `utils/` & `app/` | Manages application state, records historical contexts, and tracks user preferences. |
-| **Planner** | `app/controller.py` | Receives parsed actions and maps out the correct sequences of file, terminal, or GUI operations. |
-| **File Intelligence** | `file_engine/` | Resolves system paths recursively, conducts permission checks, and handles folder restructuring. |
-| **Desktop Engine** | `automation/` | Automates application launches, controls windows, and interacts with native desktop APIs. |
-| **Developer Engine** | `automation/` | Standardizes development tasks, runs local environments, and processes compiler errors. |
-| **Document Engine** | `ai_engine/` | Parses local PDF, markdown, and text documents to generate abstracts and summaries. |
-| **Automation Engine** | `automation/` | Orchestrates schedules, sequential scripts, and rule-based file organization chains. |
-| **Plugin Manager** | `app/` | Detects, loads, and initializes external extensions and customized tools. |
-| **OS Adapter** | `utils/` & `file_engine/` | Interfaces directly with Windows, macOS, or Linux APIs, abstracting path limits and system differences. |
+| **Voice Engine** | `backend/voice/` | Captures microphone input, processes wake word detection, converts speech to text, and runs text-to-speech feedback. |
+| **Conversation Engine** | `backend/core/` | Handles NLP parsing, command normalization, and formats conversational agent responses. |
+| **Memory Engine** | `backend/memory/` | Manages application state, records historical contexts, and tracks user preferences. |
+| **Planner** | `backend/core/planner.py` | Receives parsed actions and maps out the correct sequences of file, terminal, or GUI operations. |
+| **File Intelligence** | `backend/capabilities/files/` | Resolves system paths recursively, conducts permission checks, and handles folder restructuring. |
+| **Desktop Automation** | `backend/capabilities/desktop/` | Automates application launches, controls windows, screen captures, inputs, and OS system settings. |
+| **Workflow Engine** | `backend/automation/workflow/` | Orchestrates multi-step sequential desktop workflows, performs safety validations, and logs histories. |
+| **Plugin Manager** | `backend/core/` | Detects, loads, and initializes external extensions and customized tools. |
+| **OS Adapter** | `backend/utils/` | Interfaces directly with Windows, macOS, or Linux APIs, abstracting path limits and system differences. |
 
 ---
 
