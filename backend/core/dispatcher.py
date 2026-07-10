@@ -54,6 +54,12 @@ class ActionDispatcher(IDispatcher):
         Intent.DISABLE_WIFI,
         Intent.ENABLE_BLUETOOTH,
         Intent.DISABLE_BLUETOOTH,
+        Intent.COPY_SELECTION,
+        Intent.PASTE,
+        Intent.CLEAR_CLIPBOARD,
+        Intent.SHOW_CLIPBOARD,
+        Intent.SAVE_CLIPBOARD,
+        Intent.COPY_FILE_PATH,
         Intent.UNKNOWN,
     }
 
@@ -225,6 +231,12 @@ class ActionDispatcher(IDispatcher):
             Intent.DISABLE_WIFI,
             Intent.ENABLE_BLUETOOTH,
             Intent.DISABLE_BLUETOOTH,
+            Intent.COPY_SELECTION,
+            Intent.PASTE,
+            Intent.CLEAR_CLIPBOARD,
+            Intent.SHOW_CLIPBOARD,
+            Intent.SAVE_CLIPBOARD,
+            Intent.COPY_FILE_PATH,
         }:
             return "desktop"
 

@@ -13,6 +13,7 @@ from core.models import ExecutionPlan, ExecutionResult
 from .application.application_service import ApplicationService
 from .windows.window_service import WindowService
 from .system.system_service import SystemService
+from .clipboard.clipboard_service import ClipboardService
 
 
 class DesktopCapability(ICapability):
@@ -47,6 +48,12 @@ class DesktopCapability(ICapability):
         Intent.DISABLE_WIFI,
         Intent.ENABLE_BLUETOOTH,
         Intent.DISABLE_BLUETOOTH,
+        Intent.COPY_SELECTION,
+        Intent.PASTE,
+        Intent.CLEAR_CLIPBOARD,
+        Intent.SHOW_CLIPBOARD,
+        Intent.SAVE_CLIPBOARD,
+        Intent.COPY_FILE_PATH,
     })
     _CAPABILITY_NAME = "desktop"
 
@@ -55,6 +62,7 @@ class DesktopCapability(ICapability):
         application_service: ApplicationService | None = None,
         window_service: WindowService | None = None,
         system_service: SystemService | None = None,
+        clipboard_service: ClipboardService | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """Initializes the DesktopCapability.
@@ -63,6 +71,7 @@ class DesktopCapability(ICapability):
             application_service: Preconfigured ApplicationService instance.
             window_service: Preconfigured WindowService instance.
             system_service: Preconfigured SystemService instance.
+            clipboard_service: Preconfigured ClipboardService instance.
             logger: Optional logger for capability diagnostics.
         """
 
@@ -70,6 +79,7 @@ class DesktopCapability(ICapability):
         self._application_service = application_service or ApplicationService(logger=self._logger)
         self._window_service = window_service or WindowService(logger=self._logger)
         self._system_service = system_service or SystemService(logger=self._logger)
+        self._clipboard_service = clipboard_service or ClipboardService(logger=self._logger)
 
     @property
     def name(self) -> str:
@@ -415,6 +425,71 @@ class DesktopCapability(ICapability):
                 success=success,
                 response=response,
                 data={"bluetooth_enabled": not success},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.COPY_SELECTION:
+            text_to_copy = target or "Selected text placeholder"
+            self._clipboard_service.copy(text_to_copy)
+            return ExecutionResult(
+                success=True,
+                response="Text successfully copied to clipboard.",
+                data={"copied_text": text_to_copy},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.PASTE:
+            text = self._clipboard_service.paste()
+            response = f"Pasted: '{text}'" if text else "Clipboard is empty or does not contain text."
+            return ExecutionResult(
+                success=True,
+                response=response,
+                data={"text": text},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.CLEAR_CLIPBOARD:
+            self._clipboard_service.clear()
+            return ExecutionResult(
+                success=True,
+                response="Clipboard cleared.",
+                data={},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.SHOW_CLIPBOARD:
+            entry = self._clipboard_service.get_contents()
+            if entry.content_type == "empty" or not entry.content:
+                response = "Clipboard is empty."
+            else:
+                response = f"Clipboard contents ({entry.content_type}): {entry.content}"
+            return ExecutionResult(
+                success=True,
+                response=response,
+                data=entry.model_dump(),
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.SAVE_CLIPBOARD:
+            success = self._clipboard_service.save_to_file(target)
+            if success:
+                response = f"Clipboard contents successfully saved to file."
+            else:
+                response = "Failed to save clipboard to file (clipboard may be empty)."
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={"destination": target},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.COPY_FILE_PATH:
+            path_to_copy = target or "C:\\workspace\\active_file.txt"
+            self._clipboard_service.copy_file_path(path_to_copy)
+            return ExecutionResult(
+                success=True,
+                response=f"Copied file path '{path_to_copy}' to clipboard.",
+                data={"file_path": path_to_copy},
                 execution_time=time.perf_counter() - execution_started_at,
             )
 

@@ -60,6 +60,12 @@ class Planner(IPlanner):
         Intent.DISABLE_WIFI,
         Intent.ENABLE_BLUETOOTH,
         Intent.DISABLE_BLUETOOTH,
+        Intent.COPY_SELECTION,
+        Intent.PASTE,
+        Intent.CLEAR_CLIPBOARD,
+        Intent.SHOW_CLIPBOARD,
+        Intent.SAVE_CLIPBOARD,
+        Intent.COPY_FILE_PATH,
         Intent.UNKNOWN,
     )
 
@@ -502,6 +508,24 @@ class Planner(IPlanner):
         if normalized_message in {"enable bluetooth", "turn on bluetooth", "bluetooth on"}:
             return Intent.ENABLE_BLUETOOTH
 
+        if normalized_message in {"copy selected text", "copy selection", "copy selected"}:
+            return Intent.COPY_SELECTION
+
+        if normalized_message in {"paste", "paste clipboard", "paste contents"}:
+            return Intent.PASTE
+
+        if normalized_message in {"clear clipboard", "empty clipboard", "clear my clipboard"}:
+            return Intent.CLEAR_CLIPBOARD
+
+        if normalized_message in {"show clipboard contents", "show clipboard", "what is on my clipboard", "view clipboard"}:
+            return Intent.SHOW_CLIPBOARD
+
+        if normalized_message == "save clipboard" or normalized_message.startswith("save clipboard as ") or normalized_message.startswith("save clipboard to "):
+            return Intent.SAVE_CLIPBOARD
+
+        if normalized_message in {"copy the current file path", "copy current file path", "copy file path"}:
+            return Intent.COPY_FILE_PATH
+
         if any(normalized_message.startswith(hint) for hint in self._MINIMIZE_WINDOW_HINTS):
             return Intent.MINIMIZE_WINDOW
 
@@ -608,7 +632,20 @@ class Planner(IPlanner):
             Intent.DISABLE_WIFI,
             Intent.ENABLE_BLUETOOTH,
             Intent.DISABLE_BLUETOOTH,
+            Intent.COPY_SELECTION,
+            Intent.PASTE,
+            Intent.CLEAR_CLIPBOARD,
+            Intent.SHOW_CLIPBOARD,
+            Intent.COPY_FILE_PATH,
         }:
+            return None
+
+        if intent == Intent.SAVE_CLIPBOARD:
+            for prefix in ("save clipboard to ", "save clipboard as "):
+                if normalized_message.startswith(prefix):
+                    val = normalized_message[len(prefix):].strip()
+                    if val not in {"a text file", "text file", "file"}:
+                        return val
             return None
 
         if intent == Intent.SEARCH_FILE:
@@ -675,6 +712,12 @@ class Planner(IPlanner):
             Intent.DISABLE_WIFI: 0.75,
             Intent.ENABLE_BLUETOOTH: 0.75,
             Intent.DISABLE_BLUETOOTH: 0.75,
+            Intent.COPY_SELECTION: 0.75,
+            Intent.PASTE: 0.75,
+            Intent.CLEAR_CLIPBOARD: 0.75,
+            Intent.SHOW_CLIPBOARD: 0.75,
+            Intent.SAVE_CLIPBOARD: 0.75,
+            Intent.COPY_FILE_PATH: 0.75,
             Intent.UNKNOWN: 0.20,
         }
         confidence = base_scores.get(intent, 0.20)
