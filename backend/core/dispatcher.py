@@ -30,6 +30,10 @@ class ActionDispatcher(IDispatcher):
         Intent.DELETE_FOLDER,
         Intent.ORGANIZE_FOLDER,
         Intent.GET_FILE_INFO,
+        Intent.OPEN_APPLICATION,
+        Intent.CLOSE_APPLICATION,
+        Intent.RESTART_APPLICATION,
+        Intent.LIST_RUNNING_APPLICATIONS,
         Intent.UNKNOWN,
     }
 
@@ -175,6 +179,14 @@ class ActionDispatcher(IDispatcher):
 
     def _intent_to_capability_name(self, intent: Intent) -> str:
         """Maps an intent to the expected capability name."""
+
+        if intent in {
+            Intent.OPEN_APPLICATION,
+            Intent.CLOSE_APPLICATION,
+            Intent.RESTART_APPLICATION,
+            Intent.LIST_RUNNING_APPLICATIONS,
+        }:
+            return "desktop"
 
         return "mock_file"
 

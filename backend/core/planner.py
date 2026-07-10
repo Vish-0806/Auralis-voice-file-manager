@@ -36,6 +36,10 @@ class Planner(IPlanner):
         Intent.DELETE_FOLDER,
         Intent.ORGANIZE_FOLDER,
         Intent.GET_FILE_INFO,
+        Intent.OPEN_APPLICATION,
+        Intent.CLOSE_APPLICATION,
+        Intent.RESTART_APPLICATION,
+        Intent.LIST_RUNNING_APPLICATIONS,
         Intent.UNKNOWN,
     )
 
@@ -114,6 +118,65 @@ class Planner(IPlanner):
         "properties of",
         "information about",
         "get info for",
+    )
+
+    _OPEN_APP_HINTS: Final[tuple[str, ...]] = (
+        "open application ",
+        "open app ",
+        "launch application ",
+        "launch app ",
+        "start application ",
+        "start app ",
+        "run application ",
+        "run app ",
+        "open ",
+        "launch ",
+        "start ",
+        "run ",
+    )
+
+    _CLOSE_APP_HINTS: Final[tuple[str, ...]] = (
+        "close application ",
+        "close app ",
+        "exit application ",
+        "exit app ",
+        "terminate application ",
+        "terminate app ",
+        "kill application ",
+        "kill app ",
+        "stop application ",
+        "stop app ",
+        "close ",
+        "exit ",
+        "terminate ",
+        "kill ",
+        "stop ",
+    )
+
+    _RESTART_APP_HINTS: Final[tuple[str, ...]] = (
+        "restart application ",
+        "restart app ",
+        "relaunch application ",
+        "relaunch app ",
+        "restart ",
+        "relaunch ",
+    )
+
+    _LIST_RUNNING_APPS_HINTS: Final[tuple[str, ...]] = (
+        "list running applications",
+        "list running apps",
+        "show running applications",
+        "show running apps",
+        "list active applications",
+        "list active apps",
+        "show active applications",
+        "show active apps",
+        "running applications",
+        "running apps",
+        "list applications",
+        "list apps",
+        "show applications",
+        "show apps",
     )
 
     _FILE_EXTENSION_PATTERN: Final[re.Pattern[str]] = re.compile(
@@ -300,6 +363,18 @@ class Planner(IPlanner):
         if self._looks_like_open_file_request(normalized_message):
             return Intent.OPEN_FILE
 
+        if self._contains_any(normalized_message, self._LIST_RUNNING_APPS_HINTS):
+            return Intent.LIST_RUNNING_APPLICATIONS
+
+        if any(normalized_message.startswith(hint) for hint in self._RESTART_APP_HINTS):
+            return Intent.RESTART_APPLICATION
+
+        if any(normalized_message.startswith(hint) for hint in self._CLOSE_APP_HINTS):
+            return Intent.CLOSE_APPLICATION
+
+        if any(normalized_message.startswith(hint) for hint in self._OPEN_APP_HINTS):
+            return Intent.OPEN_APPLICATION
+
         if self._contains_any(normalized_message, self._LIST_DIRECTORY_HINTS):
             return Intent.LIST_DIRECTORY
 
@@ -343,6 +418,12 @@ class Planner(IPlanner):
         if intent == Intent.OPEN_FILE:
             return self._extract_tail_after_action(normalized_message)
 
+        if intent == Intent.LIST_RUNNING_APPLICATIONS:
+            return None
+
+        if intent in {Intent.OPEN_APPLICATION, Intent.CLOSE_APPLICATION, Intent.RESTART_APPLICATION}:
+            return self._extract_app_name(normalized_message, intent)
+
         if intent == Intent.SEARCH_FILE:
             return self._extract_search_phrase(normalized_message)
 
@@ -383,6 +464,10 @@ class Planner(IPlanner):
             Intent.CREATE_FOLDER: 0.75,
             Intent.DELETE_FOLDER: 0.75,
             Intent.ORGANIZE_FOLDER: 0.75,
+            Intent.OPEN_APPLICATION: 0.75,
+            Intent.CLOSE_APPLICATION: 0.75,
+            Intent.RESTART_APPLICATION: 0.75,
+            Intent.LIST_RUNNING_APPLICATIONS: 0.75,
             Intent.UNKNOWN: 0.20,
         }
         confidence = base_scores.get(intent, 0.20)
@@ -579,6 +664,39 @@ class Planner(IPlanner):
 
         # Fallback
         return self._extract_tail_after_action(text)
+
+    def _extract_app_name(self, text: str, intent: Intent) -> str | None:
+        """Extracts the application name from the request message."""
+
+        if intent == Intent.OPEN_APPLICATION:
+            hints = sorted(self._OPEN_APP_HINTS, key=len, reverse=True)
+        elif intent == Intent.CLOSE_APPLICATION:
+            hints = sorted(self._CLOSE_APP_HINTS, key=len, reverse=True)
+        elif intent == Intent.RESTART_APPLICATION:
+            hints = sorted(self._RESTART_APP_HINTS, key=len, reverse=True)
+        else:
+            return None
+
+        for hint in hints:
+            if text.startswith(hint):
+                app_name = text[len(hint):].strip()
+                known_casings = {
+                    "chrome": "Chrome",
+                    "microsoft edge": "Microsoft Edge",
+                    "edge": "Microsoft Edge",
+                    "firefox": "Firefox",
+                    "vs code": "VS Code",
+                    "vscode": "VS Code",
+                    "notepad": "Notepad",
+                    "calculator": "Calculator",
+                    "spotify": "Spotify",
+                    "terminal": "Terminal",
+                }
+                if app_name in known_casings:
+                    return known_casings[app_name]
+                return app_name.title()
+
+        return text.title()
 
 
 __all__ = ["ExecutionPlan", "Planner"]
