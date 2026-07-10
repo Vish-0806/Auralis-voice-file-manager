@@ -47,6 +47,19 @@ class Planner(IPlanner):
         Intent.CLOSE_WINDOW,
         Intent.SHOW_DESKTOP,
         Intent.LIST_WINDOWS,
+        Intent.SET_VOLUME,
+        Intent.MUTE,
+        Intent.UNMUTE,
+        Intent.SET_BRIGHTNESS,
+        Intent.LOCK_PC,
+        Intent.SLEEP_PC,
+        Intent.SHUTDOWN_PC,
+        Intent.RESTART_PC,
+        Intent.HIBERNATE_PC,
+        Intent.ENABLE_WIFI,
+        Intent.DISABLE_WIFI,
+        Intent.ENABLE_BLUETOOTH,
+        Intent.DISABLE_BLUETOOTH,
         Intent.UNKNOWN,
     )
 
@@ -234,6 +247,30 @@ class Planner(IPlanner):
         "list windows",
         "show open windows",
         "show windows",
+    )
+
+    _SET_VOLUME_HINTS: Final[tuple[str, ...]] = (
+        "set volume to ",
+        "set volume ",
+        "increase volume to ",
+        "increase volume ",
+        "decrease volume to ",
+        "decrease volume ",
+        "change volume to ",
+        "change volume ",
+        "volume to ",
+        "volume ",
+    )
+
+    _SET_BRIGHTNESS_HINTS: Final[tuple[str, ...]] = (
+        "set brightness to ",
+        "set brightness ",
+        "increase brightness to ",
+        "increase brightness ",
+        "decrease brightness to ",
+        "decrease brightness ",
+        "brightness to ",
+        "brightness ",
     )
 
     _FILE_EXTENSION_PATTERN: Final[re.Pattern[str]] = re.compile(
@@ -426,6 +463,45 @@ class Planner(IPlanner):
         if self._contains_any(normalized_message, self._SHOW_DESKTOP_HINTS):
             return Intent.SHOW_DESKTOP
 
+        if normalized_message in {"mute", "mute system", "mute audio", "mute sound"}:
+            return Intent.MUTE
+
+        if normalized_message in {"unmute", "unmute system", "unmute audio", "unmute sound"}:
+            return Intent.UNMUTE
+
+        if any(normalized_message.startswith(hint) for hint in self._SET_VOLUME_HINTS):
+            return Intent.SET_VOLUME
+
+        if any(normalized_message.startswith(hint) for hint in self._SET_BRIGHTNESS_HINTS):
+            return Intent.SET_BRIGHTNESS
+
+        if normalized_message in {"lock my computer", "lock pc", "lock computer", "lock screen", "lock workstation"}:
+            return Intent.LOCK_PC
+
+        if normalized_message == "sleep" or normalized_message in {"put the computer to sleep", "put computer to sleep", "put pc to sleep", "sleep computer", "sleep pc"}:
+            return Intent.SLEEP_PC
+
+        if normalized_message == "shutdown" or normalized_message in {"shutdown my computer", "shutdown computer", "shutdown pc"}:
+            return Intent.SHUTDOWN_PC
+
+        if normalized_message in {"restart", "reboot", "restart my computer", "restart computer", "restart pc", "reboot computer", "reboot pc"}:
+            return Intent.RESTART_PC
+
+        if normalized_message == "hibernate" or normalized_message in {"hibernate my computer", "hibernate computer", "hibernate pc"}:
+            return Intent.HIBERNATE_PC
+
+        if normalized_message in {"disable wi-fi", "disable wifi", "turn off wi-fi", "turn off wifi", "wifi off"}:
+            return Intent.DISABLE_WIFI
+
+        if normalized_message in {"enable wi-fi", "enable wifi", "turn on wi-fi", "turn on wifi", "wifi on"}:
+            return Intent.ENABLE_WIFI
+
+        if normalized_message in {"disable bluetooth", "turn off bluetooth", "bluetooth off"}:
+            return Intent.DISABLE_BLUETOOTH
+
+        if normalized_message in {"enable bluetooth", "turn on bluetooth", "bluetooth on"}:
+            return Intent.ENABLE_BLUETOOTH
+
         if any(normalized_message.startswith(hint) for hint in self._MINIMIZE_WINDOW_HINTS):
             return Intent.MINIMIZE_WINDOW
 
@@ -517,6 +593,24 @@ class Planner(IPlanner):
         if intent in {Intent.SHOW_DESKTOP, Intent.LIST_WINDOWS}:
             return None
 
+        if intent in {Intent.SET_VOLUME, Intent.SET_BRIGHTNESS}:
+            return self._extract_number(normalized_message)
+
+        if intent in {
+            Intent.MUTE,
+            Intent.UNMUTE,
+            Intent.LOCK_PC,
+            Intent.SLEEP_PC,
+            Intent.SHUTDOWN_PC,
+            Intent.RESTART_PC,
+            Intent.HIBERNATE_PC,
+            Intent.ENABLE_WIFI,
+            Intent.DISABLE_WIFI,
+            Intent.ENABLE_BLUETOOTH,
+            Intent.DISABLE_BLUETOOTH,
+        }:
+            return None
+
         if intent == Intent.SEARCH_FILE:
             return self._extract_search_phrase(normalized_message)
 
@@ -568,6 +662,19 @@ class Planner(IPlanner):
             Intent.CLOSE_WINDOW: 0.75,
             Intent.SHOW_DESKTOP: 0.75,
             Intent.LIST_WINDOWS: 0.75,
+            Intent.SET_VOLUME: 0.75,
+            Intent.MUTE: 0.75,
+            Intent.UNMUTE: 0.75,
+            Intent.SET_BRIGHTNESS: 0.75,
+            Intent.LOCK_PC: 0.75,
+            Intent.SLEEP_PC: 0.75,
+            Intent.SHUTDOWN_PC: 0.75,
+            Intent.RESTART_PC: 0.75,
+            Intent.HIBERNATE_PC: 0.75,
+            Intent.ENABLE_WIFI: 0.75,
+            Intent.DISABLE_WIFI: 0.75,
+            Intent.ENABLE_BLUETOOTH: 0.75,
+            Intent.DISABLE_BLUETOOTH: 0.75,
             Intent.UNKNOWN: 0.20,
         }
         confidence = base_scores.get(intent, 0.20)
@@ -834,6 +941,13 @@ class Planner(IPlanner):
                 return target.title()
 
         return text.title()
+
+    def _extract_number(self, text: str) -> str | None:
+        """Extracts a percentage or numeric value from text."""
+        match = re.search(r"(\d+)\s*%?", text)
+        if match:
+            return match.group(0).strip()
+        return None
 
 
 __all__ = ["ExecutionPlan", "Planner"]

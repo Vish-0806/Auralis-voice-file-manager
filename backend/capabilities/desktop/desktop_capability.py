@@ -12,6 +12,7 @@ from core.models import ExecutionPlan, ExecutionResult
 
 from .application.application_service import ApplicationService
 from .windows.window_service import WindowService
+from .system.system_service import SystemService
 
 
 class DesktopCapability(ICapability):
@@ -33,6 +34,19 @@ class DesktopCapability(ICapability):
         Intent.CLOSE_WINDOW,
         Intent.SHOW_DESKTOP,
         Intent.LIST_WINDOWS,
+        Intent.SET_VOLUME,
+        Intent.MUTE,
+        Intent.UNMUTE,
+        Intent.SET_BRIGHTNESS,
+        Intent.LOCK_PC,
+        Intent.SLEEP_PC,
+        Intent.SHUTDOWN_PC,
+        Intent.RESTART_PC,
+        Intent.HIBERNATE_PC,
+        Intent.ENABLE_WIFI,
+        Intent.DISABLE_WIFI,
+        Intent.ENABLE_BLUETOOTH,
+        Intent.DISABLE_BLUETOOTH,
     })
     _CAPABILITY_NAME = "desktop"
 
@@ -40,6 +54,7 @@ class DesktopCapability(ICapability):
         self,
         application_service: ApplicationService | None = None,
         window_service: WindowService | None = None,
+        system_service: SystemService | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """Initializes the DesktopCapability.
@@ -47,12 +62,14 @@ class DesktopCapability(ICapability):
         Args:
             application_service: Preconfigured ApplicationService instance.
             window_service: Preconfigured WindowService instance.
+            system_service: Preconfigured SystemService instance.
             logger: Optional logger for capability diagnostics.
         """
 
         self._logger = logger or logging.getLogger(__name__)
         self._application_service = application_service or ApplicationService(logger=self._logger)
         self._window_service = window_service or WindowService(logger=self._logger)
+        self._system_service = system_service or SystemService(logger=self._logger)
 
     @property
     def name(self) -> str:
@@ -254,6 +271,150 @@ class DesktopCapability(ICapability):
                 success=True,
                 response=response,
                 data={"windows": [w.model_dump() for w in wins]},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.SET_VOLUME:
+            if not target:
+                raise ValueError("Volume level target is required.")
+            clean_level = target.replace("%", "").strip()
+            level_val = int(clean_level)
+            self._system_service.set_volume(level_val)
+            return ExecutionResult(
+                success=True,
+                response=f"System volume set to {level_val}%.",
+                data={"volume": level_val},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.MUTE:
+            self._system_service.mute()
+            return ExecutionResult(
+                success=True,
+                response="System audio muted.",
+                data={"is_muted": True},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.UNMUTE:
+            self._system_service.unmute()
+            return ExecutionResult(
+                success=True,
+                response="System audio unmuted.",
+                data={"is_muted": False},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.SET_BRIGHTNESS:
+            if not target:
+                raise ValueError("Brightness level target is required.")
+            clean_level = target.replace("%", "").strip()
+            level_val = int(clean_level)
+            self._system_service.set_brightness(level_val)
+            return ExecutionResult(
+                success=True,
+                response=f"Screen brightness set to {level_val}%.",
+                data={"brightness": level_val},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.LOCK_PC:
+            self._system_service.lock_pc()
+            return ExecutionResult(
+                success=True,
+                response="Computer locked.",
+                data={},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.SLEEP_PC:
+            self._system_service.sleep_pc()
+            return ExecutionResult(
+                success=True,
+                response="System put to sleep.",
+                data={},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.SHUTDOWN_PC:
+            confirm = plan.parameters.get("confirm", False)
+            success = self._system_service.shutdown_pc(confirm)
+            if success:
+                response = "System shutting down."
+            else:
+                response = "Shutdown request pending confirmation."
+            return ExecutionResult(
+                success=True,
+                response=response,
+                data={"executed": success, "needs_confirmation": not success},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.RESTART_PC:
+            confirm = plan.parameters.get("confirm", False)
+            success = self._system_service.restart_pc(confirm)
+            if success:
+                response = "System restarting."
+            else:
+                response = "Restart request pending confirmation."
+            return ExecutionResult(
+                success=True,
+                response=response,
+                data={"executed": success, "needs_confirmation": not success},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.HIBERNATE_PC:
+            confirm = plan.parameters.get("confirm", False)
+            success = self._system_service.hibernate_pc(confirm)
+            if success:
+                response = "System hibernating."
+            else:
+                response = "Hibernation request pending confirmation."
+            return ExecutionResult(
+                success=True,
+                response=response,
+                data={"executed": success, "needs_confirmation": not success},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.ENABLE_WIFI:
+            success = self._system_service.enable_wifi()
+            response = "Wi-Fi enabled." if success else "Failed to enable Wi-Fi."
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={"wifi_enabled": success},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.DISABLE_WIFI:
+            success = self._system_service.disable_wifi()
+            response = "Wi-Fi disabled." if success else "Failed to disable Wi-Fi."
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={"wifi_enabled": not success},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.ENABLE_BLUETOOTH:
+            success = self._system_service.enable_bluetooth()
+            response = "Bluetooth enabled." if success else "Failed to enable Bluetooth."
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={"bluetooth_enabled": success},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.DISABLE_BLUETOOTH:
+            success = self._system_service.disable_bluetooth()
+            response = "Bluetooth disabled." if success else "Failed to disable Bluetooth."
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={"bluetooth_enabled": not success},
                 execution_time=time.perf_counter() - execution_started_at,
             )
 
