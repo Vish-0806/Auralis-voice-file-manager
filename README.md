@@ -126,17 +126,15 @@ The project is structured into independent packages to ensure separation of conc
 
 | Module | Namespace | Function & Responsibility |
 | :--- | :--- | :--- |
-| **Voice Engine** | `voice_engine/` | Captures microphone input, processes wake word detection, converts speech to text, and runs text-to-speech feedback. |
-| **Conversation Engine** | `ai_engine/` | Handles NLP parsing, command normalization, and formats conversational agent responses. |
-| **Memory Engine** | `utils/` & `app/` | Manages application state, records historical contexts, and tracks user preferences. |
-| **Planner** | `app/controller.py` | Receives parsed actions and maps out the correct sequences of file, terminal, or GUI operations. |
-| **File Intelligence** | `file_engine/` | Resolves system paths recursively, conducts permission checks, and handles folder restructuring. |
-| **Desktop Engine** | `automation/` | Automates application launches, controls windows, and interacts with native desktop APIs. |
-| **Developer Engine** | `automation/` | Standardizes development tasks, runs local environments, and processes compiler errors. |
-| **Document Engine** | `ai_engine/` | Parses local PDF, markdown, and text documents to generate abstracts and summaries. |
-| **Automation Engine** | `automation/` | Orchestrates schedules, sequential scripts, and rule-based file organization chains. |
-| **Plugin Manager** | `app/` | Detects, loads, and initializes external extensions and customized tools. |
-| **OS Adapter** | `utils/` & `file_engine/` | Interfaces directly with Windows, macOS, or Linux APIs, abstracting path limits and system differences. |
+| **Voice Engine** | `backend/voice/` | Captures microphone input, processes wake word detection, converts speech to text, and runs text-to-speech feedback. |
+| **Conversation Engine** | `backend/core/` | Handles NLP parsing, command normalization, and formats conversational agent responses. |
+| **Memory Engine** | `backend/memory/` | Manages application state, records historical contexts, and tracks user preferences. |
+| **Planner** | `backend/core/planner.py` | Receives parsed actions and maps out the correct sequences of file, terminal, or GUI operations. |
+| **File Intelligence** | `backend/capabilities/files/` | Resolves system paths recursively, conducts permission checks, and handles folder restructuring. |
+| **Desktop Automation** | `backend/capabilities/desktop/` | Automates application launches, controls windows, screen captures, inputs, and OS system settings. |
+| **Workflow Engine** | `backend/automation/workflow/` | Orchestrates multi-step sequential desktop workflows, performs safety validations, and logs histories. |
+| **Plugin Manager** | `backend/core/` | Detects, loads, and initializes external extensions and customized tools. |
+| **OS Adapter** | `backend/utils/` | Interfaces directly with Windows, macOS, or Linux APIs, abstracting path limits and system differences. |
 
 ---
 

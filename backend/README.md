@@ -12,7 +12,8 @@ The backend codebase is divided into independent packages matching specific boun
 backend/
 ├── api/               # API Router endpoints (routes.py, voice_routes.py, etc.)
 ├── core/              # Assistant boundary, intent schemas, planner, and dispatcher
-├── capabilities/      # Specific OS operations (files, folder operations, etc.)
+├── capabilities/      # Specific OS operations (files, desktop capability, etc.)
+├── automation/        # Workflow Engine sequential orchestration
 ├── events/            # Centralized event schema interfaces
 ├── voice/             # Modular Voice Engine subsystems
 │   ├── speech/        # PyAudio device interactions and Speech-to-Text transcription
@@ -42,6 +43,11 @@ backend/
 * **Voice UX**: Standardizes states (`SLEEPING`, `LISTENING`, `PROCESSING`, `SPEAKING`, `WAITING`, `ERROR`) and triggers platform chimes.
 * **Context Awareness**: Resolves fuzzy pronoun/ordinal references (like "delete it" or "the second one") using `ReferenceResolver`.
 * **Voice Integration Pipeline**: Continuously listens for wake phrases, loops follow-up speech-to-intent pipelines, and handles system failures (mic disconnection, recognition timeouts, planner/capability exceptions, speech interruption).
+
+### 2.3 Desktop Automation & Workflow Subsystem (v0.4.0)
+* **Desktop Capability**: Single capability wrapping Application Management (launch/close), Window Management (minimize/maximize/focus/close), System Controls (volume/brightness/power/network), Clipboard automation (read/write/clear), and Screenshot/Screen recording services.
+* **Workflow Engine**: Orchestrates sequential steps of pre-registered workflows (Start Coding, Study Mode, Meeting Mode, Movie Mode, Clean Workspace), performs dependency validations, and logs execution histories for rollbacks.
+* **Input Automation**: Low-level mouse (movement, click, double click, scroll, drag) and keyboard (typing, hotkeys, custom macros) automation wrappers.
 
 ---
 
@@ -76,4 +82,4 @@ Execute the entire Pytest suite:
 ```bash
 pytest
 ```
-Currently, the backend contains **279 unit and integration tests** verifying core flows, file operations, state transitions, speech, and integration pipeline steps.
+Currently, the backend contains **326 unit and integration tests** verifying core flows, file operations, state transitions, speech, and integration pipeline steps.
