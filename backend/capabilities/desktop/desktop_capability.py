@@ -11,6 +11,7 @@ from core.intents import Intent
 from core.models import ExecutionPlan, ExecutionResult
 
 from .application.application_service import ApplicationService
+from .windows.window_service import WindowService
 
 
 class DesktopCapability(ICapability):
@@ -25,23 +26,33 @@ class DesktopCapability(ICapability):
         Intent.CLOSE_APPLICATION,
         Intent.RESTART_APPLICATION,
         Intent.LIST_RUNNING_APPLICATIONS,
+        Intent.MINIMIZE_WINDOW,
+        Intent.MAXIMIZE_WINDOW,
+        Intent.RESTORE_WINDOW,
+        Intent.FOCUS_WINDOW,
+        Intent.CLOSE_WINDOW,
+        Intent.SHOW_DESKTOP,
+        Intent.LIST_WINDOWS,
     })
     _CAPABILITY_NAME = "desktop"
 
     def __init__(
         self,
         application_service: ApplicationService | None = None,
+        window_service: WindowService | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """Initializes the DesktopCapability.
 
         Args:
             application_service: Preconfigured ApplicationService instance.
+            window_service: Preconfigured WindowService instance.
             logger: Optional logger for capability diagnostics.
         """
 
         self._logger = logger or logging.getLogger(__name__)
         self._application_service = application_service or ApplicationService(logger=self._logger)
+        self._window_service = window_service or WindowService(logger=self._logger)
 
     @property
     def name(self) -> str:
@@ -155,6 +166,94 @@ class DesktopCapability(ICapability):
                 success=True,
                 response=response,
                 data={"applications": [app.model_dump() for app in apps]},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.MINIMIZE_WINDOW:
+            success = self._window_service.minimize_window(target)
+            if success:
+                response = f"Successfully minimized window '{target or 'active'}'."
+            else:
+                response = f"Could not minimize window '{target or 'active'}'."
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={"target": target},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.MAXIMIZE_WINDOW:
+            success = self._window_service.maximize_window(target)
+            if success:
+                response = f"Successfully maximized window '{target or 'active'}'."
+            else:
+                response = f"Could not maximize window '{target or 'active'}'."
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={"target": target},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.RESTORE_WINDOW:
+            success = self._window_service.restore_window(target)
+            if success:
+                response = f"Successfully restored window '{target or 'active'}'."
+            else:
+                response = f"Could not restore window '{target or 'active'}'."
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={"target": target},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.FOCUS_WINDOW:
+            success = self._window_service.focus_window(target)
+            if success:
+                response = f"Successfully focused window '{target or 'active'}'."
+            else:
+                response = f"Could not focus window '{target or 'active'}'."
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={"target": target},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.CLOSE_WINDOW:
+            success = self._window_service.close_window(target)
+            if success:
+                response = f"Successfully closed window '{target or 'active'}'."
+            else:
+                response = f"Could not close window '{target or 'active'}'."
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={"target": target},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.SHOW_DESKTOP:
+            self._window_service.show_desktop()
+            return ExecutionResult(
+                success=True,
+                response="Desktop shown.",
+                data={},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.LIST_WINDOWS:
+            wins = self._window_service.list_windows()
+            open_wins = [w.title for w in wins]
+            if open_wins:
+                response = f"Currently open windows: {', '.join(open_wins)}."
+            else:
+                response = "No open application windows were found."
+            return ExecutionResult(
+                success=True,
+                response=response,
+                data={"windows": [w.model_dump() for w in wins]},
                 execution_time=time.perf_counter() - execution_started_at,
             )
 

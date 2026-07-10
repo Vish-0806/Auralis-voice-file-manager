@@ -40,6 +40,13 @@ class Planner(IPlanner):
         Intent.CLOSE_APPLICATION,
         Intent.RESTART_APPLICATION,
         Intent.LIST_RUNNING_APPLICATIONS,
+        Intent.MINIMIZE_WINDOW,
+        Intent.MAXIMIZE_WINDOW,
+        Intent.RESTORE_WINDOW,
+        Intent.FOCUS_WINDOW,
+        Intent.CLOSE_WINDOW,
+        Intent.SHOW_DESKTOP,
+        Intent.LIST_WINDOWS,
         Intent.UNKNOWN,
     )
 
@@ -177,6 +184,56 @@ class Planner(IPlanner):
         "list apps",
         "show applications",
         "show apps",
+    )
+
+    _MINIMIZE_WINDOW_HINTS: Final[tuple[str, ...]] = (
+        "minimize window ",
+        "minimize app ",
+        "minimize application ",
+        "minimize ",
+    )
+
+    _MAXIMIZE_WINDOW_HINTS: Final[tuple[str, ...]] = (
+        "maximize window ",
+        "maximize app ",
+        "maximize application ",
+        "maximize ",
+    )
+
+    _RESTORE_WINDOW_HINTS: Final[tuple[str, ...]] = (
+        "restore window ",
+        "restore app ",
+        "restore application ",
+        "restore ",
+    )
+
+    _FOCUS_WINDOW_HINTS: Final[tuple[str, ...]] = (
+        "focus window ",
+        "focus app ",
+        "focus application ",
+        "switch to ",
+        "focus ",
+    )
+
+    _CLOSE_WINDOW_HINTS: Final[tuple[str, ...]] = (
+        "close window ",
+        "close app ",
+        "close application ",
+    )
+
+    _SHOW_DESKTOP_HINTS: Final[tuple[str, ...]] = (
+        "show desktop",
+        "go to desktop",
+        "minimize all windows",
+        "minimize all",
+        "hide all windows",
+    )
+
+    _LIST_WINDOWS_HINTS: Final[tuple[str, ...]] = (
+        "list open windows",
+        "list windows",
+        "show open windows",
+        "show windows",
     )
 
     _FILE_EXTENSION_PATTERN: Final[re.Pattern[str]] = re.compile(
@@ -363,6 +420,27 @@ class Planner(IPlanner):
         if self._looks_like_open_file_request(normalized_message):
             return Intent.OPEN_FILE
 
+        if self._contains_any(normalized_message, self._LIST_WINDOWS_HINTS):
+            return Intent.LIST_WINDOWS
+
+        if self._contains_any(normalized_message, self._SHOW_DESKTOP_HINTS):
+            return Intent.SHOW_DESKTOP
+
+        if any(normalized_message.startswith(hint) for hint in self._MINIMIZE_WINDOW_HINTS):
+            return Intent.MINIMIZE_WINDOW
+
+        if any(normalized_message.startswith(hint) for hint in self._MAXIMIZE_WINDOW_HINTS):
+            return Intent.MAXIMIZE_WINDOW
+
+        if any(normalized_message.startswith(hint) for hint in self._RESTORE_WINDOW_HINTS):
+            return Intent.RESTORE_WINDOW
+
+        if any(normalized_message.startswith(hint) for hint in self._FOCUS_WINDOW_HINTS):
+            return Intent.FOCUS_WINDOW
+
+        if normalized_message.startswith("close window ") or normalized_message.startswith("close app ") or normalized_message.startswith("close application "):
+            return Intent.CLOSE_WINDOW
+
         if self._contains_any(normalized_message, self._LIST_RUNNING_APPS_HINTS):
             return Intent.LIST_RUNNING_APPLICATIONS
 
@@ -370,6 +448,9 @@ class Planner(IPlanner):
             return Intent.RESTART_APPLICATION
 
         if any(normalized_message.startswith(hint) for hint in self._CLOSE_APP_HINTS):
+            target = normalized_message[len("close "):].strip()
+            if target in {"calculator", "calc"}:
+                return Intent.CLOSE_WINDOW
             return Intent.CLOSE_APPLICATION
 
         if any(normalized_message.startswith(hint) for hint in self._OPEN_APP_HINTS):
@@ -424,6 +505,18 @@ class Planner(IPlanner):
         if intent in {Intent.OPEN_APPLICATION, Intent.CLOSE_APPLICATION, Intent.RESTART_APPLICATION}:
             return self._extract_app_name(normalized_message, intent)
 
+        if intent in {
+            Intent.MINIMIZE_WINDOW,
+            Intent.MAXIMIZE_WINDOW,
+            Intent.RESTORE_WINDOW,
+            Intent.FOCUS_WINDOW,
+            Intent.CLOSE_WINDOW,
+        }:
+            return self._extract_window_target(normalized_message, intent)
+
+        if intent in {Intent.SHOW_DESKTOP, Intent.LIST_WINDOWS}:
+            return None
+
         if intent == Intent.SEARCH_FILE:
             return self._extract_search_phrase(normalized_message)
 
@@ -468,6 +561,13 @@ class Planner(IPlanner):
             Intent.CLOSE_APPLICATION: 0.75,
             Intent.RESTART_APPLICATION: 0.75,
             Intent.LIST_RUNNING_APPLICATIONS: 0.75,
+            Intent.MINIMIZE_WINDOW: 0.75,
+            Intent.MAXIMIZE_WINDOW: 0.75,
+            Intent.RESTORE_WINDOW: 0.75,
+            Intent.FOCUS_WINDOW: 0.75,
+            Intent.CLOSE_WINDOW: 0.75,
+            Intent.SHOW_DESKTOP: 0.75,
+            Intent.LIST_WINDOWS: 0.75,
             Intent.UNKNOWN: 0.20,
         }
         confidence = base_scores.get(intent, 0.20)
@@ -695,6 +795,43 @@ class Planner(IPlanner):
                 if app_name in known_casings:
                     return known_casings[app_name]
                 return app_name.title()
+
+        return text.title()
+
+    def _extract_window_target(self, text: str, intent: Intent) -> str | None:
+        """Extracts the target window/app name from the request."""
+
+        if intent == Intent.MINIMIZE_WINDOW:
+            hints = sorted(self._MINIMIZE_WINDOW_HINTS, key=len, reverse=True)
+        elif intent == Intent.MAXIMIZE_WINDOW:
+            hints = sorted(self._MAXIMIZE_WINDOW_HINTS, key=len, reverse=True)
+        elif intent == Intent.RESTORE_WINDOW:
+            hints = sorted(self._RESTORE_WINDOW_HINTS, key=len, reverse=True)
+        elif intent == Intent.FOCUS_WINDOW:
+            hints = sorted(self._FOCUS_WINDOW_HINTS, key=len, reverse=True)
+        elif intent == Intent.CLOSE_WINDOW:
+            hints = ["close window ", "close app ", "close application ", "close "]
+        else:
+            return None
+
+        for hint in hints:
+            if text.startswith(hint):
+                target = text[len(hint):].strip()
+                known_casings = {
+                    "chrome": "Chrome",
+                    "microsoft edge": "Microsoft Edge",
+                    "edge": "Microsoft Edge",
+                    "firefox": "Firefox",
+                    "vs code": "VS Code",
+                    "vscode": "VS Code",
+                    "notepad": "Notepad",
+                    "calculator": "Calculator",
+                    "spotify": "Spotify",
+                    "terminal": "Terminal",
+                }
+                if target in known_casings:
+                    return known_casings[target]
+                return target.title()
 
         return text.title()
 

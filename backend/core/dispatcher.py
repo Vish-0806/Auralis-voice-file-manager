@@ -34,6 +34,13 @@ class ActionDispatcher(IDispatcher):
         Intent.CLOSE_APPLICATION,
         Intent.RESTART_APPLICATION,
         Intent.LIST_RUNNING_APPLICATIONS,
+        Intent.MINIMIZE_WINDOW,
+        Intent.MAXIMIZE_WINDOW,
+        Intent.RESTORE_WINDOW,
+        Intent.FOCUS_WINDOW,
+        Intent.CLOSE_WINDOW,
+        Intent.SHOW_DESKTOP,
+        Intent.LIST_WINDOWS,
         Intent.UNKNOWN,
     }
 
@@ -185,6 +192,13 @@ class ActionDispatcher(IDispatcher):
             Intent.CLOSE_APPLICATION,
             Intent.RESTART_APPLICATION,
             Intent.LIST_RUNNING_APPLICATIONS,
+            Intent.MINIMIZE_WINDOW,
+            Intent.MAXIMIZE_WINDOW,
+            Intent.RESTORE_WINDOW,
+            Intent.FOCUS_WINDOW,
+            Intent.CLOSE_WINDOW,
+            Intent.SHOW_DESKTOP,
+            Intent.LIST_WINDOWS,
         }:
             return "desktop"
 
