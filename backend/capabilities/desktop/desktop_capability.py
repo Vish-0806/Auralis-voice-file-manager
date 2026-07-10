@@ -14,6 +14,8 @@ from .application.application_service import ApplicationService
 from .windows.window_service import WindowService
 from .system.system_service import SystemService
 from .clipboard.clipboard_service import ClipboardService
+from .screenshot.screenshot_service import ScreenshotService
+from .screenshot.screen_recorder import ScreenRecorder
 
 
 class DesktopCapability(ICapability):
@@ -54,6 +56,14 @@ class DesktopCapability(ICapability):
         Intent.SHOW_CLIPBOARD,
         Intent.SAVE_CLIPBOARD,
         Intent.COPY_FILE_PATH,
+        Intent.TAKE_SCREENSHOT,
+        Intent.CAPTURE_WINDOW,
+        Intent.CAPTURE_MONITOR,
+        Intent.DELAYED_SCREENSHOT,
+        Intent.COPY_SCREENSHOT,
+        Intent.SAVE_SCREENSHOT,
+        Intent.START_RECORDING,
+        Intent.STOP_RECORDING,
     })
     _CAPABILITY_NAME = "desktop"
 
@@ -63,6 +73,8 @@ class DesktopCapability(ICapability):
         window_service: WindowService | None = None,
         system_service: SystemService | None = None,
         clipboard_service: ClipboardService | None = None,
+        screenshot_service: ScreenshotService | None = None,
+        screen_recorder: ScreenRecorder | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """Initializes the DesktopCapability.
@@ -72,6 +84,8 @@ class DesktopCapability(ICapability):
             window_service: Preconfigured WindowService instance.
             system_service: Preconfigured SystemService instance.
             clipboard_service: Preconfigured ClipboardService instance.
+            screenshot_service: Preconfigured ScreenshotService instance.
+            screen_recorder: Preconfigured ScreenRecorder instance.
             logger: Optional logger for capability diagnostics.
         """
 
@@ -80,6 +94,8 @@ class DesktopCapability(ICapability):
         self._window_service = window_service or WindowService(logger=self._logger)
         self._system_service = system_service or SystemService(logger=self._logger)
         self._clipboard_service = clipboard_service or ClipboardService(logger=self._logger)
+        self._screenshot_service = screenshot_service or ScreenshotService(logger=self._logger)
+        self._screen_recorder = screen_recorder or ScreenRecorder(logger=self._logger)
 
     @property
     def name(self) -> str:
@@ -490,6 +506,98 @@ class DesktopCapability(ICapability):
                 success=True,
                 response=f"Copied file path '{path_to_copy}' to clipboard.",
                 data={"file_path": path_to_copy},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.TAKE_SCREENSHOT:
+            self._screenshot_service.capture_fullscreen()
+            return ExecutionResult(
+                success=True,
+                response="Screenshot captured successfully.",
+                data={},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.CAPTURE_WINDOW:
+            try:
+                self._screenshot_service.capture_active_window()
+                response = "Active window captured successfully."
+                success = True
+            except Exception as exc:
+                response = f"Failed to capture active window: {str(exc)}"
+                success = False
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.CAPTURE_MONITOR:
+            if not target:
+                raise ValueError("Monitor number is required to capture a specific monitor.")
+            try:
+                monitor_num = int(target)
+                self._screenshot_service.capture_monitor(monitor_num)
+                response = f"Monitor {monitor_num} captured successfully."
+                success = True
+            except Exception as exc:
+                response = f"Failed to capture monitor: {str(exc)}"
+                success = False
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={"monitor": monitor_num},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.DELAYED_SCREENSHOT:
+            delay = float(target) if target else 5.0
+            self._screenshot_service.capture_delayed(delay)
+            return ExecutionResult(
+                success=True,
+                response=f"Screenshot captured successfully after {delay} seconds delay.",
+                data={"delay_seconds": delay},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.COPY_SCREENSHOT:
+            success = self._screenshot_service.copy_to_clipboard()
+            response = "Screenshot copied to clipboard." if success else "Failed to copy screenshot to clipboard."
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.SAVE_SCREENSHOT:
+            details = self._screenshot_service.save_image(None, target)
+            return ExecutionResult(
+                success=True,
+                response=f"Screenshot saved successfully to: {details.path}",
+                data=details.model_dump(),
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.START_RECORDING:
+            dest = target or "screen_recording.mp4"
+            success = self._screen_recorder.start_recording(dest)
+            response = f"Screen recording started to: {dest}." if success else "Failed to start screen recording."
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={"destination": dest},
+                execution_time=time.perf_counter() - execution_started_at,
+            )
+
+        if intent == Intent.STOP_RECORDING:
+            success = self._screen_recorder.stop_recording()
+            response = "Screen recording stopped." if success else "No active recording to stop."
+            return ExecutionResult(
+                success=success,
+                response=response,
+                data={},
                 execution_time=time.perf_counter() - execution_started_at,
             )
 

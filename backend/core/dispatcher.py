@@ -60,6 +60,14 @@ class ActionDispatcher(IDispatcher):
         Intent.SHOW_CLIPBOARD,
         Intent.SAVE_CLIPBOARD,
         Intent.COPY_FILE_PATH,
+        Intent.TAKE_SCREENSHOT,
+        Intent.CAPTURE_WINDOW,
+        Intent.CAPTURE_MONITOR,
+        Intent.DELAYED_SCREENSHOT,
+        Intent.COPY_SCREENSHOT,
+        Intent.SAVE_SCREENSHOT,
+        Intent.START_RECORDING,
+        Intent.STOP_RECORDING,
         Intent.UNKNOWN,
     }
 
@@ -237,6 +245,14 @@ class ActionDispatcher(IDispatcher):
             Intent.SHOW_CLIPBOARD,
             Intent.SAVE_CLIPBOARD,
             Intent.COPY_FILE_PATH,
+            Intent.TAKE_SCREENSHOT,
+            Intent.CAPTURE_WINDOW,
+            Intent.CAPTURE_MONITOR,
+            Intent.DELAYED_SCREENSHOT,
+            Intent.COPY_SCREENSHOT,
+            Intent.SAVE_SCREENSHOT,
+            Intent.START_RECORDING,
+            Intent.STOP_RECORDING,
         }:
             return "desktop"
 

@@ -66,6 +66,14 @@ class Planner(IPlanner):
         Intent.SHOW_CLIPBOARD,
         Intent.SAVE_CLIPBOARD,
         Intent.COPY_FILE_PATH,
+        Intent.TAKE_SCREENSHOT,
+        Intent.CAPTURE_WINDOW,
+        Intent.CAPTURE_MONITOR,
+        Intent.DELAYED_SCREENSHOT,
+        Intent.COPY_SCREENSHOT,
+        Intent.SAVE_SCREENSHOT,
+        Intent.START_RECORDING,
+        Intent.STOP_RECORDING,
         Intent.UNKNOWN,
     )
 
@@ -526,6 +534,30 @@ class Planner(IPlanner):
         if normalized_message in {"copy the current file path", "copy current file path", "copy file path"}:
             return Intent.COPY_FILE_PATH
 
+        if normalized_message in {"take a screenshot", "take screenshot", "capture screen", "screenshot"}:
+            return Intent.TAKE_SCREENSHOT
+
+        if normalized_message in {"capture the active window", "capture active window", "screenshot active window"}:
+            return Intent.CAPTURE_WINDOW
+
+        if normalized_message.startswith("capture monitor ") or normalized_message.startswith("capture display ") or normalized_message.startswith("screenshot monitor "):
+            return Intent.CAPTURE_MONITOR
+
+        if normalized_message.startswith("take a screenshot in ") or normalized_message.startswith("take screenshot in ") or normalized_message.startswith("screenshot in "):
+            return Intent.DELAYED_SCREENSHOT
+
+        if normalized_message in {"copy screenshot to clipboard", "copy screenshot", "copy capture"}:
+            return Intent.COPY_SCREENSHOT
+
+        if normalized_message == "save screenshot" or normalized_message.startswith("save screenshot to ") or normalized_message.startswith("save screenshot as "):
+            return Intent.SAVE_SCREENSHOT
+
+        if normalized_message in {"start recording screen", "start screen recording", "start recording", "record screen"}:
+            return Intent.START_RECORDING
+
+        if normalized_message in {"stop recording screen", "stop screen recording", "stop recording", "stop record"}:
+            return Intent.STOP_RECORDING
+
         if any(normalized_message.startswith(hint) for hint in self._MINIMIZE_WINDOW_HINTS):
             return Intent.MINIMIZE_WINDOW
 
@@ -637,7 +669,21 @@ class Planner(IPlanner):
             Intent.CLEAR_CLIPBOARD,
             Intent.SHOW_CLIPBOARD,
             Intent.COPY_FILE_PATH,
+            Intent.TAKE_SCREENSHOT,
+            Intent.CAPTURE_WINDOW,
+            Intent.COPY_SCREENSHOT,
+            Intent.START_RECORDING,
+            Intent.STOP_RECORDING,
         }:
+            return None
+
+        if intent in {Intent.CAPTURE_MONITOR, Intent.DELAYED_SCREENSHOT}:
+            return self._extract_number(normalized_message)
+
+        if intent == Intent.SAVE_SCREENSHOT:
+            for prefix in ("save screenshot to ", "save screenshot as "):
+                if normalized_message.startswith(prefix):
+                    return normalized_message[len(prefix):].strip()
             return None
 
         if intent == Intent.SAVE_CLIPBOARD:
@@ -718,6 +764,14 @@ class Planner(IPlanner):
             Intent.SHOW_CLIPBOARD: 0.75,
             Intent.SAVE_CLIPBOARD: 0.75,
             Intent.COPY_FILE_PATH: 0.75,
+            Intent.TAKE_SCREENSHOT: 0.75,
+            Intent.CAPTURE_WINDOW: 0.75,
+            Intent.CAPTURE_MONITOR: 0.75,
+            Intent.DELAYED_SCREENSHOT: 0.75,
+            Intent.COPY_SCREENSHOT: 0.75,
+            Intent.SAVE_SCREENSHOT: 0.75,
+            Intent.START_RECORDING: 0.75,
+            Intent.STOP_RECORDING: 0.75,
             Intent.UNKNOWN: 0.20,
         }
         confidence = base_scores.get(intent, 0.20)
