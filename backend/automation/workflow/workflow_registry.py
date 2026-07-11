@@ -10,6 +10,9 @@ from .models import WorkflowStep, WorkflowDefinition
 class WorkflowRegistry:
     """Stores and retrieves registered workflow definitions."""
 
+    # Class-level dictionary to hold dynamically registered task planner workflows
+    _dynamic_registry: dict[str, WorkflowDefinition] = {}
+
     def __init__(self, logger: logging.Logger | None = None) -> None:
         """Initializes the registry and registers default built-in workflows."""
 
@@ -26,12 +29,16 @@ class WorkflowRegistry:
     def get_workflow(self, name: str) -> WorkflowDefinition | None:
         """Retrieves a workflow by name."""
 
+        if name in self._dynamic_registry:
+            return self._dynamic_registry[name]
         return self._registry.get(name)
 
     def list_workflows(self) -> list[WorkflowDefinition]:
         """Returns all registered workflow definitions."""
 
-        return list(self._registry.values())
+        built_in = list(self._registry.values())
+        dynamic = list(self._dynamic_registry.values())
+        return built_in + dynamic
 
     def _register_defaults(self) -> None:
         """Populates the registry with core built-in workflows."""

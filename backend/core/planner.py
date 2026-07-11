@@ -9,9 +9,17 @@ side effects are performed here.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import Any, Final
 
+from brain.goal.goal_interpreter import GoalInterpreter
+from brain.goal.models import Goal
+from brain.reasoning.reasoning_engine import ReasoningEngine
+from brain.reasoning.models import ReasoningResult
+from brain.planning.task_planner import TaskPlanner
+from brain.capability.capability_selector import CapabilitySelector
+from brain.capability.models import RoutedExecutionPlan
 from .exceptions import ValidationException
 from .interfaces import IPlanner
 from .intents import Intent
@@ -313,6 +321,11 @@ class Planner(IPlanner):
         agent_brain: Any | None = None,
         event_bus: Any | None = None,
         logger: logging.Logger | None = None,
+        goal_threshold: float = 0.7,
+        goal_interpreter: GoalInterpreter | None = None,
+        reasoning_engine: ReasoningEngine | None = None,
+        task_planner: TaskPlanner | None = None,
+        capability_selector: CapabilitySelector | None = None,
     ) -> None:
         """Initializes the planner.
 
@@ -320,11 +333,88 @@ class Planner(IPlanner):
             agent_brain: Retained for compatibility with the current codebase.
             event_bus: Retained for compatibility with the current codebase.
             logger: Optional logger used for planner diagnostics.
+            goal_threshold: Configurable minimum confidence threshold for interpreted goals.
+            goal_interpreter: Injected GoalInterpreter implementation.
+            reasoning_engine: Injected ReasoningEngine implementation.
+            task_planner: Injected TaskPlanner implementation.
+            capability_selector: Injected CapabilitySelector implementation.
         """
 
         self._agent_brain = agent_brain
         self._event_bus = event_bus
         self._logger = logger or logging.getLogger(__name__)
+
+        # Load threshold from environment variable if present
+        env_threshold = os.environ.get("AURALIS_GOAL_THRESHOLD")
+        if env_threshold is not None:
+            try:
+                goal_threshold = float(env_threshold)
+            except ValueError:
+                self._logger.warning(
+                    "Invalid AURALIS_GOAL_THRESHOLD env variable; using default",
+                    extra={"value": env_threshold},
+                )
+
+        self._goal_threshold = goal_threshold
+        self._goal_interpreter = goal_interpreter or GoalInterpreter(logger=self._logger)
+        self._reasoning_engine = reasoning_engine or ReasoningEngine(logger=self._logger)
+        self._task_planner = task_planner or TaskPlanner(logger=self._logger)
+        self._capability_selector = capability_selector or CapabilitySelector(logger=self._logger)
+
+    def _map_goal_to_plan(self, goal: Goal, confidence_score: float) -> ExecutionPlan | None:
+        """Maps an interpreted Goal to a core ExecutionPlan.
+
+        Args:
+            goal: The interpreted Goal.
+            confidence_score: The confidence score from goal interpreter.
+
+        Returns:
+            An ExecutionPlan if mapping succeeds, otherwise None.
+        """
+        if goal.name == "START_CODING":
+            return ExecutionPlan(
+                intent=Intent.RUN_WORKFLOW,
+                target="Start Coding",
+                confidence=confidence_score,
+            )
+        elif goal.name == "STUDY":
+            return ExecutionPlan(
+                intent=Intent.RUN_WORKFLOW,
+                target="Study Mode",
+                confidence=confidence_score,
+            )
+        elif goal.name == "MEETING":
+            return ExecutionPlan(
+                intent=Intent.RUN_WORKFLOW,
+                target="Meeting Mode",
+                confidence=confidence_score,
+            )
+        elif goal.name == "ORGANIZE_DOWNLOADS":
+            return ExecutionPlan(
+                intent=Intent.ORGANIZE_FOLDER,
+                target="Downloads",
+                confidence=confidence_score,
+            )
+        elif goal.name == "CLEAN_WORKSPACE":
+            return ExecutionPlan(
+                intent=Intent.RUN_WORKFLOW,
+                target="Clean Workspace",
+                confidence=confidence_score,
+            )
+        elif goal.name == "LOCK_COMPUTER":
+            return ExecutionPlan(
+                intent=Intent.LOCK_PC,
+                confidence=confidence_score,
+            )
+        elif goal.name == "OPEN_APPLICATION":
+            app_name = goal.parameters.get("application")
+            if app_name:
+                return ExecutionPlan(
+                    intent=Intent.OPEN_APPLICATION,
+                    target=app_name,
+                    confidence=confidence_score,
+                )
+        return None
 
     def create_plan(
         self,
@@ -346,6 +436,66 @@ class Planner(IPlanner):
         """
 
         self._validate_request(request)
+
+        # Run Goal Interpreter first
+        if self._goal_interpreter is not None:
+            try:
+                goal_result = self._goal_interpreter.interpret(request.message)
+                if (
+                    goal_result.confidence.score >= self._goal_threshold
+                    and goal_result.goal.name != "UNKNOWN"
+                ):
+                    # 1. Run the reasoning engine
+                    reasoning_result = self._reasoning_engine.reason(goal_result.goal)
+
+                    # 2. Run the dynamic task planner to generate the plan
+                    plan = self._task_planner.plan(reasoning_result, confidence=goal_result.confidence.score)
+
+                    # 3. Embed reasoning details in plan parameters
+                    plan.parameters["reasoning"] = {
+                        "objective": {
+                            "title": reasoning_result.objective.title,
+                            "description": reasoning_result.objective.description,
+                            "target": reasoning_result.objective.target,
+                        },
+                        "required_capabilities": reasoning_result.required_capabilities,
+                        "constraints": [
+                            {
+                                "name": c.name,
+                                "type": c.type,
+                                "description": c.description,
+                                "satisfied": c.satisfied,
+                            }
+                            for c in reasoning_result.constraints
+                        ],
+                        "priority": reasoning_result.priority.value,
+                        "estimated_complexity": reasoning_result.estimated_complexity,
+                    }
+
+                    # 4. Route plan through the Capability Selector
+                    if self._capability_selector is not None:
+                        try:
+                            plan = self._capability_selector.select_capabilities(plan)
+                        except Exception as cs_exc:
+                            self._logger.error(
+                                "Error executing Capability Selector; proceeding with raw plan",
+                                exc_info=cs_exc,
+                            )
+
+                    self._logger.info(
+                        "Goal dynamically planned, reasoned, and routed successfully, bypassing existing planner rules",
+                        extra={
+                            "goal_name": goal_result.goal.name,
+                            "category": goal_result.goal.category.value,
+                            "confidence": goal_result.confidence.score,
+                        },
+                    )
+                    return plan
+            except Exception as exc:
+                self._logger.error(
+                    "Error executing Goal Interpreter/Planning, falling back to existing planner rules",
+                    exc_info=exc,
+                )
 
         normalized_message = self._normalize_text(request.message)
         intent = self._detect_intent(normalized_message)

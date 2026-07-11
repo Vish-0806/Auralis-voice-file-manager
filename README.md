@@ -96,6 +96,28 @@ All desktop actions are tracked for execution time and logged with detailed JSON
 
 ---
 
+## AI Brain Orchestration & Self-Correction Engine (v1.0.0)
+
+Auralis Version 1.0.0 implements the complete Phase 5 **AI Brain Orchestration** and **Self-Correction & Recovery Engine**. It establishes a modular, pipeline-based request execution gateway.
+
+### 1. Module Subsystems
+- **Goal Interpreter**: Classifies commands to canonical Goals and calculates confidence levels.
+- **Reasoning Engine**: Deduces target objectives, priorities, execution constraints, and estimated complexities.
+- **Dynamic Task Planner**: Constructs dependency-resolved step structures topologically, automatically prepending constraint checks.
+- **Capability Selector**: Routes execution steps to registered capabilities.
+- **Multi-Step Execution Engine**: Manages state context and schedules step executions sequentially.
+- **Self-Correction & Recovery**: Detects step failures and executes fallback strategies (e.g. launching Microsoft Edge if Chrome fails to load).
+- **Progress Monitoring**: Publishes step-by-step progress events and monitors execution for stalls.
+- **Brain Controller**: Coordinates the entire pipeline, routing requests first and falling back to legacy rule-based execution.
+
+### 2. Supported E2E Integration Scenarios
+- **Start Coding**: Triggers `START_CODING` -> launches VS Code, Terminal, and volume configuration.
+- **Study Mode**: Triggers `STUDY` -> launches Edge (or recovers from Chrome launch failures) and mutes master volume.
+- **Meeting Preparation**: Triggers `MEETING` -> launches Notepad, mutes master volume, and clears active window layouts.
+- **Downloads Organization**: Triggers `ORGANIZE_DOWNLOADS` -> routes sorting and folder actions to the File capability.
+
+---
+
 ## Architecture
 
 Auralis uses a modular architecture that separates voice capture, natural language understanding, execution planning, and OS operations:
@@ -129,6 +151,7 @@ The project is structured into independent packages to ensure separation of conc
 | **Voice Engine** | `backend/voice/` | Captures microphone input, processes wake word detection, converts speech to text, and runs text-to-speech feedback. |
 | **Conversation Engine** | `backend/core/` | Handles NLP parsing, command normalization, and formats conversational agent responses. |
 | **Memory Engine** | `backend/memory/` | Manages application state, records historical contexts, and tracks user preferences. |
+| **AI Brain Orchestration** | `backend/brain/` | Integrates Goal Interpreter, Reasoning, Dynamic Planner, Capability Selector, Execution Engine, Recovery Fallbacks, Progress Monitor, and Brain Controller. |
 | **Planner** | `backend/core/planner.py` | Receives parsed actions and maps out the correct sequences of file, terminal, or GUI operations. |
 | **File Intelligence** | `backend/capabilities/files/` | Resolves system paths recursively, conducts permission checks, and handles folder restructuring. |
 | **Desktop Automation** | `backend/capabilities/desktop/` | Automates application launches, controls windows, screen captures, inputs, and OS system settings. |
@@ -295,6 +318,7 @@ Track the development stages of Auralis:
 * [x] **Core Pipeline:** Create the modular FastAPI backend structure and link to Vitest-proxied React dashboard.
 * [x] **Voice Subsystems (Phase 3):** Implement modular Speech-to-Text (Whisper), Text-to-Speech (Edge-TTS), Session Manager state-machine, Inactivity timers, Voice UX (status tracks, sound chimes), and Context reference resolvers.
 * [x] **Pipeline Integration:** Stitch all voice subsystems into a thread-safe, continuous execution pipeline with robust error recovery (mic reconnects, STT fallbacks, planner/capability exceptions, speech interruption).
+* [x] **AI Brain Orchestration (Phase 5):** Complete the modular pipeline (Goal Interpreter, Reasoning, Dynamic Planner, Selector, Execution Scheduler, Self-Correction, Progress Monitor, and Controller integration).
 * [ ] **Current Development:**
   * [ ] Implement basic document intelligence parser using local PyMuPDF extraction.
   * [ ] Refactor the system monitoring panel to display real-time CPU/RAM graphs in the dashboard.
