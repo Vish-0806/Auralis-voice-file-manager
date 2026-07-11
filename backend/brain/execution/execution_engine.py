@@ -11,6 +11,7 @@ from typing import Any
 from brain.capability.models import RoutedExecutionPlan
 from brain.capability.capability_matcher import CapabilityMatcher
 from brain.recovery.recovery_engine import RecoveryEngine
+from brain.monitoring.progress_monitor import ProgressMonitor
 from automation.workflow.workflow_registry import WorkflowRegistry
 from core.models import ExecutionPlan as CoreExecutionPlan
 from core.intents import Intent
@@ -31,6 +32,7 @@ class ExecutionEngine:
         scheduler: ExecutionScheduler | None = None,
         history: ExecutionHistory | None = None,
         recovery_engine: RecoveryEngine | None = None,
+        progress_monitor: ProgressMonitor | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """Initializes the ExecutionEngine.
@@ -40,6 +42,7 @@ class ExecutionEngine:
             scheduler: Sequence task scheduler.
             history: Session history logger.
             recovery_engine: Injected RecoveryEngine instance.
+            progress_monitor: Injected ProgressMonitor instance.
             logger: Optional custom logger.
         """
         self._logger = logger or logging.getLogger(__name__)
@@ -48,6 +51,7 @@ class ExecutionEngine:
         self._history = history or ExecutionHistory(logger=self._logger)
         self._matcher = CapabilityMatcher(logger=self._logger)
         self._recovery_engine = recovery_engine or RecoveryEngine(logger=self._logger)
+        self._progress_monitor = progress_monitor or ProgressMonitor(logger=self._logger)
 
     def execute_plan(self, plan: RoutedExecutionPlan, dispatcher: Any) -> ExecutionSummary:
         """Validates and executes a RoutedExecutionPlan step-by-step through the dispatcher.
@@ -81,6 +85,9 @@ class ExecutionEngine:
         summary_error = None
 
         scheduled_routes = self._scheduler.schedule_steps(plan.routes)
+        
+        step_ids = [route.step_id or "main" for route in scheduled_routes]
+        self._progress_monitor.start_session(execution_id, step_ids)
 
         steps_map = {}
         if plan.intent == Intent.RUN_WORKFLOW and plan.target:
@@ -134,6 +141,8 @@ class ExecutionEngine:
             step_response = None
             step_error = None
 
+            self._progress_monitor.start_step(step_id)
+
             try:
                 result = dispatcher.dispatch(step_plan)
                 duration = result.execution_time
@@ -144,6 +153,7 @@ class ExecutionEngine:
                 else:
                     step_response = result.response
                     context.complete_step(step_id, {"response": result.response, "data": result.data})
+                    self._progress_monitor.complete_step(step_id, duration)
             except Exception as disp_err:
                 duration = time.perf_counter() - step_start_time
                 step_status = ExecutionStatus.FAILED
@@ -164,7 +174,11 @@ class ExecutionEngine:
             records.append(record)
 
             if step_status == ExecutionStatus.FAILED:
+                self._progress_monitor.fail_step(step_id, duration)
+
                 self._logger.info("Attempting automatic self-correction and recovery", extra={"step_id": step_id})
+                self._progress_monitor.start_recovery()
+
                 recovery_result = self._recovery_engine.recover(
                     step_id=step_id,
                     intent=step_plan.intent,
@@ -173,6 +187,8 @@ class ExecutionEngine:
                     error_message=step_error or "",
                     dispatcher=dispatcher,
                 )
+
+                self._progress_monitor.finish_recovery(success=recovery_result.success)
 
                 if recovery_result.success:
                     self._logger.info("Step recovery resolved successfully. Continuing execution loop.", extra={"step_id": step_id})
@@ -202,6 +218,8 @@ class ExecutionEngine:
             total_duration=total_duration,
             error=summary_error,
         )
+
+        self._progress_monitor.complete_session(success=overall_success, total_duration=total_duration)
 
         self._logger.info(
             "Execution session completed",
