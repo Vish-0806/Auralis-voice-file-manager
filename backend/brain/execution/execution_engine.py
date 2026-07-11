@@ -10,6 +10,7 @@ from typing import Any
 # pyrefly: ignore [missing-import]
 from brain.capability.models import RoutedExecutionPlan
 from brain.capability.capability_matcher import CapabilityMatcher
+from brain.recovery.recovery_engine import RecoveryEngine
 from automation.workflow.workflow_registry import WorkflowRegistry
 from core.models import ExecutionPlan as CoreExecutionPlan
 from core.intents import Intent
@@ -29,6 +30,7 @@ class ExecutionEngine:
         validator: ExecutionValidator | None = None,
         scheduler: ExecutionScheduler | None = None,
         history: ExecutionHistory | None = None,
+        recovery_engine: RecoveryEngine | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """Initializes the ExecutionEngine.
@@ -37,6 +39,7 @@ class ExecutionEngine:
             validator: Plan integrity checker.
             scheduler: Sequence task scheduler.
             history: Session history logger.
+            recovery_engine: Injected RecoveryEngine instance.
             logger: Optional custom logger.
         """
         self._logger = logger or logging.getLogger(__name__)
@@ -44,6 +47,7 @@ class ExecutionEngine:
         self._scheduler = scheduler or ExecutionScheduler(logger=self._logger)
         self._history = history or ExecutionHistory(logger=self._logger)
         self._matcher = CapabilityMatcher(logger=self._logger)
+        self._recovery_engine = recovery_engine or RecoveryEngine(logger=self._logger)
 
     def execute_plan(self, plan: RoutedExecutionPlan, dispatcher: Any) -> ExecutionSummary:
         """Validates and executes a RoutedExecutionPlan step-by-step through the dispatcher.
@@ -160,13 +164,35 @@ class ExecutionEngine:
             records.append(record)
 
             if step_status == ExecutionStatus.FAILED:
-                self._logger.warning(
-                    "Sequential execution aborted due to step failure",
-                    extra={"failed_step_id": step_id, "error": step_error},
+                self._logger.info("Attempting automatic self-correction and recovery", extra={"step_id": step_id})
+                recovery_result = self._recovery_engine.recover(
+                    step_id=step_id,
+                    intent=step_plan.intent,
+                    target=step_plan.target,
+                    parameters=step_plan.parameters,
+                    error_message=step_error or "",
+                    dispatcher=dispatcher,
                 )
-                overall_success = False
-                summary_error = f"Step '{step_id}' failed: {step_error}"
-                break
+
+                if recovery_result.success:
+                    self._logger.info("Step recovery resolved successfully. Continuing execution loop.", extra={"step_id": step_id})
+                    step_status = ExecutionStatus.SUCCESS
+                    step_error = None
+                    step_response = f"Recovered via strategy: {recovery_result.strategy_applied}"
+                    
+                    context.complete_step(step_id, {"recovered": True, "strategy": recovery_result.strategy_applied})
+
+                    record.status = ExecutionStatus.SUCCESS
+                    record.response = step_response
+                    record.error = None
+                else:
+                    self._logger.warning(
+                        "Sequential execution aborted due to step failure",
+                        extra={"failed_step_id": step_id, "error": step_error},
+                    )
+                    overall_success = False
+                    summary_error = f"Step '{step_id}' failed: {step_error}. Recovery failed: {recovery_result.error}"
+                    break
 
         total_duration = time.perf_counter() - session_start_time
         summary = ExecutionSummary(
