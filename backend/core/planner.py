@@ -9,9 +9,12 @@ side effects are performed here.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import Any, Final
 
+from brain.goal.goal_interpreter import GoalInterpreter
+from brain.goal.models import Goal
 from .exceptions import ValidationException
 from .interfaces import IPlanner
 from .intents import Intent
@@ -313,6 +316,8 @@ class Planner(IPlanner):
         agent_brain: Any | None = None,
         event_bus: Any | None = None,
         logger: logging.Logger | None = None,
+        goal_threshold: float = 0.7,
+        goal_interpreter: GoalInterpreter | None = None,
     ) -> None:
         """Initializes the planner.
 
@@ -320,11 +325,82 @@ class Planner(IPlanner):
             agent_brain: Retained for compatibility with the current codebase.
             event_bus: Retained for compatibility with the current codebase.
             logger: Optional logger used for planner diagnostics.
+            goal_threshold: Configurable minimum confidence threshold for interpreted goals.
+            goal_interpreter: Injected GoalInterpreter implementation.
         """
 
         self._agent_brain = agent_brain
         self._event_bus = event_bus
         self._logger = logger or logging.getLogger(__name__)
+
+        # Load threshold from environment variable if present
+        env_threshold = os.environ.get("AURALIS_GOAL_THRESHOLD")
+        if env_threshold is not None:
+            try:
+                goal_threshold = float(env_threshold)
+            except ValueError:
+                self._logger.warning(
+                    "Invalid AURALIS_GOAL_THRESHOLD env variable; using default",
+                    extra={"value": env_threshold},
+                )
+
+        self._goal_threshold = goal_threshold
+        self._goal_interpreter = goal_interpreter or GoalInterpreter(logger=self._logger)
+
+    def _map_goal_to_plan(self, goal: Goal, confidence_score: float) -> ExecutionPlan | None:
+        """Maps an interpreted Goal to a core ExecutionPlan.
+
+        Args:
+            goal: The interpreted Goal.
+            confidence_score: The confidence score from goal interpreter.
+
+        Returns:
+            An ExecutionPlan if mapping succeeds, otherwise None.
+        """
+        if goal.name == "START_CODING":
+            return ExecutionPlan(
+                intent=Intent.RUN_WORKFLOW,
+                target="Start Coding",
+                confidence=confidence_score,
+            )
+        elif goal.name == "STUDY":
+            return ExecutionPlan(
+                intent=Intent.RUN_WORKFLOW,
+                target="Study Mode",
+                confidence=confidence_score,
+            )
+        elif goal.name == "MEETING":
+            return ExecutionPlan(
+                intent=Intent.RUN_WORKFLOW,
+                target="Meeting Mode",
+                confidence=confidence_score,
+            )
+        elif goal.name == "ORGANIZE_DOWNLOADS":
+            return ExecutionPlan(
+                intent=Intent.ORGANIZE_FOLDER,
+                target="Downloads",
+                confidence=confidence_score,
+            )
+        elif goal.name == "CLEAN_WORKSPACE":
+            return ExecutionPlan(
+                intent=Intent.RUN_WORKFLOW,
+                target="Clean Workspace",
+                confidence=confidence_score,
+            )
+        elif goal.name == "LOCK_COMPUTER":
+            return ExecutionPlan(
+                intent=Intent.LOCK_PC,
+                confidence=confidence_score,
+            )
+        elif goal.name == "OPEN_APPLICATION":
+            app_name = goal.parameters.get("application")
+            if app_name:
+                return ExecutionPlan(
+                    intent=Intent.OPEN_APPLICATION,
+                    target=app_name,
+                    confidence=confidence_score,
+                )
+        return None
 
     def create_plan(
         self,
@@ -346,6 +422,31 @@ class Planner(IPlanner):
         """
 
         self._validate_request(request)
+
+        # Run Goal Interpreter first
+        if self._goal_interpreter is not None:
+            try:
+                goal_result = self._goal_interpreter.interpret(request.message)
+                if (
+                    goal_result.confidence.score >= self._goal_threshold
+                    and goal_result.goal.name != "UNKNOWN"
+                ):
+                    plan = self._map_goal_to_plan(goal_result.goal, goal_result.confidence.score)
+                    if plan is not None:
+                        self._logger.info(
+                            "Goal interpreted successfully, bypassing existing planner rules",
+                            extra={
+                                "goal_name": goal_result.goal.name,
+                                "category": goal_result.goal.category.value,
+                                "confidence": goal_result.confidence.score,
+                            },
+                        )
+                        return plan
+            except Exception as exc:
+                self._logger.error(
+                    "Error executing Goal Interpreter, falling back to existing planner rules",
+                    exc_info=exc,
+                )
 
         normalized_message = self._normalize_text(request.message)
         intent = self._detect_intent(normalized_message)
