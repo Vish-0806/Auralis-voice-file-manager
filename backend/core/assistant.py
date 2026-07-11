@@ -9,9 +9,12 @@ implement business logic, file operations, AI behavior, or voice handling.
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+from brain.controller.brain_controller import BrainController
+from brain.controller.models import BrainRequest
 from .exceptions import DispatchException, PlanningException, ValidationException
 from .interfaces import IAssistant, IDispatcher, IPlanner
 from .intents import Intent
@@ -38,6 +41,7 @@ class AuralisAssistant(IAssistant):
         self._planner = planner
         self._dispatcher = dispatcher
         self._logger = logger or logging.getLogger(__name__)
+        self._brain_controller = BrainController(logger=self._logger)
 
     def process_request(
         self,
@@ -59,13 +63,60 @@ class AuralisAssistant(IAssistant):
 
         try:
             self._validate_request(assistant_request)
+
+            # 1. Try executing via the AI Brain Controller pipeline
+            brain_req = BrainRequest(
+                message=assistant_request.message,
+                context={"session_id": session_context.session_id if session_context else None},
+                correlation_id=f"exec_{uuid.uuid4().hex[:8]}",
+            )
+            brain_res = self._brain_controller.process_request(brain_req, self._dispatcher)
+
+            if brain_res.success:
+                plan = brain_res.plan
+                
+                # Normalize target casing for RUN_WORKFLOW to match registry names / legacy tests
+                if plan and plan.intent == Intent.RUN_WORKFLOW and plan.target:
+                    casing_map = {
+                        "START_CODING": "Start Coding",
+                        "STUDY": "Study Mode",
+                        "MEETING": "Meeting Preparation",
+                    }
+                    upper_target = plan.target.upper()
+                    if upper_target in casing_map:
+                        plan.target = casing_map[upper_target]
+
+                # Determine the response string for backward compatibility
+                response_str = brain_res.message
+                if brain_res.summary and brain_res.summary.records:
+                    if len(brain_res.summary.records) == 1:
+                        response_str = brain_res.summary.records[0].response or brain_res.message
+
+                result = ExecutionResult(
+                    success=True,
+                    response=response_str,
+                    data=brain_res.summary.model_dump() if brain_res.summary else {},
+                    execution_time=brain_res.summary.total_duration if brain_res.summary else 0.0,
+                )
+                self._logger.info(
+                    "Processed assistant request successfully via AI Brain Controller",
+                    extra={"goal": brain_res.goal_name},
+                )
+                return AssistantResponse(
+                    response=response_str,
+                    plan=plan,
+                    result=result,
+                )
+
+            # 2. Bypassed or failed, fall back to core planner and dispatcher rules
+            self._logger.info("AI Brain pipeline bypassed/failed; executing core planner rules fallback")
             plan = self._planner.create_plan(assistant_request, session_context)
             self._validate_plan(plan)
             result = self._dispatcher.dispatch(plan, session_context)
             self._validate_result(result)
             response = self._build_response(plan, result)
             self._logger.info(
-                "Processed assistant request successfully",
+                "Processed assistant request successfully via fallback rules",
                 extra={"intent": plan.intent.value, "success": result.success},
             )
             return response
