@@ -18,6 +18,8 @@ from brain.goal.models import Goal
 from brain.reasoning.reasoning_engine import ReasoningEngine
 from brain.reasoning.models import ReasoningResult
 from brain.planning.task_planner import TaskPlanner
+from brain.capability.capability_selector import CapabilitySelector
+from brain.capability.models import RoutedExecutionPlan
 from .exceptions import ValidationException
 from .interfaces import IPlanner
 from .intents import Intent
@@ -323,6 +325,7 @@ class Planner(IPlanner):
         goal_interpreter: GoalInterpreter | None = None,
         reasoning_engine: ReasoningEngine | None = None,
         task_planner: TaskPlanner | None = None,
+        capability_selector: CapabilitySelector | None = None,
     ) -> None:
         """Initializes the planner.
 
@@ -334,6 +337,7 @@ class Planner(IPlanner):
             goal_interpreter: Injected GoalInterpreter implementation.
             reasoning_engine: Injected ReasoningEngine implementation.
             task_planner: Injected TaskPlanner implementation.
+            capability_selector: Injected CapabilitySelector implementation.
         """
 
         self._agent_brain = agent_brain
@@ -355,6 +359,7 @@ class Planner(IPlanner):
         self._goal_interpreter = goal_interpreter or GoalInterpreter(logger=self._logger)
         self._reasoning_engine = reasoning_engine or ReasoningEngine(logger=self._logger)
         self._task_planner = task_planner or TaskPlanner(logger=self._logger)
+        self._capability_selector = capability_selector or CapabilitySelector(logger=self._logger)
 
     def _map_goal_to_plan(self, goal: Goal, confidence_score: float) -> ExecutionPlan | None:
         """Maps an interpreted Goal to a core ExecutionPlan.
@@ -467,8 +472,18 @@ class Planner(IPlanner):
                         "estimated_complexity": reasoning_result.estimated_complexity,
                     }
 
+                    # 4. Route plan through the Capability Selector
+                    if self._capability_selector is not None:
+                        try:
+                            plan = self._capability_selector.select_capabilities(plan)
+                        except Exception as cs_exc:
+                            self._logger.error(
+                                "Error executing Capability Selector; proceeding with raw plan",
+                                exc_info=cs_exc,
+                            )
+
                     self._logger.info(
-                        "Goal dynamically planned and reasoned successfully, bypassing existing planner rules",
+                        "Goal dynamically planned, reasoned, and routed successfully, bypassing existing planner rules",
                         extra={
                             "goal_name": goal_result.goal.name,
                             "category": goal_result.goal.category.value,
