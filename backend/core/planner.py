@@ -17,6 +17,7 @@ from brain.goal.goal_interpreter import GoalInterpreter
 from brain.goal.models import Goal
 from brain.reasoning.reasoning_engine import ReasoningEngine
 from brain.reasoning.models import ReasoningResult
+from brain.planning.task_planner import TaskPlanner
 from .exceptions import ValidationException
 from .interfaces import IPlanner
 from .intents import Intent
@@ -321,6 +322,7 @@ class Planner(IPlanner):
         goal_threshold: float = 0.7,
         goal_interpreter: GoalInterpreter | None = None,
         reasoning_engine: ReasoningEngine | None = None,
+        task_planner: TaskPlanner | None = None,
     ) -> None:
         """Initializes the planner.
 
@@ -331,6 +333,7 @@ class Planner(IPlanner):
             goal_threshold: Configurable minimum confidence threshold for interpreted goals.
             goal_interpreter: Injected GoalInterpreter implementation.
             reasoning_engine: Injected ReasoningEngine implementation.
+            task_planner: Injected TaskPlanner implementation.
         """
 
         self._agent_brain = agent_brain
@@ -351,6 +354,7 @@ class Planner(IPlanner):
         self._goal_threshold = goal_threshold
         self._goal_interpreter = goal_interpreter or GoalInterpreter(logger=self._logger)
         self._reasoning_engine = reasoning_engine or ReasoningEngine(logger=self._logger)
+        self._task_planner = task_planner or TaskPlanner(logger=self._logger)
 
     def _map_goal_to_plan(self, goal: Goal, confidence_score: float) -> ExecutionPlan | None:
         """Maps an interpreted Goal to a core ExecutionPlan.
@@ -436,49 +440,45 @@ class Planner(IPlanner):
                     goal_result.confidence.score >= self._goal_threshold
                     and goal_result.goal.name != "UNKNOWN"
                 ):
-                    plan = self._map_goal_to_plan(goal_result.goal, goal_result.confidence.score)
-                    if plan is not None:
-                        # Run the reasoning engine
-                        if self._reasoning_engine is not None:
-                            try:
-                                reasoning_result = self._reasoning_engine.reason(goal_result.goal)
-                                plan.parameters["reasoning"] = {
-                                    "objective": {
-                                        "title": reasoning_result.objective.title,
-                                        "description": reasoning_result.objective.description,
-                                        "target": reasoning_result.objective.target,
-                                    },
-                                    "required_capabilities": reasoning_result.required_capabilities,
-                                    "constraints": [
-                                        {
-                                            "name": c.name,
-                                            "type": c.type,
-                                            "description": c.description,
-                                            "satisfied": c.satisfied,
-                                        }
-                                        for c in reasoning_result.constraints
-                                    ],
-                                    "priority": reasoning_result.priority.value,
-                                    "estimated_complexity": reasoning_result.estimated_complexity,
-                                }
-                            except Exception as re_exc:
-                                self._logger.error(
-                                    "Error executing Reasoning Engine; proceeding with raw plan",
-                                    exc_info=re_exc,
-                                )
+                    # 1. Run the reasoning engine
+                    reasoning_result = self._reasoning_engine.reason(goal_result.goal)
 
-                        self._logger.info(
-                            "Goal interpreted and reasoned successfully, bypassing existing planner rules",
-                            extra={
-                                "goal_name": goal_result.goal.name,
-                                "category": goal_result.goal.category.value,
-                                "confidence": goal_result.confidence.score,
-                            },
-                        )
-                        return plan
+                    # 2. Run the dynamic task planner to generate the plan
+                    plan = self._task_planner.plan(reasoning_result, confidence=goal_result.confidence.score)
+
+                    # 3. Embed reasoning details in plan parameters
+                    plan.parameters["reasoning"] = {
+                        "objective": {
+                            "title": reasoning_result.objective.title,
+                            "description": reasoning_result.objective.description,
+                            "target": reasoning_result.objective.target,
+                        },
+                        "required_capabilities": reasoning_result.required_capabilities,
+                        "constraints": [
+                            {
+                                "name": c.name,
+                                "type": c.type,
+                                "description": c.description,
+                                "satisfied": c.satisfied,
+                            }
+                            for c in reasoning_result.constraints
+                        ],
+                        "priority": reasoning_result.priority.value,
+                        "estimated_complexity": reasoning_result.estimated_complexity,
+                    }
+
+                    self._logger.info(
+                        "Goal dynamically planned and reasoned successfully, bypassing existing planner rules",
+                        extra={
+                            "goal_name": goal_result.goal.name,
+                            "category": goal_result.goal.category.value,
+                            "confidence": goal_result.confidence.score,
+                        },
+                    )
+                    return plan
             except Exception as exc:
                 self._logger.error(
-                    "Error executing Goal Interpreter, falling back to existing planner rules",
+                    "Error executing Goal Interpreter/Planning, falling back to existing planner rules",
                     exc_info=exc,
                 )
 
