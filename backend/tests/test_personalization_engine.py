@@ -18,7 +18,15 @@ from memory.personalization import (
 def mock_preference_service():
     """Provides a mock PreferenceService."""
     service = MagicMock()
-    service.get.side_effect = lambda user_id, category: {
+
+    def get_side_effect(user_id, category, key):
+        return {
+            "ide": {"theme": "light"},
+            "voice": {"speech_rate": 160},
+        }.get(category, {}).get(key)
+
+    service.get.side_effect = get_side_effect
+    service.list.side_effect = lambda user_id, category: {
         "ide": {"theme": "light"},
         "voice": {"speech_rate": 160},
     }.get(category, {})

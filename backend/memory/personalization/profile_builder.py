@@ -41,7 +41,7 @@ class ProfileBuilder:
         for category in ["ide", "voice", "desktop", "system"]:
             try:
                 # Load all preferences for category
-                prefs[category] = preference_service.get(user_id, category)
+                prefs[category] = preference_service.list(user_id, category)
             except Exception as e:
                 logger.debug(f"Failed to fetch preference category '{category}': {e}")
 

@@ -54,8 +54,14 @@ class DecisionEngine:
             return user_overrides[key], "Explicit User Command"
 
         # Priority 2: Current Context
-        if context and key in context:
-            return context[key], "Current Context"
+        if context:
+            if key in context:
+                return context[key], "Current Context"
+            if key == "workspace_path":
+                if "active_workspace" in context:
+                    return context["active_workspace"], "Current Context"
+                if "current_project" in context:
+                    return context["current_project"], "Current Context"
 
         # Priority 3: Workspace Profile settings
         if workspace_settings:

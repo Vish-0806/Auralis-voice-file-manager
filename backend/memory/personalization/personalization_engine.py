@@ -96,7 +96,7 @@ class PersonalizationEngine:
         preferences = {}
         for category in ["ide", "voice", "desktop", "system"]:
             try:
-                preferences[category] = self._preference_service.get(user_id, category)
+                preferences[category] = self._preference_service.list(user_id, category)
             except Exception:
                 pass
 
@@ -147,7 +147,7 @@ class PersonalizationEngine:
         preferences = {}
         for category in ["ide", "voice", "desktop", "system"]:
             try:
-                preferences[category] = self._preference_service.get(user_id, category)
+                preferences[category] = self._preference_service.list(user_id, category)
             except Exception:
                 pass
 
