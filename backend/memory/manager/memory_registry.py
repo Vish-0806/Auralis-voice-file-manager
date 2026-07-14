@@ -63,3 +63,7 @@ class MemoryRegistry:
 
 # Auto-register the default in-memory provider
 MemoryRegistry.register("in_memory", InMemoryProvider)
+
+# Auto-register the PostgreSQL provider
+from memory.providers.postgres_provider import PostgresProvider
+MemoryRegistry.register("postgres", PostgresProvider)

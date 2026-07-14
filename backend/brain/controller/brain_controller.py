@@ -7,6 +7,8 @@ import uuid
 import time
 from typing import Any
 
+from memory import MemoryService
+
 from brain.goal.goal_interpreter import GoalInterpreter
 from brain.reasoning.reasoning_engine import ReasoningEngine
 from brain.planning.task_planner import TaskPlanner
@@ -29,6 +31,7 @@ class BrainController:
         config: BrainConfig | None = None,
         registry: BrainRegistry | None = None,
         logger: logging.Logger | None = None,
+        memory_service: MemoryService | None = None,
     ) -> None:
         """Initializes the BrainController.
 
@@ -36,12 +39,28 @@ class BrainController:
             config: Configured BrainConfig parameters.
             registry: Configured dynamic BrainRegistry mapping.
             logger: Optional custom logger.
+            memory_service: Optional injected MemoryService instance.
         """
         self._logger = logger or logging.getLogger(__name__)
         self._config = config or BrainConfig()
         self._registry = registry or BrainRegistry(logger=self._logger)
+        self._memory_service = memory_service or MemoryService()
         self._active_executions: dict[str, BrainExecution] = {}
         self._register_subsystems()
+
+    def _run_async(self, coro) -> Any:
+        """Runs a coroutine synchronously or schedules it on a running event loop."""
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        if loop.is_running():
+            return loop.create_task(coro)
+        else:
+            return loop.run_until_complete(coro)
 
     def process_request(self, request: BrainRequest, dispatcher: Any) -> BrainResponse:
         """Runs the request through the registered pipeline.
@@ -55,6 +74,21 @@ class BrainController:
         """
         execution_id = request.correlation_id or f"exec_{uuid.uuid4().hex[:8]}"
         self._logger.info("Controller received brain request processing trigger", extra={"execution_id": execution_id})
+
+        # Save incoming conversation prompt to memory
+        from memory.models.domain_models import MemoryEntry, MemoryType, MemoryMetadata
+        user_entry = MemoryEntry(
+            id=execution_id + "_user",
+            content=request.message,
+            memory_type=MemoryType.CONVERSATION,
+            metadata=MemoryMetadata(
+                additional_info={
+                    "session_id": request.correlation_id or "default",
+                    "role": "user",
+                }
+            )
+        )
+        self._run_async(self._memory_service.save(user_entry))
 
         execution = BrainExecution(
             execution_id=execution_id,
@@ -83,6 +117,38 @@ class BrainController:
             "Controller completed request pipeline execution",
             extra={"execution_id": execution_id, "status": execution.status.value},
         )
+
+        # Save outgoing conversation reply to memory
+        from memory.models.domain_models import MemoryEntry, MemoryType, MemoryMetadata
+        assistant_entry = MemoryEntry(
+            id=execution_id + "_assistant",
+            content=response.message,
+            memory_type=MemoryType.CONVERSATION,
+            metadata=MemoryMetadata(
+                additional_info={
+                    "session_id": request.correlation_id or "default",
+                    "role": "assistant",
+                }
+            )
+        )
+        self._run_async(self._memory_service.save(assistant_entry))
+
+        # Save activity execution history to memory
+        activity_entry = MemoryEntry(
+            id=execution_id + "_activity",
+            content=f"Execution completed for goal {response.goal_name}",
+            memory_type=MemoryType.ACTIVITY,
+            metadata=MemoryMetadata(
+                additional_info={
+                    "status": execution.status.value,
+                    "duration_ms": int((execution.end_time - execution.start_time) * 1000),
+                    "input_parameters": {"message": request.message},
+                    "output_result": {"success": response.success, "message": response.message},
+                }
+            )
+        )
+        self._run_async(self._memory_service.save(activity_entry))
+
         return response
 
     def get_execution_status(self, execution_id: str) -> BrainStatus:
