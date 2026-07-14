@@ -29,3 +29,8 @@ pycaw==20251023
 mss==10.2.0
 Pillow==12.3.0
 pyautogui==0.9.54
+sqlalchemy==2.0.51
+psycopg==3.3.4
+alembic==1.18.5
+python-dotenv==1.2.2
+
