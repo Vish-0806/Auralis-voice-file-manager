@@ -9,6 +9,7 @@ from memory.preferences.preference_service import PreferenceService
 from memory.context.context_service import ContextService
 from memory.workspace.workspace_service import WorkspaceService
 from memory.learning.routine_learning_service import RoutineLearningService
+from memory.personalization.personalization_service import PersonalizationService
 from memory.models.domain_models import (
     MemoryEntry,
     MemoryMetadata,
@@ -23,6 +24,7 @@ __all__ = [
     "ContextService",
     "WorkspaceService",
     "RoutineLearningService",
+    "PersonalizationService",
     "MemoryEntry",
     "MemoryMetadata",
     "MemoryQuery",
