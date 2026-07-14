@@ -118,6 +118,24 @@ Auralis Version 1.0.0 implements the complete Phase 5 **AI Brain Orchestration**
 
 ---
 
+## Tiered Memory & Personalization Platform (v1.1.0)
+
+Auralis Version 1.1.0 introduces the production-ready **Tiered Memory & Personalization Platform**, offering state persistence, behavioral routine mining, workspace profile management, and a unified execution context resolving pipeline.
+
+### 1. Memory Subsystem Modules
+* **Preference Engine:** Manages persistent user configurations across multiple categories (IDE, Voice, Desktop, System) with schema validation and default fallbacks.
+* **Context Memory:** Maintains short-term session context (e.g. active folder, clipboard state) with thread-safe operations, schema validation, and automatic TTL expiration.
+* **Workspace Profiles:** Captures runtime snapshots of disk paths and active window lists, and routes automatic restoration requests to native OS capabilities.
+* **Routine Learning:** Observes execution history logs, groups sequences into episodes, uses n-gram token matching to discover behavioral patterns, calculates statistical confidence scores, and generates routine recommendations.
+* **Personalization Engine:** Consolidates all memory layers into a single profile and uses a deterministic conflict resolution decider (Explicit overrides > Context > Workspace Settings > Preferences > Routines > System Defaults).
+* **Memory Coordinator:** The sole gateway for all memory platform operations. Encapsulates underlying service objects and handles SQL transactional connections.
+
+### 2. Platform Health & Metrics
+* **Diagnostics Health checks:** Probes PostgreSQL/SQLite database engine connection status, validates cache operations, and verifies registry service statuses.
+* **Memory Statistics & Metrics:** Reports the count of active context parameters, workspace profiles, user preferences, and routines.
+
+---
+
 ## Architecture
 
 Auralis uses a modular architecture that separates voice capture, natural language understanding, execution planning, and OS operations:
@@ -150,7 +168,7 @@ The project is structured into independent packages to ensure separation of conc
 | :--- | :--- | :--- |
 | **Voice Engine** | `backend/voice/` | Captures microphone input, processes wake word detection, converts speech to text, and runs text-to-speech feedback. |
 | **Conversation Engine** | `backend/core/` | Handles NLP parsing, command normalization, and formats conversational agent responses. |
-| **Memory Engine** | `backend/memory/` | Manages application state, records historical contexts, and tracks user preferences. |
+| **Memory Engine** | `backend/memory/` | Manages state, preferences, short-term context cache, workspace profiles, routine pattern-matching calculations, personalization resolution, and exposes a unified memory coordinator interface. |
 | **AI Brain Orchestration** | `backend/brain/` | Integrates Goal Interpreter, Reasoning, Dynamic Planner, Capability Selector, Execution Engine, Recovery Fallbacks, Progress Monitor, and Brain Controller. |
 | **Planner** | `backend/core/planner.py` | Receives parsed actions and maps out the correct sequences of file, terminal, or GUI operations. |
 | **File Intelligence** | `backend/capabilities/files/` | Resolves system paths recursively, conducts permission checks, and handles folder restructuring. |
@@ -319,6 +337,7 @@ Track the development stages of Auralis:
 * [x] **Voice Subsystems (Phase 3):** Implement modular Speech-to-Text (Whisper), Text-to-Speech (Edge-TTS), Session Manager state-machine, Inactivity timers, Voice UX (status tracks, sound chimes), and Context reference resolvers.
 * [x] **Pipeline Integration:** Stitch all voice subsystems into a thread-safe, continuous execution pipeline with robust error recovery (mic reconnects, STT fallbacks, planner/capability exceptions, speech interruption).
 * [x] **AI Brain Orchestration (Phase 5):** Complete the modular pipeline (Goal Interpreter, Reasoning, Dynamic Planner, Selector, Execution Scheduler, Self-Correction, Progress Monitor, and Controller integration).
+* [x] **Tiered Memory Platform (Phase 6):** Complete the modular subsystems (Preference Engine, Context Memory cache, Workspace Profiles snapshot/restorer, Routine Learning n-gram matching behavior mining, Personalization resolution decider, and unified Memory Coordinator integrations).
 * [ ] **Current Development:**
   * [ ] Implement basic document intelligence parser using local PyMuPDF extraction.
   * [ ] Refactor the system monitoring panel to display real-time CPU/RAM graphs in the dashboard.

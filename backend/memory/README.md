@@ -1,69 +1,70 @@
-# Memory Subsystem
+# Foundational Memory Subsystem
 
-## Memory Architecture & Lifecycles
-Auralis uses a tiered memory system to maintain operational and conversational context without overloading the LLM's context window. Memory is divided into short-term (in-memory, transient), mid-term (relational settings/workflows), and long-term (semantic vector store) tiers. All memory is stored locally to ensure user privacy.
+The Memory Subsystem serves as the foundation for storing, retrieving, and searching Auralis agent memories. It follows Clean Architecture, domain-driven design, and SOLID principles.
 
-The memory lifecycle has three stages:
-1. **Gather:** Context parameters (workspace paths, settings, active window) are collected during a request.
-2. **Retrieve:** Similar memories are fetched from the vector store and injected into the active prompt payload.
-3. **Commit:** Chat turns and execution logs are committed back to short-term, long-term, and preference systems after a response.
+## Architecture
 
----
-
-## Memory Types & Storage Targets
-
-Auralis categorizes memory into distinct scopes to optimize lookup speeds and context relevance:
+The system is organized into decoupled layers:
 
 ```mermaid
 graph TD
-    subgraph Volatile [Volatile In-Memory Cache]
-        Session[Session State Memory]
-        Conv[Conversational Message Buffer]
-        Cache[High-Speed TTL Cache]
+    Client[AI Brain / Clients] -->|uses| Service[MemoryService]
+    
+    subgraph Management [Service & Manager Layer]
+        Service -->|delegates to| Manager[MemoryManager]
+        Manager -->|uses abstract| BaseRepo[BaseRepository]
     end
 
-    subgraph Relational [SQLite Persistence]
-        Prefs[User Preferences Settings]
-        Workflows[Automated Macros / Schedules]
-        Activity[Audit Activity Logs]
-        FileIdx[File Search Indices]
+    subgraph Repository [Data Access Layer]
+        BaseRepo <|-- RepoImpl[MemoryRepository]
+        RepoImpl -->|uses| BaseProvider[BaseProvider]
     end
 
-    subgraph Semantic [Vector DB Persistence]
-        LongTerm[Long-Term Semantic Memory]
-        Proj[Project & Code Contexts]
+    subgraph Storage [Providers Layer]
+        BaseProvider <|-- InMemory[InMemoryProvider]
+        BaseProvider <|.. PostgreSQL[Future PostgreSQL Provider]
+        
+        Factory[ProviderFactory] -->|creates configured| BaseProvider
+        Registry[MemoryRegistry] -->|registers & resolves| BaseProvider
     end
 ```
 
-- **Session Memory:** Active variables and state scopes. Cleared when the session closes.
-- **Conversational Memory:** The current sliding message buffer (up to 15-20 turns).
-- **Preference Memory:** Persistent user configurations (e.g. default directories, favorite apps) stored in SQLite.
-- **Workflow Memory:** Registered automated routine configurations and schedules stored in SQLite.
-- **Activity Memory:** Audit logs of executed commands and outcomes.
-- **Project Memory:** Active directory paths, git branch info, and environment profiles stored in SQLite.
-- **File Memory:** Indexed system file properties and path structures.
-- **Long-Term Memory:** Semantically embedded summaries of historical interactions stored in the vector database.
+- **Domain Models (`models/domain_models.py`):** Independent data structures representing core memory units (`MemoryEntry`, `MemoryType`, `MemoryQuery`, `MemoryResult`, `MemoryMetadata`), completely decoupled from database tables or ORM frameworks.
+- **Centralized Configuration (`config.py`):** Configures variables like active provider type, embedding dimensions, cache TTLs, and similarity boundaries, with safe fallback defaults.
+- **Service Layer (`manager/memory_service.py`):** The *sole public interface* exposed to the AI Brain. Offers high-level async APIs (`save`, `get`, `search`, `update`, `delete`, `list`).
+- **Manager Layer (`manager/memory_manager.py`):** Orchestrates memory domain business logic, coordinating between repositories and formatting inputs/outputs into domain models.
+- **Repository Pattern (`repository/`):** Decouples business logic from specific persistence clients.
+  - `BaseRepository`: Abstract contract defining database-neutral operations.
+  - `MemoryRepository`: Concrete repository implementation delegating work to a resolved storage provider.
+- **Provider Pattern (`providers/`):** Adapts specific database/cache clients to the memory subsystem.
+  - `BaseProvider`: Abstract contract defining standard persistence layer APIs.
+  - `InMemoryProvider`: A default, transient, thread-safe in-memory store for local testing and bootstrapping.
+  - `MemoryRegistry`: Catalog for provider registration and dynamic discovery.
+  - `ProviderFactory`: Instantiates and returns the configured provider.
 
----
+## Usage
 
-## Subsystem Interactions
+```python
+import uuid
+from backend.memory import MemoryService, MemoryEntry, MemoryType, MemoryQuery
 
-The Memory Manager coordinates memory operations across all system layers:
+# Initialize service (auto-resolves default transient provider)
+memory_service = MemoryService()
 
-```mermaid
-graph LR
-    Core[Core Assistant] -->|1. process_request| Manager[Memory Manager]
-    Manager -->|2. fetch active context| Cache[Volatile Cache]
-    Manager -->|3. query semantic history| Vector[Vector DB]
-    Manager -->|4. retrieve settings| SQLite[SQLite DB]
-    
-    Manager -->|5. compile merged context| AI[AI Brain]
-    AI -->|6. plan actions| Core
-    
-    Events[Event Bus] -->|7. listen for updates| Manager
-    Manager -->|8. invalidate cache / commit logs| SQLite
+# 1. Save a new memory
+entry = MemoryEntry(
+    id=str(uuid.uuid4()),
+    content="User preference: set default terminal to powershell.",
+    memory_type=MemoryType.PREFERENCE
+)
+await memory_service.save(entry)
+
+# 2. Search memories
+query = MemoryQuery(
+    text="terminal",
+    memory_type=MemoryType.PREFERENCE
+)
+results = await memory_service.search(query)
+for result in results:
+    print(f"Memory: {result.entry.content} (Score: {result.score})")
 ```
-
-* **Core & AI:** The Core Assistant calls the Memory Manager to build context maps. The AI Brain uses this context to make accurate planning decisions.
-* **Capabilities:** System capabilities publish lifecycle events (e.g. `file_created`, `task_started`) to the Event Bus. The Memory Manager listens to these events and updates file search indexes and activity logs.
-* **Events:** System events trigger memory updates (e.g., updating user preferences when settings changes are detected).
