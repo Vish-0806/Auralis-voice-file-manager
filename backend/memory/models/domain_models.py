@@ -87,3 +87,99 @@ class MemoryResult(BaseModel):
 
     entry: MemoryEntry
     score: float
+
+
+class UserDomain(BaseModel):
+    """Domain model representing User database entry."""
+
+    id: Optional[int] = None
+    username: str
+    email: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class PreferenceDomain(BaseModel):
+    """Domain model representing Preference database entry."""
+
+    id: Optional[int] = None
+    user_id: int
+    key: str
+    value: Any
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class WorkspaceProfileDomain(BaseModel):
+    """Domain model representing WorkspaceProfile database entry."""
+
+    id: Optional[int] = None
+    user_id: int
+    name: str
+    path: str
+    settings: Dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class ContextDomain(BaseModel):
+    """Domain model representing Context database entry."""
+
+    id: Optional[int] = None
+    user_id: int
+    session_id: str
+    active_window: Optional[str] = None
+    workspace_path: Optional[str] = None
+    metadata_bag: Dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class ConversationHistoryDomain(BaseModel):
+    """Domain model representing ConversationHistory database entry."""
+
+    id: Optional[int] = None
+    user_id: int
+    session_id: str
+    role: str
+    content: str
+    token_count: Optional[int] = None
+    created_at: Optional[datetime] = None
+
+
+class RoutineLearningDomain(BaseModel):
+    """Domain model representing RoutineLearning database entry."""
+
+    id: Optional[int] = None
+    user_id: int
+    trigger_event: str
+    action_sequence: Dict[str, Any]
+    confidence_score: float = 0.0
+    is_active: bool = True
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class ExecutionHistoryDomain(BaseModel):
+    """Domain model representing ExecutionHistory database entry."""
+
+    id: Optional[int] = None
+    user_id: int
+    action: str
+    status: str
+    duration_ms: Optional[int] = None
+    logs: Optional[str] = None
+    input_parameters: Dict[str, Any] = Field(default_factory=dict)
+    output_result: Dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[datetime] = None
+
+
+class MemoryEventDomain(BaseModel):
+    """Domain model representing MemoryEvent database entry."""
+
+    id: Optional[int] = None
+    user_id: int
+    event_type: str
+    payload: Dict[str, Any]
+    created_at: Optional[datetime] = None
+
