@@ -1,7 +1,7 @@
 """Parses command strings and resolves pronoun, ordinal, and noun references."""
 
 import re
-from typing import List, Optional, Set
+from typing import Set
 from utils.logger import get_logger
 
 from voice.context.models import ContextState, ResolutionResult

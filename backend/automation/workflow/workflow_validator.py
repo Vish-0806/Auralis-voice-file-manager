@@ -41,7 +41,7 @@ class WorkflowValidator:
             True if all dependency checks pass.
         """
 
-        self._logger.info("Validating workflow dependencies", extra={"name": workflow.name})
+        self._logger.info("Validating workflow dependencies", extra={"workflow_name": workflow.name})
         for step in workflow.steps:
             if step.intent in {Intent.OPEN_APPLICATION, Intent.CLOSE_APPLICATION, Intent.RESTART_APPLICATION}:
                 if step.target and step.target not in self._known_apps:

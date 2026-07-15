@@ -66,5 +66,5 @@ class ShortcutManager:
         if not target_shortcut:
             raise ValueError(f"Unsupported shortcut requested: {name}.")
 
-        self._logger.info("Executing mapped system shortcut", extra={"name": name})
+        self._logger.info("Executing mapped system shortcut", extra={"shortcut_name": name})
         self._keyboard.press_hotkey(*target_shortcut)

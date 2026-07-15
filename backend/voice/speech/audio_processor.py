@@ -6,7 +6,6 @@ power, scaling volume, changing sample rates, and adding WAV containers.
 
 import audioop
 import struct
-from typing import Optional, Tuple
 from utils.logger import get_logger
 
 logger = get_logger(__name__)

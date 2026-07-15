@@ -8,7 +8,7 @@ and returning domain models to the service layer.
 import logging
 from typing import List, Optional
 from memory.models.domain_models import MemoryEntry, MemoryQuery, MemoryResult
-from memory.repository.base_repository import BaseRepository
+from memory.repository.memory_repository import MemoryRepository
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +20,11 @@ class MemoryManager:
     delegating the low-level data storage operations to repositories.
     """
 
-    def __init__(self, repository: BaseRepository) -> None:
+    def __init__(self, repository: MemoryRepository) -> None:
         """Initializes the MemoryManager.
 
         Args:
-            repository: An implementation of BaseRepository.
+            repository: The MemoryRepository instance.
         """
         self._repository = repository
         logger.debug(
