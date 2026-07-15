@@ -69,7 +69,7 @@ class WorkspaceManager:
 
         logger.info(
             "Creating workspace profile",
-            extra={"user_id": user_id, "name": name, "path": path},
+            extra={"user_id": user_id, "profile_name": name, "path": path},
         )
         domain = WorkspaceProfileDomain(
             user_id=user_id,

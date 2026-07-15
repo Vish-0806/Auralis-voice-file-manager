@@ -110,7 +110,7 @@ class TaskPlanner:
         )
 
         WorkflowRegistry._dynamic_registry[workflow_name] = workflow_def
-        self._logger.debug("Registered dynamic workflow definition", extra={"name": workflow_name})
+        self._logger.debug("Registered dynamic workflow definition", extra={"workflow_name": workflow_name})
 
         return CoreExecutionPlan(
             intent=Intent.RUN_WORKFLOW,

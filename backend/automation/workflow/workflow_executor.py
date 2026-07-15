@@ -33,7 +33,7 @@ class WorkflowExecutor:
             An ExecutionResult indicating final status.
         """
 
-        self._logger.info("Starting workflow sequential execution", extra={"name": workflow.name})
+        self._logger.info("Starting workflow sequential execution", extra={"workflow_name": workflow.name})
         self._history_logs.clear()
         start_time = time.perf_counter()
 
@@ -85,7 +85,7 @@ class WorkflowExecutor:
                     execution_time=time.perf_counter() - start_time,
                 )
 
-        self._logger.info("Workflow completed successfully", extra={"name": workflow.name})
+        self._logger.info("Workflow completed successfully", extra={"workflow_name": workflow.name})
         return ExecutionResult(
             success=True,
             response=f"Workflow '{workflow.name}' completed successfully.",

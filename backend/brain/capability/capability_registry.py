@@ -25,7 +25,7 @@ class CapabilityRegistry:
         self._registry[name.title()] = identifier
         self._logger.info(
             "Registered new capability in brain registry",
-            extra={"name": name, "identifier": identifier},
+            extra={"capability_name": name, "identifier": identifier},
         )
 
     def get_identifier(self, name: str) -> str | None:

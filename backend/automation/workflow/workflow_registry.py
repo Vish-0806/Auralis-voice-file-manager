@@ -24,7 +24,7 @@ class WorkflowRegistry:
         """Registers a new workflow definition."""
 
         self._registry[workflow.name] = workflow
-        self._logger.info("Registered workflow", extra={"name": workflow.name})
+        self._logger.info("Registered workflow", extra={"workflow_name": workflow.name})
 
     def get_workflow(self, name: str) -> WorkflowDefinition | None:
         """Retrieves a workflow by name."""
