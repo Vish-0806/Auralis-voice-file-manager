@@ -1,11 +1,11 @@
 """Voice integration pipeline coordinating all modular voice subsystems."""
 
 from datetime import datetime, UTC
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from utils.logger import get_logger
 
 from core.models import AssistantRequest, SessionContext
-from voice.speech import Microphone, SpeechToText, SpeechResult
+from voice.speech import Microphone, SpeechToText
 from voice.conversation import SessionManager, CONVERSATION_EXIT_COMMANDS
 from voice.context import ContextManager
 from voice.tts import TextToSpeech
