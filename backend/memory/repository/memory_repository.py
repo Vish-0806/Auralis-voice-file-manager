@@ -1,6 +1,6 @@
 """MemoryRepository implementation module.
 
-Implements the BaseRepository contract by delegating operations to the active BaseProvider,
+Provides a repository interface by delegating operations to the active BaseProvider,
 ready for a PostgreSQL or other database provider implementation in the future.
 """
 
@@ -8,12 +8,11 @@ import logging
 from typing import List, Optional
 from memory.models.domain_models import MemoryEntry, MemoryQuery, MemoryResult
 from memory.providers.base_provider import BaseProvider
-from memory.repository.base_repository import BaseRepository
 
 logger = logging.getLogger(__name__)
 
 
-class MemoryRepository(BaseRepository):
+class MemoryRepository:
     """Repository implementation that delegates operations to a storage provider.
 
     This serves as the main abstraction layer for data access, decoupling
