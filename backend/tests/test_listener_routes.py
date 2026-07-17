@@ -7,7 +7,7 @@ client = TestClient(app)
 
 def test_get_listener_status_stopped():
     """Verify GET /listener/status when stopped."""
-    with patch("api.listener_routes.get_assistant") as mock_get_assistant:
+    with patch("api.assistant_routes.get_assistant") as mock_get_assistant:
         mock_assistant = MagicMock()
         mock_listener = MagicMock()
         mock_listener.is_running = False
@@ -21,7 +21,7 @@ def test_get_listener_status_stopped():
 
 def test_get_listener_status_running():
     """Verify GET /listener/status when running."""
-    with patch("api.listener_routes.get_assistant") as mock_get_assistant:
+    with patch("api.assistant_routes.get_assistant") as mock_get_assistant:
         mock_assistant = MagicMock()
         mock_listener = MagicMock()
         mock_listener.is_running = True
@@ -35,7 +35,7 @@ def test_get_listener_status_running():
 
 def test_start_listener_success():
     """Verify starting the listener when it is stopped."""
-    with patch("api.listener_routes.get_assistant") as mock_get_assistant:
+    with patch("api.assistant_routes.get_assistant") as mock_get_assistant:
         mock_assistant = MagicMock()
         mock_listener = MagicMock()
         mock_listener.is_running = False
@@ -53,7 +53,7 @@ def test_start_listener_success():
 
 def test_start_listener_already_running():
     """Verify starting the listener when it is already running."""
-    with patch("api.listener_routes.get_assistant") as mock_get_assistant:
+    with patch("api.assistant_routes.get_assistant") as mock_get_assistant:
         mock_assistant = MagicMock()
         mock_listener = MagicMock()
         mock_listener.is_running = True
@@ -71,7 +71,7 @@ def test_start_listener_already_running():
 
 def test_start_listener_failure():
     """Verify failure response if starting raises an exception."""
-    with patch("api.listener_routes.get_assistant") as mock_get_assistant:
+    with patch("api.assistant_routes.get_assistant") as mock_get_assistant:
         mock_assistant = MagicMock()
         mock_listener = MagicMock()
         mock_listener.is_running = False
@@ -86,7 +86,7 @@ def test_start_listener_failure():
 
 def test_stop_listener_success():
     """Verify stopping the listener when it is running."""
-    with patch("api.listener_routes.get_assistant") as mock_get_assistant:
+    with patch("api.assistant_routes.get_assistant") as mock_get_assistant:
         mock_assistant = MagicMock()
         mock_listener = MagicMock()
         mock_listener.is_running = True
@@ -104,7 +104,7 @@ def test_stop_listener_success():
 
 def test_stop_listener_not_running():
     """Verify stopping the listener when it is already stopped."""
-    with patch("api.listener_routes.get_assistant") as mock_get_assistant:
+    with patch("api.assistant_routes.get_assistant") as mock_get_assistant:
         mock_assistant = MagicMock()
         mock_listener = MagicMock()
         mock_listener.is_running = False
@@ -122,7 +122,7 @@ def test_stop_listener_not_running():
 
 def test_stop_listener_failure():
     """Verify failure response if stopping raises an exception."""
-    with patch("api.listener_routes.get_assistant") as mock_get_assistant:
+    with patch("api.assistant_routes.get_assistant") as mock_get_assistant:
         mock_assistant = MagicMock()
         mock_listener = MagicMock()
         mock_listener.is_running = True
@@ -137,7 +137,7 @@ def test_stop_listener_failure():
 
 def test_start_listener_not_implemented():
     """Verify HTTP 501 response when voice listener is not implemented."""
-    with patch("api.listener_routes.get_assistant") as mock_get_assistant:
+    with patch("api.assistant_routes.get_assistant") as mock_get_assistant:
         mock_assistant = MagicMock()
         mock_assistant.get_voice_listener.side_effect = NotImplementedError("Voice interaction is not implemented in this phase.")
         mock_get_assistant.return_value = mock_assistant
@@ -149,7 +149,7 @@ def test_start_listener_not_implemented():
 
 def test_stop_listener_not_implemented():
     """Verify HTTP 501 response when voice listener is not implemented on stop."""
-    with patch("api.listener_routes.get_assistant") as mock_get_assistant:
+    with patch("api.assistant_routes.get_assistant") as mock_get_assistant:
         mock_assistant = MagicMock()
         mock_assistant.get_voice_listener.side_effect = NotImplementedError("Voice interaction is not implemented in this phase.")
         mock_get_assistant.return_value = mock_assistant
@@ -161,7 +161,7 @@ def test_stop_listener_not_implemented():
 
 def test_status_listener_not_implemented():
     """Verify HTTP 501 response when voice listener is not implemented on status check."""
-    with patch("api.listener_routes.get_assistant") as mock_get_assistant:
+    with patch("api.assistant_routes.get_assistant") as mock_get_assistant:
         mock_assistant = MagicMock()
         mock_assistant.get_voice_listener.side_effect = NotImplementedError("Voice interaction is not implemented in this phase.")
         mock_get_assistant.return_value = mock_assistant

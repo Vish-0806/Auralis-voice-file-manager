@@ -3,8 +3,9 @@ Voice API routes for speech-to-text command handling.
 Integrates with core.assistant for command parsing and execution.
 """
 
-from fastapi import APIRouter, HTTPException
-from core.assistant import get_assistant
+from fastapi import APIRouter, Depends, HTTPException
+from api.assistant_routes import get_assistant_dependency
+from core.assistant import AuralisAssistant
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/voice", tags=["voice"])
 
 
 @router.get("/listen")
-def handle_voice_command():
+def handle_voice_command(assistant: AuralisAssistant = Depends(get_assistant_dependency)):
     """
     Listen to microphone input and execute recognized command.
     
@@ -26,7 +27,6 @@ def handle_voice_command():
     6. Return structured response
     """
     logger.info("Voice command endpoint invoked")
-    assistant = get_assistant()
     
     # Step 1: Capture and recognize speech
     recognized_text = assistant.listen_voice()

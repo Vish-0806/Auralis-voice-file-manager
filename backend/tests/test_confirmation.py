@@ -232,7 +232,7 @@ from fastapi.testclient import TestClient
 from main import app
 client = TestClient(app)
 
-@patch("api.voice_routes.get_assistant")
+@patch("api.assistant_routes.get_assistant")
 def test_voice_route_confirmation_flow(mock_get_assistant):
     set_pending_action(None)
     
@@ -267,7 +267,7 @@ def test_voice_route_confirmation_flow(mock_get_assistant):
     mock_assistant.execute_action.assert_called_once_with({"action": "confirm", "target": ""})
     mock_assistant.speak.assert_called_once_with("Deleted.")
 
-@patch("api.voice_routes.get_assistant")
+@patch("api.assistant_routes.get_assistant")
 def test_voice_route_cancellation_flow(mock_get_assistant):
     set_pending_action(None)
     
@@ -302,7 +302,7 @@ def test_voice_route_cancellation_flow(mock_get_assistant):
     mock_assistant.execute_action.assert_called_once_with({"action": "cancel", "target": ""})
     mock_assistant.speak.assert_called_once_with("Action cancelled.")
 
-@patch("api.voice_routes.get_assistant")
+@patch("api.assistant_routes.get_assistant")
 def test_voice_route_invalid_flow_when_pending(mock_get_assistant):
     set_pending_action(None)
     

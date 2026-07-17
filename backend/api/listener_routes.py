@@ -2,8 +2,10 @@
 Listener API routes to manage the continuous voice listener singleton.
 """
 
-from fastapi import APIRouter, HTTPException, status
-from core.assistant import get_assistant
+# pyrefly: ignore [missing-import]
+from fastapi import APIRouter, Depends, HTTPException, status
+from api.assistant_routes import get_assistant_dependency
+from core.assistant import AuralisAssistant
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -12,12 +14,11 @@ router = APIRouter(prefix="/listener", tags=["listener"])
 
 
 @router.post("/start")
-def start_listener():
+def start_listener(assistant: AuralisAssistant = Depends(get_assistant_dependency)):
     """
     Start the continuous listener in a background thread if it is not already running.
     """
     try:
-        assistant = get_assistant()
         listener = assistant.get_voice_listener()
         if listener.is_running:
             logger.info("Request to start listener ignored: already running")
@@ -45,12 +46,11 @@ def start_listener():
 
 
 @router.post("/stop")
-def stop_listener():
+def stop_listener(assistant: AuralisAssistant = Depends(get_assistant_dependency)):
     """
     Stop the continuous listener if it is running.
     """
     try:
-        assistant = get_assistant()
         listener = assistant.get_voice_listener()
         if not listener.is_running:
             logger.info("Request to stop listener ignored: not running")
@@ -78,12 +78,11 @@ def stop_listener():
 
 
 @router.get("/status")
-def get_listener_status():
+def get_listener_status(assistant: AuralisAssistant = Depends(get_assistant_dependency)):
     """
     Get the current status of the continuous listener.
     """
     try:
-        assistant = get_assistant()
         listener = assistant.get_voice_listener()
         is_running = listener.is_running
         return {
