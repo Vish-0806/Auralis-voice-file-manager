@@ -133,3 +133,39 @@ def test_stop_listener_failure():
         response = client.post("/listener/stop")
         assert response.status_code == 500
         assert "Failed to stop listener: Lock failure" in response.json()["detail"]
+
+
+def test_start_listener_not_implemented():
+    """Verify HTTP 501 response when voice listener is not implemented."""
+    with patch("api.listener_routes.get_assistant") as mock_get_assistant:
+        mock_assistant = MagicMock()
+        mock_assistant.get_voice_listener.side_effect = NotImplementedError("Voice interaction is not implemented in this phase.")
+        mock_get_assistant.return_value = mock_assistant
+
+        response = client.post("/listener/start")
+        assert response.status_code == 501
+        assert "Voice interaction is not implemented in this phase." in response.json()["detail"]
+
+
+def test_stop_listener_not_implemented():
+    """Verify HTTP 501 response when voice listener is not implemented on stop."""
+    with patch("api.listener_routes.get_assistant") as mock_get_assistant:
+        mock_assistant = MagicMock()
+        mock_assistant.get_voice_listener.side_effect = NotImplementedError("Voice interaction is not implemented in this phase.")
+        mock_get_assistant.return_value = mock_assistant
+
+        response = client.post("/listener/stop")
+        assert response.status_code == 501
+        assert "Voice interaction is not implemented in this phase." in response.json()["detail"]
+
+
+def test_status_listener_not_implemented():
+    """Verify HTTP 501 response when voice listener is not implemented on status check."""
+    with patch("api.listener_routes.get_assistant") as mock_get_assistant:
+        mock_assistant = MagicMock()
+        mock_assistant.get_voice_listener.side_effect = NotImplementedError("Voice interaction is not implemented in this phase.")
+        mock_get_assistant.return_value = mock_assistant
+
+        response = client.get("/listener/status")
+        assert response.status_code == 501
+        assert "Voice interaction is not implemented in this phase." in response.json()["detail"]

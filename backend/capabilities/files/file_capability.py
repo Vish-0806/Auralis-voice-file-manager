@@ -659,7 +659,7 @@ class FileCapability(ICapability):
 
         self._logger.warning(
             "File transfer validation failed",
-            extra={"operation": operation, "target": target, "message": message},
+            extra={"operation": operation, "target": target, "validation_message": message},
         )
         return ExecutionResult(
             success=False,
@@ -680,7 +680,7 @@ class FileCapability(ICapability):
 
         self._logger.warning(
             "File operation validation failed",
-            extra={"operation": operation, "target": target, "message": message},
+            extra={"operation": operation, "target": target, "validation_message": message},
         )
         return ExecutionResult(
             success=False,
