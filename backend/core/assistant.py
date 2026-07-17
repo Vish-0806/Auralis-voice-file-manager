@@ -285,92 +285,112 @@ class AuralisAssistant(IAssistant):
     def listen_voice(self) -> str:
         """Legacy voice hook preserved for compatibility.
 
-        Raises:
-            NotImplementedError: Voice is intentionally out of scope for this phase.
+        Returns:
+            Recognized speech string or empty string.
         """
-
-        raise NotImplementedError("Voice interaction is not implemented in this phase.")
+        from voice.speech_to_text import listen
+        res = listen()
+        return res if res is not None else ""
 
     def detect_wake_word(self, text: str) -> dict[str, Any]:
         """Legacy wake-word hook preserved for compatibility.
 
-        Raises:
-            NotImplementedError: Voice is intentionally out of scope for this phase.
-        """
+        Args:
+            text: Input command.
 
-        raise NotImplementedError("Voice interaction is not implemented in this phase.")
+        Returns:
+            Wake word status.
+        """
+        from voice.wake_word import detect_wake_word
+        return detect_wake_word(text)
 
     def speak(self, text: str) -> None:
         """Legacy speech hook preserved for compatibility.
 
-        Raises:
-            NotImplementedError: Voice is intentionally out of scope for this phase.
+        Args:
+            text: Response message.
         """
-
-        raise NotImplementedError("Voice interaction is not implemented in this phase.")
+        from voice.text_to_speech import speak
+        speak(text)
 
     def get_voice_listener(self) -> Any:
         """Legacy listener hook preserved for compatibility.
 
-        Raises:
-            NotImplementedError: Voice is intentionally out of scope for this phase.
+        Returns:
+            The continuous voice listener instance.
         """
-
-        raise NotImplementedError("Voice interaction is not implemented in this phase.")
+        from voice.listener import get_listener
+        return get_listener()
 
     def search_files(self, query: str) -> list[dict[str, str]]:
         """Legacy search hook preserved for compatibility.
 
-        Raises:
-            NotImplementedError: File operations are intentionally out of scope.
-        """
+        Args:
+            query: Filename pattern query.
 
-        raise NotImplementedError("File search is not implemented in this phase.")
+        Returns:
+            Matching file dictionary list.
+        """
+        from capabilities.files.file_operations import search_files
+        return search_files(query)
 
     def get_pending_action(self) -> dict[str, Any] | None:
         """Legacy pending-action hook preserved for compatibility.
 
-        Raises:
-            NotImplementedError: Execution state handling is intentionally out of scope.
+        Returns:
+            Pending confirmation action metadata or None.
         """
-
-        raise NotImplementedError("Pending action inspection is not implemented in this phase.")
+        from capabilities.files.file_operations import get_pending_action
+        return get_pending_action()
 
     def classify_intent(self, command: str) -> str:
         """Legacy intent helper preserved for compatibility.
 
-        Raises:
-            NotImplementedError: AI-driven intent classification is intentionally out of scope.
-        """
+        Args:
+            command: Cleaned voice command.
 
-        raise NotImplementedError("Intent classification is not implemented in this phase.")
+        Returns:
+            Classified intent name string.
+        """
+        from ai.intent_classifier import classify_intent
+        return classify_intent(command)
 
     def parse_command(self, command: str) -> dict[str, Any]:
         """Legacy parser hook preserved for compatibility.
 
-        Raises:
-            NotImplementedError: Parsing is now handled by the planner contract.
-        """
+        Args:
+            command: Cleaned voice command.
 
-        raise NotImplementedError("Command parsing is handled by the planner contract.")
+        Returns:
+            Parsed action dictionary.
+        """
+        from ai.command_parser import parse_command
+        return parse_command(command)
 
     def execute_action(self, parsed_action: dict[str, Any]) -> Any:
         """Legacy execution hook preserved for compatibility.
 
-        Raises:
-            NotImplementedError: Direct execution is intentionally out of scope.
-        """
+        Args:
+            parsed_action: Parsed action details to run.
 
-        raise NotImplementedError("Direct execution is not implemented in this phase.")
+        Returns:
+            Execution outcome.
+        """
+        from capabilities.files.file_operations import execute_action
+        return execute_action(parsed_action)
 
     def format_speak_message(self, result: Any, parsed_action: dict[str, Any]) -> str:
         """Legacy formatting hook preserved for compatibility.
 
-        Raises:
-            NotImplementedError: Voice formatting is intentionally out of scope.
-        """
+        Args:
+            result: Command outcome.
+            parsed_action: Associated action dictionary.
 
-        raise NotImplementedError("Speech formatting is not implemented in this phase.")
+        Returns:
+            Formatted voice response string.
+        """
+        from utils.helpers import format_speak_message
+        return format_speak_message(result, parsed_action)
 
 
 Assistant = AuralisAssistant
