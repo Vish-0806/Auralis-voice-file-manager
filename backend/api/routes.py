@@ -1,7 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from core.assistant import get_assistant
+from api.assistant_routes import get_assistant_dependency
+from core.assistant import AuralisAssistant
 
 router = APIRouter()
 
@@ -11,9 +12,8 @@ class CommandRequest(BaseModel):
 
 
 @router.post("/command")
-def handle_command(data: CommandRequest):
+def handle_command(data: CommandRequest, assistant: AuralisAssistant = Depends(get_assistant_dependency)):
     """
     Handles text commands by routing them through the AuralisAssistant orchestrator.
     """
-    assistant = get_assistant()
     return assistant.process_request("", data.command)

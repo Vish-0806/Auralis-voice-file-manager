@@ -35,3 +35,10 @@ def root():
     return {
         "message": "Auralis Backend Running 🚀"
     }
+
+
+@app.on_event("startup")
+def startup_event():
+    """Initializes and registers the default assistant singleton on application startup."""
+    from api.assistant_routes import get_assistant_dependency
+    get_assistant_dependency()

@@ -57,7 +57,7 @@ class BrainPipeline:
         Returns:
             A structured BrainResponse.
         """
-        self._logger.info("Executing AI Brain pipeline", extra={"message": message})
+        self._logger.info("Executing AI Brain pipeline", extra={"brain_message": message})
 
         goal_result = self._interpreter.interpret(message)
         goal_name = goal_result.goal.name
