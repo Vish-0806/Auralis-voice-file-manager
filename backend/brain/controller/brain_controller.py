@@ -142,6 +142,30 @@ class BrainController:
                 }
             )
 
+        # Resolve references using ReferenceResolver
+        try:
+            from brain.planning.reference_resolver import ReferenceResolver
+            resolver = ReferenceResolver()
+            resolved_req = resolver.resolve(request.message, assistant_context)
+            resolved_message = resolved_req.resolved_request
+            self._logger.info(
+                "Reference resolution completed",
+                extra={
+                    "execution_id": execution_id,
+                    "original_request": request.message,
+                    "resolved_request": resolved_message,
+                    "entities": resolved_req.resolved_entities,
+                    "confidence": resolved_req.confidence_score,
+                }
+            )
+        except Exception:
+            self._logger.warning(
+                "Failed to run ReferenceResolver; falling back to original request",
+                exc_info=True,
+                extra={"execution_id": execution_id}
+            )
+            resolved_message = request.message
+
         pipeline = BrainPipeline(
             config=self._config,
             interpreter=self._registry.get_module("GoalInterpreter"),
@@ -153,7 +177,7 @@ class BrainController:
         )
 
         execution.status = BrainStatus.EXECUTING
-        response = pipeline.execute(request.message, dispatcher, context=assistant_context)
+        response = pipeline.execute(resolved_message, dispatcher, context=assistant_context)
 
         execution.status = BrainStatus.COMPLETED if response.success else BrainStatus.FAILED
         execution.end_time = time.time()
