@@ -17,8 +17,8 @@ from dotenv import load_dotenv
 env_file = Path(__file__).resolve().parent.parent.parent / ".env"
 load_dotenv(dotenv_path=env_file, override=True)
 
-print(f"Loading .env from: {env_file}")
-print(f"DATABASE_PASSWORD={os.getenv('DATABASE_PASSWORD')}")
+# print(f"Loading .env from: {env_file}")
+# print(f"DATABASE_PASSWORD={os.getenv('DATABASE_PASSWORD')}")
 
 
 class DBConfig(BaseModel):
