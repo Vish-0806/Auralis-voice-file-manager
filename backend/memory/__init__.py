@@ -5,6 +5,7 @@ and key domain models for Auralis subsystems.
 """
 
 from memory.manager.memory_service import MemoryService
+from memory.manager.context_builder import ContextBuilder
 from memory.preferences.preference_service import PreferenceService
 from memory.context.context_service import ContextService
 from memory.workspace.workspace_service import WorkspaceService
@@ -17,10 +18,12 @@ from memory.models.domain_models import (
     MemoryQuery,
     MemoryResult,
     MemoryType,
+    AssistantContext,
 )
 
 __all__ = [
     "MemoryService",
+    "ContextBuilder",
     "PreferenceService",
     "ContextService",
     "WorkspaceService",
@@ -32,4 +35,5 @@ __all__ = [
     "MemoryQuery",
     "MemoryResult",
     "MemoryType",
+    "AssistantContext",
 ]

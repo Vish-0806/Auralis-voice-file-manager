@@ -151,3 +151,9 @@ class MemoryManager:
 
     async def get_recent_events(self, limit: int) -> List[MemoryEntry]:
         return await self._repository.get_recent_events(limit)
+
+    async def get_workspace_context(self, user_id: int, path: str) -> Optional[MemoryEntry]:
+        return await self._repository.get_workspace_context(user_id, path)
+
+    async def get_user_preferences(self, user_id: int) -> List[MemoryEntry]:
+        return await self._repository.get_user_preferences(user_id)

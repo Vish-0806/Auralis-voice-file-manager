@@ -164,6 +164,16 @@ class BaseProvider(ABC):
         """Retrieves the most recent memory events."""
         pass
 
+    @abstractmethod
+    async def get_workspace_context(self, user_id: int, path: str) -> Optional[MemoryEntry]:
+        """Retrieves workspace context profile by path and user_id."""
+        pass
+
+    @abstractmethod
+    async def get_user_preferences(self, user_id: int) -> List[MemoryEntry]:
+        """Retrieves all preference entries for a user."""
+        pass
+
 
 class InMemoryProvider(BaseProvider):
     """A transient, thread-safe, in-memory storage provider for testing and bootstrapping.
@@ -387,3 +397,21 @@ class InMemoryProvider(BaseProvider):
             candidates = [e.model_copy(deep=True) for e in self._store.values() if e.memory_type not in SPECIALIZED]
             candidates.sort(key=lambda x: x.metadata.created_at, reverse=True)
             return candidates[:limit]
+
+    async def get_workspace_context(self, user_id: int, path: str) -> Optional[MemoryEntry]:
+        from memory.models.domain_models import MemoryType
+        async with self._lock:
+            candidates = [
+                e.model_copy(deep=True) for e in self._store.values()
+                if e.memory_type == MemoryType.PROJECT and str(e.metadata.additional_info.get("user_id")) == str(user_id) and e.content == path
+            ]
+            return candidates[0] if candidates else None
+
+    async def get_user_preferences(self, user_id: int) -> List[MemoryEntry]:
+        from memory.models.domain_models import MemoryType
+        async with self._lock:
+            candidates = [
+                e.model_copy(deep=True) for e in self._store.values()
+                if e.memory_type == MemoryType.PREFERENCE and str(e.metadata.additional_info.get("user_id")) == str(user_id)
+            ]
+            return candidates

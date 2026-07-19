@@ -819,3 +819,46 @@ class PostgresProvider(BaseProvider):
                     )
                 ) for item in items
             ]
+
+    async def get_workspace_context(self, user_id: int, path: str) -> Optional[MemoryEntry]:
+        with self._session_scope() as session:
+            factory = RepositoryFactory(session)
+            repo = factory.get_workspace_repository()
+            results = repo.search(filters={"user_id": user_id, "path": path}, limit=1)
+            if not results:
+                return None
+            item = results[0]
+            return MemoryEntry(
+                id=str(item.id),
+                content=item.path,
+                memory_type=MemoryType.PROJECT,
+                metadata=MemoryMetadata(
+                    created_at=item.created_at,
+                    updated_at=item.updated_at,
+                    additional_info={
+                        "user_id": item.user_id,
+                        "name": item.name,
+                        "settings": item.settings
+                    }
+                )
+            )
+
+    async def get_user_preferences(self, user_id: int) -> List[MemoryEntry]:
+        with self._session_scope() as session:
+            factory = RepositoryFactory(session)
+            repo = factory.get_preference_repository()
+            items = repo.search(filters={"user_id": user_id})
+            return [
+                MemoryEntry(
+                    id=item.key,
+                    content=item.value.get("content", "") if isinstance(item.value, dict) else str(item.value),
+                    memory_type=MemoryType.PREFERENCE,
+                    metadata=MemoryMetadata(
+                        created_at=item.created_at,
+                        additional_info={
+                            **(item.value.get("metadata", {}) if isinstance(item.value, dict) else {}),
+                            "user_id": item.user_id
+                        }
+                    )
+                ) for item in items
+            ]
