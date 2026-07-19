@@ -116,7 +116,7 @@ class BrainController:
             from memory.manager.context_builder import ContextBuilder
             builder = ContextBuilder(self._memory_service)
             session_id = request.correlation_id or "default"
-            assistant_context = self._run_async(builder.build_context(user_id=user_id, session_id=session_id))
+            assistant_context = self._run_async(builder.build_context(user_id=user_id, session_id=session_id, query_text=request.message))
             self._logger.info(
                 f"Context retrieval completed. Loaded {len(assistant_context.recent_conversations)} conversations and {len(assistant_context.recent_executions)} executions.",
                 extra={
