@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import Final
+from typing import Final, Optional
+# pyrefly: ignore [missing-import]
+from memory import AssistantContext
 
 # pyrefly: ignore [missing-import]
 from brain.reasoning.models import ReasoningResult
@@ -41,12 +43,15 @@ class TaskPlanner:
         self._dependency_resolver = dependency_resolver or DependencyResolver(logger=self._logger)
         self._plan_optimizer = plan_optimizer or PlanOptimizer(logger=self._logger)
 
-    def plan(self, reasoning: ReasoningResult, confidence: float = 1.0) -> CoreExecutionPlan:
+    def plan(
+        self, reasoning: ReasoningResult, confidence: float = 1.0, context: Optional[AssistantContext] = None
+    ) -> CoreExecutionPlan:
         """Converts a ReasoningResult into a runnable core ExecutionPlan.
 
         Args:
             reasoning: The structured reasoning from the Reasoning Engine.
             confidence: Injected confidence rating from Goal Interpretation.
+            context: Optional AssistantContext for retrieval planning.
 
         Returns:
             A core ExecutionPlan ready for the ActionDispatcher.

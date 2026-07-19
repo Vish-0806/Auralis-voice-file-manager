@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Optional
+# pyrefly: ignore [missing-import]
+from memory import AssistantContext
 from brain.goal.goal_interpreter import GoalInterpreter
 from brain.reasoning.reasoning_engine import ReasoningEngine
 from brain.planning.task_planner import TaskPlanner
@@ -47,19 +49,20 @@ class BrainPipeline:
         self._capability_selector = capability_selector
         self._execution_engine = execution_engine
 
-    def execute(self, message: str, dispatcher: Any) -> BrainResponse:
+    def execute(self, message: str, dispatcher: Any, context: Optional[AssistantContext] = None) -> BrainResponse:
         """Runs the complete modular execution pipeline.
 
         Args:
             message: User command message.
             dispatcher: ActionDispatcher instance.
+            context: Optional AssistantContext.
 
         Returns:
             A structured BrainResponse.
         """
         self._logger.info("Executing AI Brain pipeline", extra={"brain_message": message})
 
-        goal_result = self._interpreter.interpret(message)
+        goal_result = self._interpreter.interpret(message, context=context)
         goal_name = goal_result.goal.name
 
         if (
@@ -82,9 +85,9 @@ class BrainPipeline:
         )
 
         try:
-            reasoning_result = self._reasoning_engine.reason(goal_result.goal)
+            reasoning_result = self._reasoning_engine.reason(goal_result.goal, context=context)
 
-            plan = self._planner.plan(reasoning_result, confidence=goal_result.confidence.score)
+            plan = self._planner.plan(reasoning_result, confidence=goal_result.confidence.score, context=context)
 
             routed_plan = self._capability_selector.select_capabilities(plan)
 
