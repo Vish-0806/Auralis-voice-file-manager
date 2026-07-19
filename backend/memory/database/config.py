@@ -7,7 +7,9 @@ validating settings using Pydantic.
 import os
 from typing import Optional
 from urllib.parse import quote_plus
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field, model_validator
+# pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
 
 # Explicitly load environment variables from the .env file in backend/

@@ -6,6 +6,7 @@ enabling configuration via environment variables with safe defaults.
 
 import os
 from typing import Optional
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 
 

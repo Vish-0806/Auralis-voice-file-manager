@@ -7,6 +7,7 @@ results, and metadata, decoupled from any persistence or ORM layers.
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 
 

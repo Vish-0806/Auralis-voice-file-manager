@@ -5,9 +5,13 @@ from logging.config import fileConfig
 # Add backend directory to Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy import engine_from_config
+# pyrefly: ignore [missing-import]
 from sqlalchemy import pool
+# pyrefly: ignore [missing-import]
 from sqlalchemy.ext.compiler import compiles
+# pyrefly: ignore [missing-import]
 from sqlalchemy.dialects.postgresql import JSONB
 from alembic import context
 

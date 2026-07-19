@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import List, Optional
+# pyrefly: ignore [missing-import]
 from sqlalchemy import String, DateTime, func
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from memory.database import Base
 

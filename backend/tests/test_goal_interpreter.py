@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, UTC
 from unittest.mock import patch, MagicMock
+# pyrefly: ignore [missing-import]
 import pytest
 
 from core.models import AssistantRequest, SessionContext

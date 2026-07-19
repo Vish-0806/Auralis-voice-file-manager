@@ -1,5 +1,6 @@
 """Unit tests to verify SQLAlchemy ORM Models configurations and relationships."""
 
+# pyrefly: ignore [missing-import]
 import pytest
 from memory.database import Base
 # Importing memory.orm registers all schemas with Base.metadata

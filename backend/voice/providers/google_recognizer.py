@@ -4,6 +4,7 @@ Implements speech recognition using Google Speech API.
 """
 
 from typing import Optional
+# pyrefly: ignore [missing-import]
 import speech_recognition as sr
 from utils.logger import get_logger
 from voice.interfaces import ISpeechRecognizer

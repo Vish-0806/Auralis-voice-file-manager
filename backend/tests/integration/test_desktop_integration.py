@@ -24,6 +24,7 @@ except ImportError:
     pass
 
 import time
+# pyrefly: ignore [missing-import]
 import pytest
 from datetime import datetime, UTC
 from unittest.mock import patch, MagicMock

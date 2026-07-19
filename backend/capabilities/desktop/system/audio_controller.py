@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 from ctypes import POINTER, cast
+# pyrefly: ignore [missing-import]
 from comtypes import CLSCTX_ALL
+# pyrefly: ignore [missing-import]
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 
 

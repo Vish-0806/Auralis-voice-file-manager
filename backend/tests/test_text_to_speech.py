@@ -6,6 +6,7 @@ if "edge_tts" not in sys.modules:
     sys.modules["edge_tts"] = MagicMock()
 
 import time
+# pyrefly: ignore [missing-import]
 import pytest
 
 from voice.tts.models import TTSConfiguration, SpeechResponse

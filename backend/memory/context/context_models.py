@@ -2,6 +2,7 @@
 
 from enum import Enum
 from typing import Any, Dict, Optional
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 from memory.exceptions import MemoryException
 

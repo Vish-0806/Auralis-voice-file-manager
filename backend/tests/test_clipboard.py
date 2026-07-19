@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+# pyrefly: ignore [missing-import]
 import pytest
 from unittest.mock import patch, MagicMock
 from datetime import datetime, UTC

@@ -1,11 +1,17 @@
 """Database Integration Tests for Auralis Memory Repositories."""
 
+# pyrefly: ignore [missing-import]
 import pytest
+# pyrefly: ignore [missing-import]
 from sqlalchemy import create_engine
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.exc import OperationalError, IntegrityError
+# pyrefly: ignore [missing-import]
 from sqlalchemy.ext.compiler import compiles
+# pyrefly: ignore [missing-import]
 from sqlalchemy.dialects.postgresql import JSONB
+# pyrefly: ignore [missing-import]
+from sqlalchemy.exc import OperationalError, IntegrityError
 
 from memory.database import Base
 from memory.database.config import db_config

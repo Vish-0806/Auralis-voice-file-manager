@@ -3,6 +3,7 @@
 Provides the base class for declarative ORM models.
 """
 
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import DeclarativeBase
 
 

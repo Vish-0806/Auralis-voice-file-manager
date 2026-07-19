@@ -1,4 +1,6 @@
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel
 
 from api.assistant_routes import get_assistant_dependency

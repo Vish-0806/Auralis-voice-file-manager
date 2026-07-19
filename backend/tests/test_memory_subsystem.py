@@ -5,6 +5,7 @@ capabilities of the modular Memory subsystem.
 """
 
 import uuid
+# pyrefly: ignore [missing-import]
 import pytest
 from memory import (
     MemoryEntry,
@@ -209,6 +210,7 @@ async def test_search_memories(memory_service: MemoryService) -> None:
 async def test_dependency_injection() -> None:
     """Test initializing MemoryService with a custom/mock manager."""
     provider = InMemoryProvider()
+    # pyrefly: ignore [bad-instantiation]
     repository = MemoryRepository(provider)
     manager = MemoryManager(repository)
     service = MemoryService(manager=manager)

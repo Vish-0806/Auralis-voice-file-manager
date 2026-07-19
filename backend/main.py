@@ -12,6 +12,7 @@ if os.path.isdir(local_os_path):
     os.__path__ = [local_os_path]
 
 
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI
 from api.assistant_routes import router as assistant_router
 from api.routes import router

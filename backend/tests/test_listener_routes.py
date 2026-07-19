@@ -1,4 +1,5 @@
 from unittest.mock import patch, MagicMock
+# pyrefly: ignore [missing-import]
 from fastapi.testclient import TestClient
 from main import app
 
