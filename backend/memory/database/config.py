@@ -6,6 +6,7 @@ validating settings using Pydantic.
 
 import os
 from typing import Optional
+from urllib.parse import quote_plus
 from pydantic import BaseModel, Field, model_validator
 from dotenv import load_dotenv
 
@@ -45,7 +46,9 @@ class DBConfig(BaseModel):
         """
         if not self.url:
             # We use the postgresql+psycopg dialect for compatibility with psycopg (v3)
-            self.url = f"postgresql+psycopg://{self.user}:{self.password}@{self.host}:{self.port}/{self.name}"
+            quoted_user = quote_plus(self.user)
+            quoted_password = quote_plus(self.password)
+            self.url = f"postgresql+psycopg://{quoted_user}:{quoted_password}@{self.host}:{self.port}/{self.name}"
         return self
 
 
