@@ -5,6 +5,7 @@ validating settings using Pydantic.
 """
 
 import os
+from pathlib import Path
 from typing import Optional
 from urllib.parse import quote_plus
 # pyrefly: ignore [missing-import]
@@ -13,7 +14,11 @@ from pydantic import BaseModel, Field, model_validator
 from dotenv import load_dotenv
 
 # Explicitly load environment variables from the .env file in backend/
-load_dotenv()
+env_file = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_file, override=True)
+
+print(f"Loading .env from: {env_file}")
+print(f"DATABASE_PASSWORD={os.getenv('DATABASE_PASSWORD')}")
 
 
 class DBConfig(BaseModel):

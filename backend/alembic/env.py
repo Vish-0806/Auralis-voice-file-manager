@@ -6,7 +6,7 @@ from logging.config import fileConfig
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # pyrefly: ignore [missing-import]
-from sqlalchemy import engine_from_config
+from sqlalchemy import create_engine
 # pyrefly: ignore [missing-import]
 from sqlalchemy import pool
 # pyrefly: ignore [missing-import]
@@ -35,9 +35,8 @@ if config.config_file_name is not None:
 # Set target metadata
 target_metadata = Base.metadata
 
-# Inject database URL dynamically from our db_config settings
+# Import database configuration dynamically
 from memory.database.config import db_config
-config.set_main_option("sqlalchemy.url", db_config.url)
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -57,9 +56,8 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url,
+        url=db_config.url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -76,9 +74,8 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
+    connectable = create_engine(
+        db_config.url,
         poolclass=pool.NullPool,
     )
 
