@@ -5,8 +5,24 @@ from typing import Any, Dict, List, Optional
 from memory.models.domain_models import MemoryEntry, AssistantContext
 from memory.manager.memory_service import MemoryService
 from memory.manager.memory_ranker import MemoryRanker, MemoryRankerConfig
+# pyrefly: ignore [missing-import]
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+
+class ContextWindowConfig(BaseModel):
+    """Configuration for context windows.
+
+    Attributes:
+        short_term_limit: Limit for short-term activity/executions.
+        long_term_limit: Limit for long-term conversations.
+        session_limit: Limit for session conversations.
+    """
+
+    short_term_limit: int = Field(default=5, description="Limit for short-term executions")
+    long_term_limit: int = Field(default=10, description="Limit for long-term conversations")
+    session_limit: int = Field(default=5, description="Limit for session conversations")
 
 
 class ContextBuilder:
@@ -20,23 +36,25 @@ class ContextBuilder:
         self,
         memory_service: MemoryService,
         ranker_config: Optional[MemoryRankerConfig] = None,
+        window_config: Optional[ContextWindowConfig] = None,
     ) -> None:
         """Initializes the ContextBuilder.
 
         Args:
             memory_service: The active MemoryService instance to query.
             ranker_config: Optional MemoryRankerConfig for ranking memories.
+            window_config: Optional ContextWindowConfig for context window limits.
         """
         self.memory_service = memory_service
         self.ranker = MemoryRanker(ranker_config)
+        self.window_config = window_config or ContextWindowConfig()
 
     async def build_context(
         self,
         user_id: int,
         session_id: Optional[str] = None,
         query_text: Optional[str] = None,
-        conversation_limit: int = 10,
-        execution_limit: int = 5,
+        session_only: bool = False,
     ) -> AssistantContext:
         """Aggregates memory tiers into a single AssistantContext.
 
@@ -47,40 +65,47 @@ class ContextBuilder:
             user_id: The ID of the user request.
             session_id: Optional session ID to filter conversations.
             query_text: Optional current request message text.
-            conversation_limit: Maximum number of conversation records to retrieve.
-            execution_limit: Maximum number of execution history records to retrieve.
+            session_only: If True, skips loading general conversations,
+                          recent executions, and preferences.
 
         Returns:
             An AssistantContext domain model.
         """
         # 1. Retrieve recent conversations
-        try:
-            if session_id:
+        recent_conversations = []
+        if session_id:
+            try:
                 recent_conversations = await self.memory_service.get_conversations_by_session(
-                    session_id, conversation_limit
+                    session_id, self.window_config.session_limit
                 )
-            else:
+            except Exception as e:
+                logger.warning(
+                    "ContextBuilder failed to retrieve session conversations",
+                    exc_info=True,
+                )
+        elif not session_only:
+            try:
                 recent_conversations = await self.memory_service.get_recent_conversations(
-                    conversation_limit
+                    self.window_config.long_term_limit
                 )
-        except Exception as e:
-            logger.warning(
-                "ContextBuilder failed to retrieve recent conversations",
-                exc_info=True,
-            )
-            recent_conversations = []
+            except Exception as e:
+                logger.warning(
+                    "ContextBuilder failed to retrieve general conversations",
+                    exc_info=True,
+                )
 
         # 2. Retrieve recent executions
-        try:
-            recent_executions = await self.memory_service.get_recent_executions(
-                execution_limit
-            )
-        except Exception as e:
-            logger.warning(
-                "ContextBuilder failed to retrieve recent executions",
-                exc_info=True,
-            )
-            recent_executions = []
+        recent_executions = []
+        if not session_only:
+            try:
+                recent_executions = await self.memory_service.get_recent_executions(
+                    self.window_config.short_term_limit
+                )
+            except Exception as e:
+                logger.warning(
+                    "ContextBuilder failed to retrieve recent executions",
+                    exc_info=True,
+                )
 
         # 3. Retrieve latest context state
         try:
@@ -106,10 +131,14 @@ class ContextBuilder:
                     session_id=session_id,
                     workspace_path=workspace_path,
                 )
-                recent_conversations = recent_conversations[:self.ranker.config.max_conversations]
+                limit = self.window_config.session_limit if session_id else self.window_config.long_term_limit
+                if self.ranker.config.max_conversations is not None:
+                    limit = min(limit, self.ranker.config.max_conversations)
+                recent_conversations = recent_conversations[:limit]
             except Exception:
                 logger.warning("Failed to rank recent conversations", exc_info=True)
-                recent_conversations = recent_conversations[:conversation_limit]
+                limit = self.window_config.session_limit if session_id else self.window_config.long_term_limit
+                recent_conversations = recent_conversations[:limit]
 
         # Score and rank executions, then apply limit
         if recent_executions:
@@ -120,20 +149,25 @@ class ContextBuilder:
                     session_id=session_id,
                     workspace_path=workspace_path,
                 )
-                recent_executions = recent_executions[:self.ranker.config.max_executions]
+                limit = self.window_config.short_term_limit
+                if self.ranker.config.max_executions is not None:
+                    limit = min(limit, self.ranker.config.max_executions)
+                recent_executions = recent_executions[:limit]
             except Exception:
                 logger.warning("Failed to rank recent executions", exc_info=True)
-                recent_executions = recent_executions[:execution_limit]
+                limit = self.window_config.short_term_limit
+                recent_executions = recent_executions[:limit]
 
         # 4. Retrieve user preferences
-        try:
-            preferences = await self.memory_service.get_user_preferences(user_id)
-        except Exception as e:
-            logger.warning(
-                "ContextBuilder failed to retrieve user preferences",
-                exc_info=True,
-            )
-            preferences = []
+        preferences = []
+        if not session_only:
+            try:
+                preferences = await self.memory_service.get_user_preferences(user_id)
+            except Exception as e:
+                logger.warning(
+                    "ContextBuilder failed to retrieve user preferences",
+                    exc_info=True,
+                )
 
         # 5. Retrieve workspace context (when current context path is available)
         workspace_context = None

@@ -250,3 +250,91 @@ async def test_context_builder_exception_resilience(monkeypatch) -> None:
     assert context.preferences == []
     assert context.workspace_context is None
     assert context.metadata == {"user_id": 456, "session_id": "broken_sess"}
+
+
+@pytest.mark.anyio
+async def test_context_window_empty_history(mock_in_memory_service) -> None:
+    """Verify that custom context windows handle empty history cleanly."""
+    from memory import ContextWindowConfig
+    window_cfg = ContextWindowConfig(short_term_limit=0, long_term_limit=0, session_limit=0)
+    builder = ContextBuilder(mock_in_memory_service, window_config=window_cfg)
+
+    context = await builder.build_context(user_id=789)
+    assert context.recent_conversations == []
+    assert context.recent_executions == []
+
+
+@pytest.mark.anyio
+async def test_context_window_large_history(mock_in_memory_service) -> None:
+    """Verify that context window limits restrict retrieved data sizes."""
+    from memory import ContextWindowConfig
+    service = mock_in_memory_service
+    unique = "_large"
+
+    # Seed 15 conversations and 10 executions
+    for i in range(15):
+        await service.save(MemoryEntry(
+            id=f"conv_{i}{unique}",
+            content=f"conv msg {i}",
+            memory_type=MemoryType.CONVERSATION,
+            metadata=MemoryMetadata(additional_info={"user_id": 789})
+        ))
+    for i in range(10):
+        await service.save(MemoryEntry(
+            id=f"exec_{i}{unique}",
+            content=f"exec logs {i}",
+            memory_type=MemoryType.ACTIVITY,
+            metadata=MemoryMetadata(additional_info={"user_id": 789})
+        ))
+
+    window_cfg = ContextWindowConfig(short_term_limit=3, long_term_limit=5)
+    builder = ContextBuilder(service, window_config=window_cfg)
+
+    context = await builder.build_context(user_id=789)
+    assert len(context.recent_conversations) == 5
+    assert len(context.recent_executions) == 3
+
+
+@pytest.mark.anyio
+async def test_context_window_session_only(mock_in_memory_service) -> None:
+    """Verify that when session_only is True, general history is bypassed completely."""
+    from memory import ContextWindowConfig
+    service = mock_in_memory_service
+    unique = "_sess"
+
+    # Seed session conversation
+    await service.save(MemoryEntry(
+        id=f"conv_sess{unique}",
+        content="session message",
+        memory_type=MemoryType.CONVERSATION,
+        metadata=MemoryMetadata(additional_info={"user_id": 789, "session_id": "target_sess"})
+    ))
+
+    # Seed general conversation (no session_id)
+    await service.save(MemoryEntry(
+        id=f"conv_gen{unique}",
+        content="general message",
+        memory_type=MemoryType.CONVERSATION,
+        metadata=MemoryMetadata(additional_info={"user_id": 789})
+    ))
+
+    # Seed execution
+    await service.save(MemoryEntry(
+        id=f"exec_{unique}",
+        content="exec logs",
+        memory_type=MemoryType.ACTIVITY,
+        metadata=MemoryMetadata(additional_info={"user_id": 789})
+    ))
+
+    window_cfg = ContextWindowConfig(session_limit=5)
+    builder = ContextBuilder(service, window_config=window_cfg)
+
+    context = await builder.build_context(user_id=789, session_id="target_sess", session_only=True)
+
+    # Conversations should contain the session conversation only
+    assert len(context.recent_conversations) == 1
+    assert context.recent_conversations[0].content == "session message"
+
+    # Executions and preferences must be completely skipped/empty
+    assert context.recent_executions == []
+    assert context.preferences == []
