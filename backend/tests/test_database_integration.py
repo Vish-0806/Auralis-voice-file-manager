@@ -259,6 +259,7 @@ def test_transaction_rollback_on_failed_operations(db_session: Session) -> None:
     """Verify that transactions successfully roll back when integrity or database constraints fail."""
     factory = RepositoryFactory(db_session)
     user_repo = factory.get_user_repository()
+    initial_count = user_repo.count()
 
     # Create a user to set up a unique constraint test
     user = UserDomain(username="unique_username")
@@ -276,4 +277,4 @@ def test_transaction_rollback_on_failed_operations(db_session: Session) -> None:
 
     # Verify that the database session was rolled back successfully, and no changes persist
     assert user_repo.exists(username="unique_username") is False
-    assert user_repo.count() == 0
+    assert user_repo.count() == initial_count

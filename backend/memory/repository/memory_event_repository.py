@@ -1,5 +1,6 @@
 """MemoryEvent repository module for Auralis."""
 
+from typing import List
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 from memory.models.domain_models import MemoryEventDomain
@@ -31,3 +32,7 @@ class MemoryEventRepository(BaseRepository[MemoryEventDomain, MemoryEvent]):
             payload=domain.payload,
             created_at=domain.created_at,
         )
+
+    def get_recent(self, limit: int) -> List[MemoryEventDomain]:
+        """Retrieves the most recent memory events."""
+        return self.list_all(limit=limit, order_by=self.orm_model.created_at.desc())

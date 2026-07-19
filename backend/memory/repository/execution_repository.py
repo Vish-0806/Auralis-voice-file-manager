@@ -1,5 +1,6 @@
 """ExecutionHistory repository module for Auralis."""
 
+from typing import List
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 from memory.models.domain_models import ExecutionHistoryDomain
@@ -41,3 +42,15 @@ class ExecutionRepository(
             output_result=domain.output_result,
             created_at=domain.created_at,
         )
+
+    def get_recent(self, limit: int) -> List[ExecutionHistoryDomain]:
+        """Retrieves the most recent execution history items."""
+        return self.list_all(limit=limit, order_by=self.orm_model.created_at.desc())
+
+    def get_failed(self, limit: int) -> List[ExecutionHistoryDomain]:
+        """Retrieves the most recent failed execution history items."""
+        return self.search(filters={"status": "failed"}, limit=limit, order_by=self.orm_model.created_at.desc())
+
+    def get_successful(self, limit: int) -> List[ExecutionHistoryDomain]:
+        """Retrieves the most recent successful execution history items."""
+        return self.search(filters={"status": "success"}, limit=limit, order_by=self.orm_model.created_at.desc())

@@ -114,6 +114,56 @@ class BaseProvider(ABC):
         """
         pass
 
+    @abstractmethod
+    async def get_recent_conversations(self, limit: int) -> List[MemoryEntry]:
+        """Retrieves the most recent conversation entries."""
+        pass
+
+    @abstractmethod
+    async def get_conversations_by_session(self, session_id: str, limit: int) -> List[MemoryEntry]:
+        """Retrieves conversation entries by session identifier."""
+        pass
+
+    @abstractmethod
+    async def get_conversations_by_user(self, user_id: int, limit: int) -> List[MemoryEntry]:
+        """Retrieves conversation entries for a user."""
+        pass
+
+    @abstractmethod
+    async def get_recent_executions(self, limit: int) -> List[MemoryEntry]:
+        """Retrieves the most recent execution history entries."""
+        pass
+
+    @abstractmethod
+    async def get_failed_executions(self, limit: int) -> List[MemoryEntry]:
+        """Retrieves the most recent failed execution history entries."""
+        pass
+
+    @abstractmethod
+    async def get_successful_executions(self, limit: int) -> List[MemoryEntry]:
+        """Retrieves the most recent successful execution history entries."""
+        pass
+
+    @abstractmethod
+    async def get_latest_context(self, user_id: int) -> Optional[MemoryEntry]:
+        """Retrieves the most recent context entry for a user."""
+        pass
+
+    @abstractmethod
+    async def get_context_by_session(self, session_id: str) -> Optional[MemoryEntry]:
+        """Retrieves context entry by session identifier."""
+        pass
+
+    @abstractmethod
+    async def get_preference_by_key(self, user_id: int, key: str) -> Optional[MemoryEntry]:
+        """Retrieves a configuration preference value by user_id and key."""
+        pass
+
+    @abstractmethod
+    async def get_recent_events(self, limit: int) -> List[MemoryEntry]:
+        """Retrieves the most recent memory events."""
+        pass
+
 
 class InMemoryProvider(BaseProvider):
     """A transient, thread-safe, in-memory storage provider for testing and bootstrapping.
@@ -247,3 +297,93 @@ class InMemoryProvider(BaseProvider):
                     continue
                 entries.append(entry.model_copy(deep=True))
             return entries
+
+    async def get_recent_conversations(self, limit: int) -> List[MemoryEntry]:
+        from memory.models.domain_models import MemoryType
+        async with self._lock:
+            candidates = [e.model_copy(deep=True) for e in self._store.values() if e.memory_type == MemoryType.CONVERSATION]
+            candidates.sort(key=lambda x: x.metadata.created_at, reverse=True)
+            return candidates[:limit]
+
+    async def get_conversations_by_session(self, session_id: str, limit: int) -> List[MemoryEntry]:
+        from memory.models.domain_models import MemoryType
+        async with self._lock:
+            candidates = [
+                e.model_copy(deep=True) for e in self._store.values()
+                if e.memory_type == MemoryType.CONVERSATION and e.metadata.additional_info.get("session_id") == session_id
+            ]
+            candidates.sort(key=lambda x: x.metadata.created_at, reverse=True)
+            return candidates[:limit]
+
+    async def get_conversations_by_user(self, user_id: int, limit: int) -> List[MemoryEntry]:
+        from memory.models.domain_models import MemoryType
+        async with self._lock:
+            candidates = [
+                e.model_copy(deep=True) for e in self._store.values()
+                if e.memory_type == MemoryType.CONVERSATION and str(e.metadata.additional_info.get("user_id")) == str(user_id)
+            ]
+            candidates.sort(key=lambda x: x.metadata.created_at, reverse=True)
+            return candidates[:limit]
+
+    async def get_recent_executions(self, limit: int) -> List[MemoryEntry]:
+        from memory.models.domain_models import MemoryType
+        async with self._lock:
+            candidates = [e.model_copy(deep=True) for e in self._store.values() if e.memory_type == MemoryType.ACTIVITY]
+            candidates.sort(key=lambda x: x.metadata.created_at, reverse=True)
+            return candidates[:limit]
+
+    async def get_failed_executions(self, limit: int) -> List[MemoryEntry]:
+        from memory.models.domain_models import MemoryType
+        async with self._lock:
+            candidates = [
+                e.model_copy(deep=True) for e in self._store.values()
+                if e.memory_type == MemoryType.ACTIVITY and e.metadata.additional_info.get("status") == "failed"
+            ]
+            candidates.sort(key=lambda x: x.metadata.created_at, reverse=True)
+            return candidates[:limit]
+
+    async def get_successful_executions(self, limit: int) -> List[MemoryEntry]:
+        from memory.models.domain_models import MemoryType
+        async with self._lock:
+            candidates = [
+                e.model_copy(deep=True) for e in self._store.values()
+                if e.memory_type == MemoryType.ACTIVITY and e.metadata.additional_info.get("status") == "success"
+            ]
+            candidates.sort(key=lambda x: x.metadata.created_at, reverse=True)
+            return candidates[:limit]
+
+    async def get_latest_context(self, user_id: int) -> Optional[MemoryEntry]:
+        from memory.models.domain_models import MemoryType
+        async with self._lock:
+            candidates = [
+                e.model_copy(deep=True) for e in self._store.values()
+                if e.memory_type == MemoryType.SESSION and str(e.metadata.additional_info.get("user_id")) == str(user_id)
+            ]
+            candidates.sort(key=lambda x: x.metadata.created_at, reverse=True)
+            return candidates[0] if candidates else None
+
+    async def get_context_by_session(self, session_id: str) -> Optional[MemoryEntry]:
+        from memory.models.domain_models import MemoryType
+        async with self._lock:
+            candidates = [
+                e.model_copy(deep=True) for e in self._store.values()
+                if e.memory_type == MemoryType.SESSION and (e.id == session_id or e.metadata.additional_info.get("session_id") == session_id)
+            ]
+            return candidates[0] if candidates else None
+
+    async def get_preference_by_key(self, user_id: int, key: str) -> Optional[MemoryEntry]:
+        from memory.models.domain_models import MemoryType
+        async with self._lock:
+            candidates = [
+                e.model_copy(deep=True) for e in self._store.values()
+                if e.memory_type == MemoryType.PREFERENCE and str(e.metadata.additional_info.get("user_id")) == str(user_id) and e.id == key
+            ]
+            return candidates[0] if candidates else None
+
+    async def get_recent_events(self, limit: int) -> List[MemoryEntry]:
+        from memory.models.domain_models import MemoryType
+        SPECIALIZED = {MemoryType.PREFERENCE, MemoryType.SESSION, MemoryType.CONVERSATION, MemoryType.WORKFLOW, MemoryType.ACTIVITY}
+        async with self._lock:
+            candidates = [e.model_copy(deep=True) for e in self._store.values() if e.memory_type not in SPECIALIZED]
+            candidates.sort(key=lambda x: x.metadata.created_at, reverse=True)
+            return candidates[:limit]

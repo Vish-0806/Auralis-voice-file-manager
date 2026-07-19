@@ -167,12 +167,15 @@ class BaseRepository(Generic[TDomain, TORM], ABC):
             self.db.rollback()
             raise e
 
-    def list_all(self, limit: int = 100, offset: int = 0) -> List[TDomain]:
+    def list_all(
+        self, limit: int = 100, offset: int = 0, order_by: Optional[Any] = None
+    ) -> List[TDomain]:
         """Lists database records with pagination support.
 
         Args:
             limit: Maximum number of records to return.
             offset: Number of records to skip.
+            order_by: Optional SQL Alchemy order clause.
 
         Returns:
             List of domain models.
@@ -182,16 +185,21 @@ class BaseRepository(Generic[TDomain, TORM], ABC):
             extra={"orm_model": self.orm_model.__name__, "limit": limit, "offset": offset},
         )
         stmt = select(self.orm_model).limit(limit).offset(offset)
+        if order_by is not None:
+            stmt = stmt.order_by(order_by)
         result = self.db.scalars(stmt).all()
         return [self._to_domain(item) for item in result]
 
-    def search(self, filters: dict, limit: int = 100, offset: int = 0) -> List[TDomain]:
+    def search(
+        self, filters: dict, limit: int = 100, offset: int = 0, order_by: Optional[Any] = None
+    ) -> List[TDomain]:
         """Searches records using exact keyword filters.
 
         Args:
             filters: Key-value filters to apply in WHERE clause.
             limit: Maximum records to return.
             offset: Number of records to skip.
+            order_by: Optional SQL Alchemy order clause.
 
         Returns:
             List of domain models matching filter parameters.
@@ -204,6 +212,8 @@ class BaseRepository(Generic[TDomain, TORM], ABC):
         for key, val in filters.items():
             if hasattr(self.orm_model, key):
                 stmt = stmt.where(getattr(self.orm_model, key) == val)
+        if order_by is not None:
+            stmt = stmt.order_by(order_by)
         stmt = stmt.limit(limit).offset(offset)
         result = self.db.scalars(stmt).all()
         return [self._to_domain(item) for item in result]

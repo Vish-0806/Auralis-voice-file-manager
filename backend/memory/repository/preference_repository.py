@@ -64,3 +64,7 @@ class PreferenceRepository(BaseRepository[PreferenceDomain, Preference]):
         if orm_obj:
             return self._to_domain(orm_obj)
         return None
+
+    def get_by_key(self, user_id: int, key: str) -> Optional[PreferenceDomain]:
+        """Retrieves a configuration preference value by its owner user_id and key."""
+        return self.get_by_user_and_key(user_id, key)
