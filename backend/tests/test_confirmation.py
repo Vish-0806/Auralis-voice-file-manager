@@ -1,4 +1,5 @@
 import os
+# pyrefly: ignore [missing-import]
 import pytest
 from unittest.mock import patch, MagicMock
 from ai.intent_classifier import classify_intent
@@ -228,6 +229,7 @@ def test_organize_cancel_flow(tmp_path):
         assert get_pending_action() is None
 
 
+# pyrefly: ignore [missing-import]
 from fastapi.testclient import TestClient
 from main import app
 client = TestClient(app)

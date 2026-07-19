@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
+# pyrefly: ignore [missing-import]
 from .models import ClipboardEntry
 
 

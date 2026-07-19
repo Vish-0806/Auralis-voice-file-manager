@@ -7,6 +7,7 @@ results, and metadata, decoupled from any persistence or ORM layers.
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 
 
@@ -182,4 +183,15 @@ class MemoryEventDomain(BaseModel):
     event_type: str
     payload: Dict[str, Any]
     created_at: Optional[datetime] = None
+
+
+class AssistantContext(BaseModel):
+    """Domain model aggregating context information from the memory subsystem."""
+
+    recent_conversations: List[MemoryEntry] = Field(default_factory=list)
+    recent_executions: List[MemoryEntry] = Field(default_factory=list)
+    current_context: Optional[MemoryEntry] = None
+    preferences: List[MemoryEntry] = Field(default_factory=list)
+    workspace_context: Optional[MemoryEntry] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 

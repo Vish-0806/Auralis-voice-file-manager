@@ -8,8 +8,11 @@ Create Date: 2026-07-14 20:28:40.184543
 from typing import Sequence, Union
 
 from alembic import op
+# pyrefly: ignore [missing-import]
 import sqlalchemy as sa
+# pyrefly: ignore [missing-import]
 from sqlalchemy import Text
+# pyrefly: ignore [missing-import]
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+# pyrefly: ignore [missing-import]
 import pygetwindow as pgw
 import win32process
 import psutil

@@ -97,6 +97,75 @@ class BrainController:
         )
         self._active_executions[execution_id] = execution
 
+        # Resolve user_id from context if available, otherwise default to active provider's default user_id or 1
+        user_id = 1
+        if request.context and "user_id" in request.context:
+            user_id = int(request.context["user_id"])
+        elif request.context and "userId" in request.context:
+            user_id = int(request.context["userId"])
+        else:
+            try:
+                provider = self._memory_service._manager._repository._provider
+                if hasattr(provider, "_default_user_id") and provider._default_user_id is not None:
+                    user_id = provider._default_user_id
+            except Exception:
+                pass
+
+        self._logger.info("Context retrieval started", extra={"execution_id": execution_id})
+        try:
+            from memory.manager.context_builder import ContextBuilder
+            builder = ContextBuilder(self._memory_service)
+            session_id = request.correlation_id or "default"
+            assistant_context = self._run_async(builder.build_context(user_id=user_id, session_id=session_id, query_text=request.message))
+            self._logger.info(
+                f"Context retrieval completed. Loaded {len(assistant_context.recent_conversations)} conversations and {len(assistant_context.recent_executions)} executions.",
+                extra={
+                    "execution_id": execution_id,
+                    "conversations_count": len(assistant_context.recent_conversations),
+                    "executions_count": len(assistant_context.recent_executions),
+                }
+            )
+        except Exception:
+            self._logger.warning(
+                "Failed to build AssistantContext; continuing with empty context",
+                exc_info=True,
+                extra={"execution_id": execution_id}
+            )
+            from memory import AssistantContext
+            assistant_context = AssistantContext()
+            self._logger.info(
+                "Context retrieval completed. Loaded 0 conversations and 0 executions.",
+                extra={
+                    "execution_id": execution_id,
+                    "conversations_count": 0,
+                    "executions_count": 0,
+                }
+            )
+
+        # Resolve references using ReferenceResolver
+        try:
+            from brain.planning.reference_resolver import ReferenceResolver
+            resolver = ReferenceResolver()
+            resolved_req = resolver.resolve(request.message, assistant_context)
+            resolved_message = resolved_req.resolved_request
+            self._logger.info(
+                "Reference resolution completed",
+                extra={
+                    "execution_id": execution_id,
+                    "original_request": request.message,
+                    "resolved_request": resolved_message,
+                    "entities": resolved_req.resolved_entities,
+                    "confidence": resolved_req.confidence_score,
+                }
+            )
+        except Exception:
+            self._logger.warning(
+                "Failed to run ReferenceResolver; falling back to original request",
+                exc_info=True,
+                extra={"execution_id": execution_id}
+            )
+            resolved_message = request.message
+
         pipeline = BrainPipeline(
             config=self._config,
             interpreter=self._registry.get_module("GoalInterpreter"),
@@ -108,7 +177,7 @@ class BrainController:
         )
 
         execution.status = BrainStatus.EXECUTING
-        response = pipeline.execute(request.message, dispatcher)
+        response = pipeline.execute(resolved_message, dispatcher, context=assistant_context)
 
         execution.status = BrainStatus.COMPLETED if response.success else BrainStatus.FAILED
         execution.end_time = time.time()

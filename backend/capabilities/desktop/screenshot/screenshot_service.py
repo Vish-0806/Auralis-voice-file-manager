@@ -6,6 +6,7 @@ import io
 import logging
 import os
 from datetime import datetime, UTC
+# pyrefly: ignore [missing-import]
 from PIL import Image
 from .capture_manager import CaptureManager
 from .models import ScreenshotDetails

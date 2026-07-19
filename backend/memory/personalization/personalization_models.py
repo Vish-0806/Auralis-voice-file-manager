@@ -1,6 +1,7 @@
 """User Personalization exceptions and domain models."""
 
 from typing import Any, Dict, List, Optional
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 from memory.exceptions import MemoryException
 

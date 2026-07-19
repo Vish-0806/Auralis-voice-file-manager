@@ -12,7 +12,9 @@ import platform
 from datetime import UTC, datetime
 from typing import Any
 
+# pyrefly: ignore [missing-import]
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 
 from capabilities.desktop import DesktopCapability

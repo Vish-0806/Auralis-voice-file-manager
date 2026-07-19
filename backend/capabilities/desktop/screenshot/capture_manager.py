@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import logging
 import time
+# pyrefly: ignore [missing-import]
 import mss
+# pyrefly: ignore [missing-import]
 import pygetwindow as pgw
+# pyrefly: ignore [missing-import]
 from PIL import Image
 
 

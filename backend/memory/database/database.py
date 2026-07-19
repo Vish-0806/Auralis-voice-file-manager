@@ -6,7 +6,9 @@ and SQLAlchemy 2.x standards.
 
 import logging
 from typing import Optional
+# pyrefly: ignore [missing-import]
 from sqlalchemy import create_engine
+# pyrefly: ignore [missing-import]
 from sqlalchemy.engine import Engine
 from memory.database.config import db_config
 

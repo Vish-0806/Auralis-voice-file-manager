@@ -3,6 +3,7 @@ Auralis Microphone Audio Stream
 Wraps the SpeechRecognition microphone resource to conform to IAudioStream.
 """
 
+# pyrefly: ignore [missing-import]
 import speech_recognition as sr
 from voice.interfaces import IAudioStream
 

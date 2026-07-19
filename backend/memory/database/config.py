@@ -5,12 +5,17 @@ validating settings using Pydantic.
 """
 
 import os
+from pathlib import Path
 from typing import Optional
+from urllib.parse import quote_plus
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field, model_validator
+# pyrefly: ignore [missing-import]
 from dotenv import load_dotenv
 
 # Explicitly load environment variables from the .env file in backend/
-load_dotenv()
+env_file = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_file, override=True)
 
 
 class DBConfig(BaseModel):
@@ -45,7 +50,9 @@ class DBConfig(BaseModel):
         """
         if not self.url:
             # We use the postgresql+psycopg dialect for compatibility with psycopg (v3)
-            self.url = f"postgresql+psycopg://{self.user}:{self.password}@{self.host}:{self.port}/{self.name}"
+            quoted_user = quote_plus(self.user)
+            quoted_password = quote_plus(self.password)
+            self.url = f"postgresql+psycopg://{quoted_user}:{quoted_password}@{self.host}:{self.port}/{self.name}"
         return self
 
 

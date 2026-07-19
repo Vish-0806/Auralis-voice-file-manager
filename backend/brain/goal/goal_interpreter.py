@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Final
+from typing import Any, Final, Optional
+# pyrefly: ignore [missing-import]
+from memory import AssistantContext
 
 from .models import Goal, GoalCategory, GoalConfidence, GoalResult
 from .goal_classifier import GoalClassifier
@@ -134,11 +136,12 @@ class GoalInterpreter:
         normalized = re.sub(r"\s+", " ", normalized)
         return normalized.lower()
 
-    def interpret(self, message: str) -> GoalResult:
+    def interpret(self, message: str, context: Optional[AssistantContext] = None) -> GoalResult:
         """Interprets a user request and identifies their goal.
 
         Args:
             message: The raw user message.
+            context: Optional AssistantContext for retrieval planning.
 
         Returns:
             A GoalResult representing the identified goal and confidence.

@@ -1,5 +1,6 @@
 import os
 import shutil
+# pyrefly: ignore [missing-import]
 import pytest
 from unittest.mock import patch, MagicMock
 from capabilities.files.file_operations import get_category_for_file, organize_directory, execute_action

@@ -164,3 +164,70 @@ def test_assistant_brain_routing_success(mock_dispatcher):
     assert response.plan.target == "Start Coding"
     assert response.result.success is True
     assert "execution_id" in response.result.data
+
+
+def test_controller_context_builder_integration(mock_dispatcher):
+    """Verifies that ContextBuilder is invoked and AssistantContext is passed to the pipeline."""
+    from unittest.mock import patch
+    from memory import AssistantContext
+    from brain.controller.brain_pipeline import BrainPipeline
+
+    controller = BrainController()
+    req = BrainRequest(
+        message="start coding",
+        correlation_id="test_ctx_integration",
+        context={"user_id": 999}
+    )
+
+    # Let's mock the pipeline's execute method to capture what context is received
+    captured_context = None
+    orig_execute = BrainPipeline.execute
+
+    def mock_execute(self, message, dispatcher, context=None):
+        nonlocal captured_context
+        captured_context = context
+        return orig_execute(self, message, dispatcher, context=context)
+
+    with patch.object(BrainPipeline, "execute", side_effect=mock_execute, autospec=True):
+        res = controller.process_request(req, mock_dispatcher)
+
+    assert res.success is True
+    assert isinstance(captured_context, AssistantContext)
+    assert captured_context.metadata.get("user_id") == 999
+
+
+def test_controller_context_builder_failure_grace(mock_dispatcher):
+    """Verifies that if ContextBuilder fails, the pipeline still executes with an empty AssistantContext."""
+    from unittest.mock import patch
+    from memory import AssistantContext
+    from brain.controller.brain_pipeline import BrainPipeline
+    from memory.manager.context_builder import ContextBuilder
+
+    controller = BrainController()
+    req = BrainRequest(
+        message="start coding",
+        correlation_id="test_ctx_failure_grace",
+        context={"user_id": 999}
+    )
+
+    async def raise_error(*args, **kwargs):
+        raise RuntimeError("Mock context builder failure")
+
+    captured_context = None
+    orig_execute = BrainPipeline.execute
+
+    def mock_execute(self, message, dispatcher, context=None):
+        nonlocal captured_context
+        captured_context = context
+        return orig_execute(self, message, dispatcher, context=context)
+
+    with patch.object(ContextBuilder, "build_context", side_effect=raise_error):
+        with patch.object(BrainPipeline, "execute", side_effect=mock_execute, autospec=True):
+            res = controller.process_request(req, mock_dispatcher)
+
+    assert res.success is True
+    assert isinstance(captured_context, AssistantContext)
+    # The failed context builder should fallback to an empty context
+    assert len(captured_context.recent_conversations) == 0
+    assert len(captured_context.recent_executions) == 0
+    assert captured_context.current_context is None

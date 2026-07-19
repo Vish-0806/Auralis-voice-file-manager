@@ -1,6 +1,7 @@
 """User Routine Learning exceptions and models."""
 
 from typing import Any, Dict, List
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 from memory.exceptions import MemoryException
 

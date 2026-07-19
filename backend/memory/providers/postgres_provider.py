@@ -604,3 +604,261 @@ class PostgresProvider(BaseProvider):
                     )
 
         return entries
+
+    async def get_recent_conversations(self, limit: int) -> List[MemoryEntry]:
+        with self._session_scope() as session:
+            factory = RepositoryFactory(session)
+            repo = factory.get_conversation_repository()
+            items = repo.get_recent(limit)
+            return [
+                MemoryEntry(
+                    id=str(item.id),
+                    content=item.content,
+                    memory_type=MemoryType.CONVERSATION,
+                    metadata=MemoryMetadata(
+                        created_at=item.created_at,
+                        additional_info={
+                            "session_id": item.session_id,
+                            "role": item.role,
+                            "token_count": item.token_count,
+                            "user_id": item.user_id,
+                        }
+                    )
+                ) for item in items
+            ]
+
+    async def get_conversations_by_session(self, session_id: str, limit: int) -> List[MemoryEntry]:
+        with self._session_scope() as session:
+            factory = RepositoryFactory(session)
+            repo = factory.get_conversation_repository()
+            items = repo.get_by_session(session_id, limit)
+            return [
+                MemoryEntry(
+                    id=str(item.id),
+                    content=item.content,
+                    memory_type=MemoryType.CONVERSATION,
+                    metadata=MemoryMetadata(
+                        created_at=item.created_at,
+                        additional_info={
+                            "session_id": item.session_id,
+                            "role": item.role,
+                            "token_count": item.token_count,
+                            "user_id": item.user_id,
+                        }
+                    )
+                ) for item in items
+            ]
+
+    async def get_conversations_by_user(self, user_id: int, limit: int) -> List[MemoryEntry]:
+        with self._session_scope() as session:
+            factory = RepositoryFactory(session)
+            repo = factory.get_conversation_repository()
+            items = repo.get_by_user(user_id, limit)
+            return [
+                MemoryEntry(
+                    id=str(item.id),
+                    content=item.content,
+                    memory_type=MemoryType.CONVERSATION,
+                    metadata=MemoryMetadata(
+                        created_at=item.created_at,
+                        additional_info={
+                            "session_id": item.session_id,
+                            "role": item.role,
+                            "token_count": item.token_count,
+                            "user_id": item.user_id,
+                        }
+                    )
+                ) for item in items
+            ]
+
+    async def get_recent_executions(self, limit: int) -> List[MemoryEntry]:
+        with self._session_scope() as session:
+            factory = RepositoryFactory(session)
+            repo = factory.get_execution_repository()
+            items = repo.get_recent(limit)
+            return [
+                MemoryEntry(
+                    id=item.action,
+                    content=item.logs or "",
+                    memory_type=MemoryType.ACTIVITY,
+                    metadata=MemoryMetadata(
+                        created_at=item.created_at,
+                        additional_info={
+                            "status": item.status,
+                            "duration_ms": item.duration_ms,
+                            "input_parameters": item.input_parameters,
+                            "output_result": item.output_result,
+                            "user_id": item.user_id,
+                        }
+                    )
+                ) for item in items
+            ]
+
+    async def get_failed_executions(self, limit: int) -> List[MemoryEntry]:
+        with self._session_scope() as session:
+            factory = RepositoryFactory(session)
+            repo = factory.get_execution_repository()
+            items = repo.get_failed(limit)
+            return [
+                MemoryEntry(
+                    id=item.action,
+                    content=item.logs or "",
+                    memory_type=MemoryType.ACTIVITY,
+                    metadata=MemoryMetadata(
+                        created_at=item.created_at,
+                        additional_info={
+                            "status": item.status,
+                            "duration_ms": item.duration_ms,
+                            "input_parameters": item.input_parameters,
+                            "output_result": item.output_result,
+                            "user_id": item.user_id,
+                        }
+                    )
+                ) for item in items
+            ]
+
+    async def get_successful_executions(self, limit: int) -> List[MemoryEntry]:
+        with self._session_scope() as session:
+            factory = RepositoryFactory(session)
+            repo = factory.get_execution_repository()
+            items = repo.get_successful(limit)
+            return [
+                MemoryEntry(
+                    id=item.action,
+                    content=item.logs or "",
+                    memory_type=MemoryType.ACTIVITY,
+                    metadata=MemoryMetadata(
+                        created_at=item.created_at,
+                        additional_info={
+                            "status": item.status,
+                            "duration_ms": item.duration_ms,
+                            "input_parameters": item.input_parameters,
+                            "output_result": item.output_result,
+                            "user_id": item.user_id,
+                        }
+                    )
+                ) for item in items
+            ]
+
+    async def get_latest_context(self, user_id: int) -> Optional[MemoryEntry]:
+        with self._session_scope() as session:
+            factory = RepositoryFactory(session)
+            repo = factory.get_context_repository()
+            item = repo.get_latest(user_id)
+            if not item:
+                return None
+            info = dict(item.metadata_bag) if item.metadata_bag else {}
+            info["user_id"] = item.user_id
+            info["session_id"] = item.session_id
+            return MemoryEntry(
+                id=item.session_id,
+                content=item.workspace_path or "",
+                memory_type=MemoryType.SESSION,
+                metadata=MemoryMetadata(
+                    created_at=item.created_at,
+                    updated_at=item.updated_at,
+                    additional_info=info
+                )
+            )
+
+    async def get_context_by_session(self, session_id: str) -> Optional[MemoryEntry]:
+        with self._session_scope() as session:
+            factory = RepositoryFactory(session)
+            repo = factory.get_context_repository()
+            item = repo.get_by_session(session_id)
+            if not item:
+                return None
+            info = dict(item.metadata_bag) if item.metadata_bag else {}
+            info["user_id"] = item.user_id
+            info["session_id"] = item.session_id
+            return MemoryEntry(
+                id=item.session_id,
+                content=item.workspace_path or "",
+                memory_type=MemoryType.SESSION,
+                metadata=MemoryMetadata(
+                    created_at=item.created_at,
+                    updated_at=item.updated_at,
+                    additional_info=info
+                )
+            )
+
+    async def get_preference_by_key(self, user_id: int, key: str) -> Optional[MemoryEntry]:
+        with self._session_scope() as session:
+            factory = RepositoryFactory(session)
+            repo = factory.get_preference_repository()
+            item = repo.get_by_key(user_id, key)
+            if not item:
+                return None
+            content = item.value.get("content", "") if isinstance(item.value, dict) else str(item.value)
+            metadata = MemoryMetadata.model_validate(item.value.get("metadata", {})) if isinstance(item.value, dict) else MemoryMetadata()
+            metadata.created_at = item.created_at
+            metadata.additional_info["user_id"] = item.user_id
+            return MemoryEntry(
+                id=item.key,
+                content=content,
+                memory_type=MemoryType.PREFERENCE,
+                metadata=metadata
+            )
+
+    async def get_recent_events(self, limit: int) -> List[MemoryEntry]:
+        with self._session_scope() as session:
+            factory = RepositoryFactory(session)
+            repo = factory.get_memory_event_repository()
+            items = repo.get_recent(limit)
+            return [
+                MemoryEntry(
+                    id=item.payload.get("id", str(item.id)) if isinstance(item.payload, dict) else str(item.id),
+                    content=item.payload.get("content", "") if isinstance(item.payload, dict) else "",
+                    memory_type=MemoryType(item.event_type) if hasattr(MemoryType, item.event_type.upper()) else MemoryType.LONG_TERM,
+                    metadata=MemoryMetadata(
+                        created_at=item.created_at,
+                        additional_info={
+                            **(item.payload.get("metadata", {}) if isinstance(item.payload, dict) else {}),
+                            "user_id": item.user_id
+                        }
+                    )
+                ) for item in items
+            ]
+
+    async def get_workspace_context(self, user_id: int, path: str) -> Optional[MemoryEntry]:
+        with self._session_scope() as session:
+            factory = RepositoryFactory(session)
+            repo = factory.get_workspace_repository()
+            results = repo.search(filters={"user_id": user_id, "path": path}, limit=1)
+            if not results:
+                return None
+            item = results[0]
+            return MemoryEntry(
+                id=str(item.id),
+                content=item.path,
+                memory_type=MemoryType.PROJECT,
+                metadata=MemoryMetadata(
+                    created_at=item.created_at,
+                    updated_at=item.updated_at,
+                    additional_info={
+                        "user_id": item.user_id,
+                        "name": item.name,
+                        "settings": item.settings
+                    }
+                )
+            )
+
+    async def get_user_preferences(self, user_id: int) -> List[MemoryEntry]:
+        with self._session_scope() as session:
+            factory = RepositoryFactory(session)
+            repo = factory.get_preference_repository()
+            items = repo.search(filters={"user_id": user_id})
+            return [
+                MemoryEntry(
+                    id=item.key,
+                    content=item.value.get("content", "") if isinstance(item.value, dict) else str(item.value),
+                    memory_type=MemoryType.PREFERENCE,
+                    metadata=MemoryMetadata(
+                        created_at=item.created_at,
+                        additional_info={
+                            **(item.value.get("metadata", {}) if isinstance(item.value, dict) else {}),
+                            "user_id": item.user_id
+                        }
+                    )
+                ) for item in items
+            ]

@@ -66,3 +66,19 @@ class BrainResponse(BaseModel):
     plan: Optional[Any] = Field(None, description="The executed RoutedExecutionPlan")
     summary: Optional[Any] = Field(None, description="Detailed multi-step ExecutionSummary")
     metrics: Optional[Any] = Field(None, description="Aggregated ExecutionMetrics statistics")
+
+
+class ResolvedRequest(BaseModel):
+    """Encapsulates a request that has undergone core reference resolution.
+
+    Attributes:
+        original_request: The raw prompt input by the user.
+        resolved_request: The request with pronouns/contexts substituted.
+        resolved_entities: Dictionary mapping reference categories to values.
+        confidence_score: The confidence score of the resolution (0.0 to 1.0).
+    """
+
+    original_request: str = Field(description="The original user request")
+    resolved_request: str = Field(description="The resolved request string")
+    resolved_entities: Dict[str, Any] = Field(default_factory=dict, description="Resolved context entities")
+    confidence_score: float = Field(default=0.0, description="Confidence of the resolution")

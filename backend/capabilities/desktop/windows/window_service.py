@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+# pyrefly: ignore [missing-import]
 import pygetwindow as pgw
 from .window_manager import WindowManager
 from .window_resolver import WindowResolver

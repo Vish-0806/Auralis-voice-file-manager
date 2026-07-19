@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Final
+from typing import Final, Optional
+# pyrefly: ignore [missing-import]
+from memory import AssistantContext
 # pyrefly: ignore [missing-import]
 from brain.goal.models import Goal
 from .models import Objective, Constraint, Priority, ReasoningResult
@@ -35,11 +37,12 @@ class ReasoningEngine:
         self._constraint_analyzer = constraint_analyzer or ConstraintAnalyzer(logger=self._logger)
         self._priority_manager = priority_manager or PriorityManager(logger=self._logger)
 
-    def reason(self, goal: Goal) -> ReasoningResult:
+    def reason(self, goal: Goal, context: Optional[AssistantContext] = None) -> ReasoningResult:
         """Converts a structured Goal into a structured ReasoningResult.
 
         Args:
             goal: The identified User Goal.
+            context: Optional AssistantContext for retrieval planning.
 
         Returns:
             A ReasoningResult populated with objectives, capabilities, constraints, and priorities.

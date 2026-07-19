@@ -7,6 +7,7 @@ import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    # pyrefly: ignore [missing-import]
     from .input_service import InputService
 
 

@@ -1,7 +1,9 @@
 """User Preference Domain Models, Schema Schemas, and Custom Exceptions."""
 
 from typing import Any, Dict, NamedTuple, Type
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
+# pyrefly: ignore [missing-import]
 from memory.exceptions import MemoryException
 
 

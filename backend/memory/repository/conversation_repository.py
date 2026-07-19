@@ -1,5 +1,6 @@
 """ConversationHistory repository module for Auralis."""
 
+from typing import List
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 from memory.models.domain_models import ConversationHistoryDomain
@@ -37,3 +38,15 @@ class ConversationRepository(
             token_count=domain.token_count,
             created_at=domain.created_at,
         )
+
+    def get_recent(self, limit: int) -> List[ConversationHistoryDomain]:
+        """Retrieves the most recent conversation history items."""
+        return self.list_all(limit=limit, order_by=self.orm_model.created_at.desc())
+
+    def get_by_session(self, session_id: str, limit: int) -> List[ConversationHistoryDomain]:
+        """Retrieves conversation history items by session identifier."""
+        return self.search(filters={"session_id": session_id}, limit=limit, order_by=self.orm_model.created_at.desc())
+
+    def get_by_user(self, user_id: int, limit: int) -> List[ConversationHistoryDomain]:
+        """Retrieves conversation history items for a user."""
+        return self.search(filters={"user_id": user_id}, limit=limit, order_by=self.orm_model.created_at.desc())

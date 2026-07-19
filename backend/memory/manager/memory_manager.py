@@ -121,3 +121,39 @@ class MemoryManager:
             extra={"memory_type": memory_type},
         )
         return await self._repository.list_all(memory_type)
+
+    async def get_recent_conversations(self, limit: int) -> List[MemoryEntry]:
+        return await self._repository.get_recent_conversations(limit)
+
+    async def get_conversations_by_session(self, session_id: str, limit: int) -> List[MemoryEntry]:
+        return await self._repository.get_conversations_by_session(session_id, limit)
+
+    async def get_conversations_by_user(self, user_id: int, limit: int) -> List[MemoryEntry]:
+        return await self._repository.get_conversations_by_user(user_id, limit)
+
+    async def get_recent_executions(self, limit: int) -> List[MemoryEntry]:
+        return await self._repository.get_recent_executions(limit)
+
+    async def get_failed_executions(self, limit: int) -> List[MemoryEntry]:
+        return await self._repository.get_failed_executions(limit)
+
+    async def get_successful_executions(self, limit: int) -> List[MemoryEntry]:
+        return await self._repository.get_successful_executions(limit)
+
+    async def get_latest_context(self, user_id: int) -> Optional[MemoryEntry]:
+        return await self._repository.get_latest_context(user_id)
+
+    async def get_context_by_session(self, session_id: str) -> Optional[MemoryEntry]:
+        return await self._repository.get_context_by_session(session_id)
+
+    async def get_preference_by_key(self, user_id: int, key: str) -> Optional[MemoryEntry]:
+        return await self._repository.get_preference_by_key(user_id, key)
+
+    async def get_recent_events(self, limit: int) -> List[MemoryEntry]:
+        return await self._repository.get_recent_events(limit)
+
+    async def get_workspace_context(self, user_id: int, path: str) -> Optional[MemoryEntry]:
+        return await self._repository.get_workspace_context(user_id, path)
+
+    async def get_user_preferences(self, user_id: int) -> List[MemoryEntry]:
+        return await self._repository.get_user_preferences(user_id)

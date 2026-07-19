@@ -5,8 +5,16 @@ enabling configuration via environment variables with safe defaults.
 """
 
 import os
+from pathlib import Path
 from typing import Optional
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
+# pyrefly: ignore [missing-import]
+from dotenv import load_dotenv
+
+# Explicitly load environment variables from the .env file in backend/
+env_file = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_file, override=True)
 
 
 class MemorySettings(BaseModel):

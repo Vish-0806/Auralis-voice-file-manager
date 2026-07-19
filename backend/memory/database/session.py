@@ -6,6 +6,7 @@ compatible with FastAPI dependency injection lifecycles.
 
 import logging
 from typing import Generator
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import sessionmaker, Session
 from memory.database.database import get_engine
 

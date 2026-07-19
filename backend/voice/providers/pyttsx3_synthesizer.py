@@ -32,6 +32,7 @@ class Pyttsx3Synthesizer(ISpeechSynthesizer):
                 return cls._engine
 
             try:
+                # pyrefly: ignore [missing-import]
                 import pyttsx3
 
                 driver_name = None

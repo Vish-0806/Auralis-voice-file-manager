@@ -1,5 +1,6 @@
 """Context repository module for Auralis."""
 
+from typing import Optional
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Session
 from memory.models.domain_models import ContextDomain
@@ -37,3 +38,13 @@ class ContextRepository(BaseRepository[ContextDomain, Context]):
             created_at=domain.created_at,
             updated_at=domain.updated_at,
         )
+
+    def get_latest(self, user_id: int) -> Optional[ContextDomain]:
+        """Retrieves the most recent context state for a user."""
+        results = self.search(filters={"user_id": user_id}, limit=1, order_by=self.orm_model.created_at.desc())
+        return results[0] if results else None
+
+    def get_by_session(self, session_id: str) -> Optional[ContextDomain]:
+        """Retrieves context state by session identifier."""
+        results = self.search(filters={"session_id": session_id}, limit=1)
+        return results[0] if results else None

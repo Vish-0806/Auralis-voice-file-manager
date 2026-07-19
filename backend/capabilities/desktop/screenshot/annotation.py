@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+# pyrefly: ignore [missing-import]
 from PIL import Image, ImageDraw, ImageFilter
 
 

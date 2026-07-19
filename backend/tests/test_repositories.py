@@ -1,9 +1,13 @@
 """Unit tests for the Auralis Memory Repository layer."""
-
+# pyrefly: ignore [missing-import]
 import pytest
+# pyrefly: ignore [missing-import]
 from sqlalchemy import create_engine
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import sessionmaker, Session
+# pyrefly: ignore [missing-import]
 from sqlalchemy.ext.compiler import compiles
+# pyrefly: ignore [missing-import]
 from sqlalchemy.dialects.postgresql import JSONB
 from memory.database import Base
 from memory.models.domain_models import UserDomain, PreferenceDomain
