@@ -39,7 +39,35 @@ def root():
 
 
 @app.on_event("startup")
-def startup_event():
-    """Initializes and registers the default assistant singleton on application startup."""
+async def startup_event():
+    """Initializes assistant dependencies and active memory providers on application startup."""
+    import logging
+    import sys
     from api.assistant_routes import get_assistant_dependency
+    from memory.providers.provider_factory import ProviderFactory
+
+    logger = logging.getLogger("auralis.startup")
+
+    # Check if running under pytest to avoid seeding database/polluting tests
+    if "pytest" in sys.modules:
+        logger.info("Pytest detected; skipping Postgres provider initialization during API startup.")
+        get_assistant_dependency()
+        return
+
+    # 1. Resolve active provider and log selection
+    try:
+        provider = ProviderFactory.get_provider()
+        provider_name = provider.__class__.__name__
+        logger.info(f"Memory provider selected: {provider_name}")
+
+        # 2. Initialize PostgresProvider if selected
+        if provider_name == "PostgresProvider":
+            logger.info("Memory provider initialization started.")
+            await provider.initialize()
+            logger.info("Memory provider initialization successful.")
+    except Exception as e:
+        logger.error(f"Memory provider initialization failed: {e}", exc_info=True)
+        raise e
+
+    # 3. Build assistant dependency
     get_assistant_dependency()

@@ -1,5 +1,6 @@
 """Integration tests for the Auralis PostgreSQL Memory Provider."""
 
+# pyrefly: ignore [missing-import]
 import pytest
 import uuid
 from memory import MemoryService, MemoryEntry, MemoryMetadata, MemoryQuery, MemoryType
@@ -16,6 +17,7 @@ def ensure_postgres_provider_active(monkeypatch):
 @pytest.fixture(scope="module", autouse=True)
 def setup_postgres_tables():
     """Ensure PostgreSQL tables exist before running integration tests."""
+    # pyrefly: ignore [missing-import]
     from sqlalchemy import create_engine
     from memory.database import Base
     from memory.database.config import db_config
