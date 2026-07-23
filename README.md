@@ -1,4 +1,4 @@
-# Auralis
+# Auralis 🎙
 
 <p align="center">
   <b>Your AI Operating System Assistant</b>
