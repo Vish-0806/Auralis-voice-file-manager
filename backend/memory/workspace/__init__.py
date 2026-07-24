@@ -10,6 +10,12 @@ from memory.workspace.workspace_discovery import (
     WorkspaceDiscoveryConfig,
     WorkspaceDiscoveryResult,
 )
+from memory.workspace.workspace_indexer import (
+    WorkspaceIndexer,
+    WorkspaceIndexerConfig,
+    WorkspaceFileEntry,
+    WorkspaceIndex,
+)
 from memory.workspace.workspace_models import (
     WorkspaceError,
     InvalidWorkspaceError,
@@ -26,6 +32,10 @@ __all__ = [
     "WorkspaceDiscoveryEngine",
     "WorkspaceDiscoveryConfig",
     "WorkspaceDiscoveryResult",
+    "WorkspaceIndexer",
+    "WorkspaceIndexerConfig",
+    "WorkspaceFileEntry",
+    "WorkspaceIndex",
     "WorkspaceError",
     "InvalidWorkspaceError",
     "WorkspaceNotFoundError",
