@@ -26,6 +26,10 @@ from memory.workspace.project_intelligence import (
     BuildSystemSummary,
 )
 from memory.workspace.workspace_analysis import WorkspaceAnalysis
+from memory.workspace.workspace_coordinator import (
+    WorkspaceIntelligenceCoordinator,
+    WorkspaceCache,
+)
 from memory.workspace.workspace_models import (
     WorkspaceError,
     InvalidWorkspaceError,
@@ -52,6 +56,8 @@ __all__ = [
     "BuildSystemDetector",
     "GitWorkspaceAnalyzer",
     "WorkspaceAnalysis",
+    "WorkspaceIntelligenceCoordinator",
+    "WorkspaceCache",
     "GitSummary",
     "BuildSystemSummary",
     "WorkspaceError",
