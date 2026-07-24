@@ -164,7 +164,7 @@ class ContextWindowManager:
                 metadata=context.metadata,
             )
 
-        # 3. Add other items according to priority and relevance
+        # 3. Add other items according to priority, count limits, and relevance
         # Group A: Workspace Profile (High priority workspace path metadata)
         if workspace_context:
             if remaining_budget >= workspace_tokens:
@@ -187,7 +187,12 @@ class ContextWindowManager:
         # Filters remaining conversations preserving their relative ranked order
         ranked_remaining_convs = [c for c in conversations if c in remaining_convs]
         keep_remaining_convs = []
+        max_additional = max(0, self.config.maximum_conversations - len(protected_convs))
+        
         for c in ranked_remaining_convs:
+            if len(keep_remaining_convs) >= max_additional:
+                items_removed += 1
+                continue
             c_tokens = self.estimate_entry_tokens(c)
             if remaining_budget >= c_tokens:
                 keep_remaining_convs.append(c)
@@ -201,6 +206,9 @@ class ContextWindowManager:
 
         # Group D: Executions (ranked order from ContextBuilder)
         for ex in executions:
+            if len(final_executions) >= self.config.maximum_execution_history:
+                items_removed += 1
+                continue
             ex_tokens = self.estimate_entry_tokens(ex)
             if remaining_budget >= ex_tokens:
                 final_executions.append(ex)

@@ -15,9 +15,9 @@ class ContextWindowConfig(BaseModel):
     """Configuration for context windows.
 
     Attributes:
-        short_term_limit: Limit for short-term activity/executions.
-        long_term_limit: Limit for long-term conversations.
-        session_limit: Limit for session conversations.
+        short_term_limit: [DEPRECATED] Limit for short-term executions. Use maximum_execution_history instead.
+        long_term_limit: [DEPRECATED] Limit for long-term conversations. Use maximum_conversations instead.
+        session_limit: [DEPRECATED] Limit for session conversations. Use maximum_conversations instead.
         token_budget: Total token limit for the context window.
         reserved_response_tokens: Reserved tokens for model reply generation.
         safety_margin_tokens: Safety margin buffer tokens.
@@ -32,9 +32,10 @@ class ContextWindowConfig(BaseModel):
         minimum_recent_conversations: Minimum recent conversation turns to protect from pruning.
     """
 
-    short_term_limit: int = Field(default=5, description="Limit for short-term executions")
-    long_term_limit: int = Field(default=10, description="Limit for long-term conversations")
-    session_limit: int = Field(default=5, description="Limit for session conversations")
+    # DEPRECATED fields preserved for backward compatibility
+    short_term_limit: int = Field(default=5, description="[DEPRECATED: Use maximum_execution_history instead] Limit for short-term executions")
+    long_term_limit: int = Field(default=10, description="[DEPRECATED: Use maximum_conversations instead] Limit for long-term conversations")
+    session_limit: int = Field(default=5, description="[DEPRECATED: Use maximum_conversations instead] Limit for session conversations")
 
     # Production context window parameters
     token_budget: int = Field(default=4096, description="Total token limit for the context window")
@@ -78,6 +79,15 @@ class ContextBuilder:
         self.memory_service = memory_service
         self.ranker = MemoryRanker(ranker_config)
         self.window_config = window_config or ContextWindowConfig()
+
+        # Backward compatibility overrides from MemoryRankerConfig
+        ranker_max_conv = self.ranker.config.max_conversations
+        if ranker_max_conv is not None:
+            self.window_config.maximum_conversations = min(self.window_config.maximum_conversations, ranker_max_conv)
+
+        ranker_max_exec = self.ranker.config.max_executions
+        if ranker_max_exec is not None:
+            self.window_config.maximum_execution_history = min(self.window_config.maximum_execution_history, ranker_max_exec)
 
         # Local import to prevent circular dependencies
         from memory.manager.context_window_manager import ContextWindowManager
@@ -156,7 +166,7 @@ class ContextBuilder:
         if current_context:
             workspace_path = current_context.metadata.additional_info.get("workspace_path") or current_context.content
 
-        # Score and rank conversations, then apply limit
+        # Score and rank conversations
         if recent_conversations:
             try:
                 recent_conversations = self.ranker.rank_memories(
@@ -165,16 +175,10 @@ class ContextBuilder:
                     session_id=session_id,
                     workspace_path=workspace_path,
                 )
-                limit = self.window_config.session_limit if session_id else self.window_config.long_term_limit
-                if self.ranker.config.max_conversations is not None:
-                    limit = min(limit, self.ranker.config.max_conversations)
-                recent_conversations = recent_conversations[:limit]
             except Exception:
                 logger.warning("Failed to rank recent conversations", exc_info=True)
-                limit = self.window_config.session_limit if session_id else self.window_config.long_term_limit
-                recent_conversations = recent_conversations[:limit]
 
-        # Score and rank executions, then apply limit
+        # Score and rank executions
         if recent_executions:
             try:
                 recent_executions = self.ranker.rank_memories(
@@ -183,14 +187,8 @@ class ContextBuilder:
                     session_id=session_id,
                     workspace_path=workspace_path,
                 )
-                limit = self.window_config.short_term_limit
-                if self.ranker.config.max_executions is not None:
-                    limit = min(limit, self.ranker.config.max_executions)
-                recent_executions = recent_executions[:limit]
             except Exception:
                 logger.warning("Failed to rank recent executions", exc_info=True)
-                limit = self.window_config.short_term_limit
-                recent_executions = recent_executions[:limit]
 
         # 4. Retrieve user preferences
         preferences = []
@@ -227,7 +225,7 @@ class ContextBuilder:
             metadata={"user_id": user_id, "session_id": session_id},
         )
 
-        # Optimize context window before passing to AI Brain
+        # Optimize context window before passing to AI Brain (single authority)
         optimized_context = self.window_manager.optimize_context_window(
             raw_context, query_text=query_text
         )
