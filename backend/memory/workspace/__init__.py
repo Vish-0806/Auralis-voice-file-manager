@@ -5,6 +5,11 @@ from memory.workspace.workspace_manager import WorkspaceManager
 from memory.workspace.workspace_validator import WorkspaceValidator
 from memory.workspace.workspace_launcher import WorkspaceLauncher
 from memory.workspace.workspace_snapshot import WorkspaceSnapshot
+from memory.workspace.workspace_discovery import (
+    WorkspaceDiscoveryEngine,
+    WorkspaceDiscoveryConfig,
+    WorkspaceDiscoveryResult,
+)
 from memory.workspace.workspace_models import (
     WorkspaceError,
     InvalidWorkspaceError,
@@ -18,6 +23,9 @@ __all__ = [
     "WorkspaceValidator",
     "WorkspaceLauncher",
     "WorkspaceSnapshot",
+    "WorkspaceDiscoveryEngine",
+    "WorkspaceDiscoveryConfig",
+    "WorkspaceDiscoveryResult",
     "WorkspaceError",
     "InvalidWorkspaceError",
     "WorkspaceNotFoundError",
