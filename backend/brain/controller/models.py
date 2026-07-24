@@ -66,6 +66,7 @@ class BrainResponse(BaseModel):
     plan: Optional[Any] = Field(None, description="The executed RoutedExecutionPlan")
     summary: Optional[Any] = Field(None, description="Detailed multi-step ExecutionSummary")
     metrics: Optional[Any] = Field(None, description="Aggregated ExecutionMetrics statistics")
+    workspace_summary: Optional[str] = Field(None, description="Concise workspace summary string")
 
 
 class ResolvedRequest(BaseModel):

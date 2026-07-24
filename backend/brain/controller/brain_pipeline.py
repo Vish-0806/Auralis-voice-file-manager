@@ -49,6 +49,35 @@ class BrainPipeline:
         self._capability_selector = capability_selector
         self._execution_engine = execution_engine
 
+    def generate_workspace_summary(self, context: Optional[AssistantContext]) -> Optional[str]:
+        """Generates a concise workspace summary string from AssistantContext.
+
+        Args:
+            context: The aggregated AssistantContext.
+
+        Returns:
+            A formatted multi-line summary string, or None.
+        """
+        if not context or not getattr(context, "workspace_analysis", None):
+            return None
+
+        analysis = context.workspace_analysis
+        lines = ["Workspace:"]
+        if getattr(analysis, "project_name", None):
+            lines.append(f"Project: {analysis.project_name}")
+        if getattr(analysis, "project_type", None) and analysis.project_type != "none":
+            lines.append(f"Project Type: {analysis.project_type}")
+        if getattr(analysis, "dominant_language", None):
+            lines.append(f"Language: {analysis.dominant_language}")
+        if getattr(analysis, "build_system", None):
+            lines.append(f"Build: {analysis.build_system}")
+        if getattr(analysis, "git_branch", None):
+            lines.append(f"Branch: {analysis.git_branch}")
+        elif getattr(analysis, "repository_type", None) and analysis.repository_type != "none":
+            lines.append(f"Repository: {analysis.repository_type}")
+
+        return "\n".join(lines)
+
     def execute(self, message: str, dispatcher: Any, context: Optional[AssistantContext] = None) -> BrainResponse:
         """Runs the complete modular execution pipeline.
 
@@ -61,6 +90,11 @@ class BrainPipeline:
             A structured BrainResponse.
         """
         self._logger.info("Executing AI Brain pipeline", extra={"brain_message": message})
+
+        # Generate workspace summary for the pipeline
+        workspace_summary = self.generate_workspace_summary(context)
+        if workspace_summary:
+            self._logger.info(f"Workspace context loaded:\n{workspace_summary}")
 
         goal_result = self._interpreter.interpret(message, context=context)
         goal_name = goal_result.goal.name
@@ -77,6 +111,7 @@ class BrainPipeline:
                 success=False,
                 message="Goal bypassed: Low confidence or unknown command format.",
                 goal_name=goal_name,
+                workspace_summary=workspace_summary,
             )
 
         self._logger.info(
@@ -108,6 +143,7 @@ class BrainPipeline:
                 plan=routed_plan,
                 summary=summary,
                 metrics=metrics,
+                workspace_summary=workspace_summary,
             )
 
         except Exception as exc:
@@ -116,4 +152,5 @@ class BrainPipeline:
                 success=False,
                 message=f"Pipeline exception: {str(exc)}",
                 goal_name=goal_name,
+                workspace_summary=workspace_summary,
             )
