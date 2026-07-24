@@ -16,6 +16,16 @@ from memory.workspace.workspace_indexer import (
     WorkspaceFileEntry,
     WorkspaceIndex,
 )
+from memory.workspace.project_intelligence import (
+    ProjectIntelligenceEngine,
+    ProjectDetector,
+    LanguageDetector,
+    BuildSystemDetector,
+    GitWorkspaceAnalyzer,
+    WorkspaceAnalysis,
+    GitSummary,
+    BuildSystemSummary,
+)
 from memory.workspace.workspace_models import (
     WorkspaceError,
     InvalidWorkspaceError,
@@ -36,6 +46,14 @@ __all__ = [
     "WorkspaceIndexerConfig",
     "WorkspaceFileEntry",
     "WorkspaceIndex",
+    "ProjectIntelligenceEngine",
+    "ProjectDetector",
+    "LanguageDetector",
+    "BuildSystemDetector",
+    "GitWorkspaceAnalyzer",
+    "WorkspaceAnalysis",
+    "GitSummary",
+    "BuildSystemSummary",
     "WorkspaceError",
     "InvalidWorkspaceError",
     "WorkspaceNotFoundError",
