@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 from memory.workspace.workspace_indexer import WorkspaceIndex
+from memory.workspace.workspace_analysis import WorkspaceAnalysis
 
 logger = logging.getLogger(__name__)
 
@@ -27,21 +28,6 @@ class BuildSystemSummary(BaseModel):
     build_system: str = Field(description="Detected build tool name (e.g. cargo, npm).")
     dependency_file: str = Field(description="Detected package descriptor filename.")
     recommended_build_command: str = Field(description="Suggested build tool command line.")
-
-
-class WorkspaceAnalysis(BaseModel):
-    """The unified metadata domain model representing a completed project analysis."""
-
-    workspace_path: str = Field(description="Analyzed workspace root folder path.")
-    project_name: str = Field(description="Evaluated project name.")
-    project_type: str = Field(description="Project type classification (e.g. node, rust).")
-    dominant_language: str = Field(description="Language with the highest total byte weight.")
-    language_statistics: Dict[str, float] = Field(description="Percentage distribution of code sizes.")
-    language_counts: Dict[str, int] = Field(description="Total file count per programming language.")
-    build_system: Optional[BuildSystemSummary] = Field(default=None, description="Build system metadata.")
-    git_summary: Optional[GitSummary] = Field(default=None, description="Git repository details.")
-    repository_type: str = Field(description="Repository classification (e.g. git, none).")
-    analysis_timestamp: datetime = Field(description="Timestamp indicating when the scan was executed.")
 
 
 class ProjectDetector:
@@ -321,11 +307,20 @@ class ProjectIntelligenceEngine:
             workspace_path=index.workspace_path,
             project_name=os.path.basename(index.workspace_path),
             project_type=project_type,
+            repository_type=repository_type,
             dominant_language=dominant_lang,
             language_statistics=lang_stats,
             language_counts=lang_counts,
-            build_system=build_sys,
-            git_summary=git_sum,
-            repository_type=repository_type,
+            build_system=build_sys.build_system if build_sys else None,
+            recommended_build_command=build_sys.recommended_build_command if build_sys else None,
+            git_branch=git_sum.branch if git_sum else None,
+            git_remote_available=git_sum.remote_available if git_sum else False,
+            git_dirty=git_sum.is_dirty if git_sum else False,
+            git_has_unpushed_commits=bool(git_sum.unpushed_commits > 0) if git_sum else False,
+            total_files=index.file_count,
+            total_directories=index.directory_count,
+            maximum_depth=index.maximum_depth,
+            total_size=index.total_size,
+            last_indexed=index.indexed_at,
             analysis_timestamp=datetime.now(timezone.utc),
         )

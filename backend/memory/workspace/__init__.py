@@ -22,10 +22,10 @@ from memory.workspace.project_intelligence import (
     LanguageDetector,
     BuildSystemDetector,
     GitWorkspaceAnalyzer,
-    WorkspaceAnalysis,
     GitSummary,
     BuildSystemSummary,
 )
+from memory.workspace.workspace_analysis import WorkspaceAnalysis
 from memory.workspace.workspace_models import (
     WorkspaceError,
     InvalidWorkspaceError,

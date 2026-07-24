@@ -249,7 +249,7 @@ async def test_project_intelligence_coordination(base_index) -> None:
         assert analysis.project_name == "workspace"
         assert analysis.project_type == "rust"
         assert analysis.dominant_language == "Rust"
-        assert analysis.build_system is not None
-        assert analysis.build_system.build_system == "cargo"
-        assert analysis.git_summary is None
+        assert analysis.build_system == "cargo"
+        assert analysis.recommended_build_command == "cargo build"
+        assert analysis.git_branch is None
         assert analysis.repository_type == "none"
