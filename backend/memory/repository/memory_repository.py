@@ -31,11 +31,6 @@ class MemoryRepository:
             extra={"provider_class": provider.__class__.__name__},
         )
 
-    def _to_domain(self, orm):
-        return orm
-
-    def _to_orm(self, domain):
-        return domain
 
     async def add(self, entry: MemoryEntry) -> None:
         """Adds a memory entry via the storage provider.

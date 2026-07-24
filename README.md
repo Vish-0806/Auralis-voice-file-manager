@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/Vish-0806/Auralis-voice-file-manager"><img src="https://img.shields.io/badge/status-active-brightgreen?style=flat-square" alt="Status"></a>
-  <a href="https://github.com/Vish-0806/Auralis-voice-file-manager/releases"><img src="https://img.shields.io/badge/version-1.2.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/Vish-0806/Auralis-voice-file-manager/releases"><img src="https://img.shields.io/badge/version-1.3.0-blue?style=flat-square" alt="Version"></a>
   <a href="file:///d:/Auralis-voice-file-manager/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/python-3.8%2B-blue?style=flat-square" alt="Python"></a>
   <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-0.136.1-red?style=flat-square" alt="FastAPI"></a>
@@ -74,6 +74,20 @@ Auralis Version 1.2.0 implements Phase 4 **Advanced Memory Retrieval API**, **Co
 4. **Reference Resolution**: Created `ReferenceResolver` to parse and resolve conversational references (`it`, `them`, `this`, `that`, `previous`, `same folder`, `same app`) prior to goal planning.
 5. **Memory Ranking**: Created `MemoryRanker` scoring memories using exponential recency decay, session affinity, workspace path matches, entity token overlap, and command verb similarity.
 6. **Context Window Management**: Configures retrieval limits (`short_term_limit`, `long_term_limit`, `session_limit`) via `ContextWindowConfig` and enables high-performance `session_only` context loading.
+
+---
+
+## Workspace Intelligence & Awareness Integration (v1.3.0)
+
+Auralis Version 1.3.0 implements the complete **Workspace Intelligence Subsystem** including **Workspace Discovery**, **Workspace Indexer**, **Project Intelligence Engine**, **Workspace Analysis**, **Workspace Cache & Coordinator**, and **Brain Awareness Integration**.
+
+### Key Additions:
+1. **Workspace Discovery Engine**: Asynchronously discovers candidate workspace folders inside user search roots while skipping ignored configurations and duplicate nested project paths.
+2. **Dynamic FS Indexer**: Traverses workspace directories asynchronously to index folder stats and file trees.
+3. **Project Intelligence**: Detects dominant programming languages, build tools, recommended build commands, and Git branches/dirty status.
+4. **Thread-Safe Cache & Coordinator**: Serializes path scans and caches the compiled analysis records for 5 minutes (`300.0` seconds) to avoid duplicate file crawlers.
+5. **ContextBuilder Integration**: Aggregates the `WorkspaceAnalysis` domain model directly into `AssistantContext` using safe fallback error envelopes.
+6. **BrainController Workspace Awareness**: Resolves concise summaries (Language, Build, Project, Branch) and attaches them to `BrainResponse` objects to feed downstream reasoning pipelines.
 
 ---
 
@@ -165,6 +179,7 @@ Track the development stages of Auralis:
 * [x] **AI Brain Orchestration (Phase 5):** Pipeline stages (Goal Interpreter, Reasoning Engine, Dynamic Planner, Capability Selector, Multi-step Execution Engine, Self-Correction & Recovery, Progress Monitor, Controller).
 * [x] **Tiered Memory Platform (Phase 6):** Preference Engine, Context Memory, Workspace Profiles, Routine Learning n-gram mining, Personalization decider, and unified Memory Coordinator.
 * [x] **Advanced Memory Retrieval & Context Construction (Phase 4):** PostgreSQL ORM Repositories, `ContextBuilder`, `BrainController` context integration, `ReferenceResolver`, `MemoryRanker`, and `ContextWindowConfig`.
+* [x] **Workspace Intelligence & Awareness (Phase 5):** Asynchronous indexers, project detectors, thread-safe caching coordinators, context construction, and brain reasoning pipelines.
 * [ ] **Future Objectives:**
   * [ ] Document intelligence parser using local PyMuPDF extraction.
   * [ ] Plugin Marketplace for community extensions.
@@ -182,7 +197,7 @@ python -m venv venv
 # Install dependencies
 pip install -r backend/requirements.txt
 
-# Run complete test suite (478 tests)
+# Run complete test suite (517 tests)
 pytest backend/tests
 
 # Launch backend server

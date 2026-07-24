@@ -125,3 +125,134 @@ async def test_ranker_context_builder_integration(mock_in_memory_service) -> Non
 
     # Max conversations slice limit of 3 should be respected
     assert len(context.recent_conversations) == 3
+
+
+def test_normalize_token() -> None:
+    """Verify lowercasing and punctuation stripping functionality."""
+    ranker = MemoryRanker()
+    assert ranker._normalize_token("Create,") == "create"
+    assert ranker._normalize_token("Launch!") == "launch"
+    assert ranker._normalize_token("Organize...") == "organize"
+    assert ranker._normalize_token("...Delete...") == "delete"
+    assert ranker._normalize_token("") == ""
+
+
+def test_score_importance() -> None:
+    """Verify that type-based importance scoring returns configured values."""
+    custom_config = MemoryRankerConfig(
+        recency_weight=0.0,
+        session_weight=0.0,
+        workspace_weight=0.0,
+        entity_weight=0.0,
+        command_weight=0.0,
+        importance_weight=1.0,
+        importance_weights={"session": 1.0, "conversation": 0.5}
+    )
+    ranker = MemoryRanker(config=custom_config)
+
+    session_entry = MemoryEntry(
+        id="session",
+        content="session ctx",
+        memory_type=MemoryType.SESSION
+    )
+    conv_entry = MemoryEntry(
+        id="conv",
+        content="conv text",
+        memory_type=MemoryType.CONVERSATION
+    )
+
+    assert ranker._score_importance(session_entry) == 1.0
+    assert ranker._score_importance(conv_entry) == 0.5
+
+    # Check overall score calculation
+    assert abs(ranker.score_entry(session_entry) - 1.0) < 1e-5
+    assert abs(ranker.score_entry(conv_entry) - 0.5) < 1e-5
+
+
+def test_score_frequency() -> None:
+    """Verify that BM25-style frequency scoring functions as expected with a saturation curve."""
+    custom_config = MemoryRankerConfig(
+        recency_weight=0.0,
+        session_weight=0.0,
+        workspace_weight=0.0,
+        entity_weight=0.0,
+        command_weight=0.0,
+        frequency_weight=1.0,
+        frequency_k=5.0
+    )
+    ranker = MemoryRanker(config=custom_config)
+
+    entry_none = MemoryEntry(
+        id="none",
+        content="no usage",
+        memory_type=MemoryType.CONVERSATION,
+        metadata=MemoryMetadata(additional_info={})
+    )
+    entry_5 = MemoryEntry(
+        id="five",
+        content="five usages",
+        memory_type=MemoryType.CONVERSATION,
+        metadata=MemoryMetadata(additional_info={"usage_count": 5})
+    )
+    entry_invalid = MemoryEntry(
+        id="invalid",
+        content="invalid usage",
+        memory_type=MemoryType.CONVERSATION,
+        metadata=MemoryMetadata(additional_info={"usage_count": "invalid"})
+    )
+
+    assert ranker._score_frequency(entry_none) == 0.0
+    assert ranker._score_frequency(entry_5) == 5.0 / (5.0 + 5.0)  # 0.5
+    assert ranker._score_frequency(entry_invalid) == 0.0
+
+    assert abs(ranker.score_entry(entry_5) - 0.5) < 1e-5
+
+
+def test_synonym_mappings() -> None:
+    """Verify command synonyms are mapped to canonical forms and correctly matched."""
+    custom_config = MemoryRankerConfig(
+        recency_weight=0.0,
+        session_weight=0.0,
+        workspace_weight=0.0,
+        entity_weight=0.0,
+        command_weight=1.0,
+    )
+    ranker = MemoryRanker(config=custom_config)
+
+    entry_del = MemoryEntry(
+        id="del",
+        content="delete the voice recording",
+        memory_type=MemoryType.CONVERSATION
+    )
+
+    score_remove = ranker.score_entry(entry_del, query_text="remove app")
+    score_erase = ranker.score_entry(entry_del, query_text="erase file")
+    score_unrelated = ranker.score_entry(entry_del, query_text="hello world")
+
+    assert score_remove == 1.0
+    assert score_erase == 1.0
+    assert score_unrelated == 0.0
+
+
+def test_helper_methods_direct_calls() -> None:
+    """Verify direct calls to all individual private scoring helper methods."""
+    ranker = MemoryRanker()
+    now = datetime.now(timezone.utc)
+    entry = MemoryEntry(
+        id="test_all",
+        content="some project path",
+        memory_type=MemoryType.PROJECT,
+        metadata=MemoryMetadata(
+            created_at=now,
+            additional_info={"session_id": "sess_123", "workspace_path": "some path", "usage_count": 10}
+        )
+    )
+
+    assert ranker._score_recency(entry) > 0.99
+    assert ranker._score_session(entry, "sess_123") == 1.0
+    assert ranker._score_session(entry, "other_sess") == 0.0
+    assert ranker._score_workspace(entry, "some path") == 1.0
+    assert ranker._score_workspace(entry, "other path") == 0.0
+    assert ranker._score_entity_similarity(entry, "project path query") == 2/3
+    assert ranker._score_importance(entry) == 0.8
+    assert ranker._score_frequency(entry) == 10.0 / (10.0 + 5.0)

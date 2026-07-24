@@ -15,14 +15,43 @@ class ContextWindowConfig(BaseModel):
     """Configuration for context windows.
 
     Attributes:
-        short_term_limit: Limit for short-term activity/executions.
-        long_term_limit: Limit for long-term conversations.
-        session_limit: Limit for session conversations.
+        short_term_limit: [DEPRECATED] Limit for short-term executions. Use maximum_execution_history instead.
+        long_term_limit: [DEPRECATED] Limit for long-term conversations. Use maximum_conversations instead.
+        session_limit: [DEPRECATED] Limit for session conversations. Use maximum_conversations instead.
+        token_budget: Total token limit for the context window.
+        reserved_response_tokens: Reserved tokens for model reply generation.
+        safety_margin_tokens: Safety margin buffer tokens.
+        maximum_conversations: Absolute upper limit on conversations.
+        maximum_execution_history: Absolute upper limit on executions.
+        maximum_preferences: Absolute upper limit on preferences.
+        maximum_contexts: Absolute upper limit on session contexts.
+        maximum_workspace_entries: Absolute upper limit on workspace context entries.
+        maximum_memory_events: Absolute upper limit on general memory events.
+        truncation_strategy: Strategy for trimming context when budget is exceeded.
+        prioritization_strategy: Strategy for prioritizing elements.
+        minimum_recent_conversations: Minimum recent conversation turns to protect from pruning.
     """
 
-    short_term_limit: int = Field(default=5, description="Limit for short-term executions")
-    long_term_limit: int = Field(default=10, description="Limit for long-term conversations")
-    session_limit: int = Field(default=5, description="Limit for session conversations")
+    # DEPRECATED fields preserved for backward compatibility
+    short_term_limit: int = Field(default=5, description="[DEPRECATED: Use maximum_execution_history instead] Limit for short-term executions")
+    long_term_limit: int = Field(default=10, description="[DEPRECATED: Use maximum_conversations instead] Limit for long-term conversations")
+    session_limit: int = Field(default=5, description="[DEPRECATED: Use maximum_conversations instead] Limit for session conversations")
+
+    # Production context window parameters
+    token_budget: int = Field(default=4096, description="Total token limit for the context window")
+    reserved_response_tokens: int = Field(default=1024, description="Reserved tokens for model reply generation")
+    safety_margin_tokens: int = Field(default=256, description="Safety margin buffer tokens")
+
+    maximum_conversations: int = Field(default=10, description="Absolute upper limit on conversations")
+    maximum_execution_history: int = Field(default=5, description="Absolute upper limit on executions")
+    maximum_preferences: int = Field(default=20, description="Absolute upper limit on preferences")
+    maximum_contexts: int = Field(default=1, description="Absolute upper limit on session contexts")
+    maximum_workspace_entries: int = Field(default=2, description="Absolute upper limit on workspace context entries")
+    maximum_memory_events: int = Field(default=10, description="Absolute upper limit on general memory events")
+
+    truncation_strategy: str = Field(default="drop_lowest_ranked", description="Strategy for trimming context")
+    prioritization_strategy: str = Field(default="priority_order", description="Strategy for prioritizing elements")
+    minimum_recent_conversations: int = Field(default=2, description="Minimum recent conversation turns to protect from pruning")
 
 
 class ContextBuilder:
@@ -37,6 +66,8 @@ class ContextBuilder:
         memory_service: MemoryService,
         ranker_config: Optional[MemoryRankerConfig] = None,
         window_config: Optional[ContextWindowConfig] = None,
+        window_manager: Optional[Any] = None,
+        coordinator: Optional[Any] = None,
     ) -> None:
         """Initializes the ContextBuilder.
 
@@ -44,10 +75,29 @@ class ContextBuilder:
             memory_service: The active MemoryService instance to query.
             ranker_config: Optional MemoryRankerConfig for ranking memories.
             window_config: Optional ContextWindowConfig for context window limits.
+            window_manager: Optional custom ContextWindowManager instance.
+            coordinator: Optional custom WorkspaceIntelligenceCoordinator instance.
         """
         self.memory_service = memory_service
         self.ranker = MemoryRanker(ranker_config)
         self.window_config = window_config or ContextWindowConfig()
+
+        # Backward compatibility overrides from MemoryRankerConfig
+        ranker_max_conv = self.ranker.config.max_conversations
+        if ranker_max_conv is not None:
+            self.window_config.maximum_conversations = min(self.window_config.maximum_conversations, ranker_max_conv)
+
+        ranker_max_exec = self.ranker.config.max_executions
+        if ranker_max_exec is not None:
+            self.window_config.maximum_execution_history = min(self.window_config.maximum_execution_history, ranker_max_exec)
+
+        # Local import to prevent circular dependencies
+        from memory.manager.context_window_manager import ContextWindowManager
+        self.window_manager = window_manager or ContextWindowManager(self.window_config)
+
+        # Initialize Workspace Intelligence Coordinator
+        from memory.workspace.workspace_coordinator import WorkspaceIntelligenceCoordinator
+        self.coordinator = coordinator or WorkspaceIntelligenceCoordinator()
 
     async def build_context(
         self,
@@ -122,7 +172,7 @@ class ContextBuilder:
         if current_context:
             workspace_path = current_context.metadata.additional_info.get("workspace_path") or current_context.content
 
-        # Score and rank conversations, then apply limit
+        # Score and rank conversations
         if recent_conversations:
             try:
                 recent_conversations = self.ranker.rank_memories(
@@ -131,16 +181,10 @@ class ContextBuilder:
                     session_id=session_id,
                     workspace_path=workspace_path,
                 )
-                limit = self.window_config.session_limit if session_id else self.window_config.long_term_limit
-                if self.ranker.config.max_conversations is not None:
-                    limit = min(limit, self.ranker.config.max_conversations)
-                recent_conversations = recent_conversations[:limit]
             except Exception:
                 logger.warning("Failed to rank recent conversations", exc_info=True)
-                limit = self.window_config.session_limit if session_id else self.window_config.long_term_limit
-                recent_conversations = recent_conversations[:limit]
 
-        # Score and rank executions, then apply limit
+        # Score and rank executions
         if recent_executions:
             try:
                 recent_executions = self.ranker.rank_memories(
@@ -149,14 +193,8 @@ class ContextBuilder:
                     session_id=session_id,
                     workspace_path=workspace_path,
                 )
-                limit = self.window_config.short_term_limit
-                if self.ranker.config.max_executions is not None:
-                    limit = min(limit, self.ranker.config.max_executions)
-                recent_executions = recent_executions[:limit]
             except Exception:
                 logger.warning("Failed to rank recent executions", exc_info=True)
-                limit = self.window_config.short_term_limit
-                recent_executions = recent_executions[:limit]
 
         # 4. Retrieve user preferences
         preferences = []
@@ -183,11 +221,30 @@ class ContextBuilder:
                 )
                 workspace_context = None
 
-        return AssistantContext(
+        # Workspace Intelligence Integration
+        workspace_analysis = None
+        if workspace_path:
+            try:
+                workspace_analysis = await self.coordinator.analyze(workspace_path)
+            except Exception as e:
+                logger.warning(
+                    f"Workspace Intelligence scan failed for path: {workspace_path}",
+                    exc_info=True,
+                )
+
+        # Assemble the raw aggregated context
+        raw_context = AssistantContext(
             recent_conversations=recent_conversations,
             recent_executions=recent_executions,
             current_context=current_context,
             preferences=preferences,
             workspace_context=workspace_context,
+            workspace_analysis=workspace_analysis,
             metadata={"user_id": user_id, "session_id": session_id},
         )
+
+        # Optimize context window before passing to AI Brain (single authority)
+        optimized_context = self.window_manager.optimize_context_window(
+            raw_context, query_text=query_text
+        )
+        return optimized_context

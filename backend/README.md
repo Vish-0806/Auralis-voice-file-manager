@@ -32,7 +32,7 @@ backend/
 │   ├── providers/     # InMemoryProvider and PostgresProvider
 │   ├── preferences/   # Preference Engine
 │   ├── context/       # Short-term Context Memory
-│   ├── workspace/     # Workspace Profiles
+│   ├── workspace/     # Workspace Profiles & Intelligence Subsystem
 │   ├── learning/      # Routine Learning Engine
 │   ├── personalization/ # Personalization Engine
 │   └── coordinator/   # Memory Coordinator
@@ -67,6 +67,7 @@ backend/
 * **MemoryRanker**: Scores retrieved memories using exponential recency decay, session affinity, workspace path matches, entity token overlap, and command verb similarity.
 * **ContextWindowConfig**: Restricts database query limits (`short_term_limit`, `long_term_limit`, `session_limit`) and provides high-performance `session_only` context loading.
 * **ReferenceResolver**: Resolves conversational pronouns (`it`, `them`, `this`, `that`) and relative spatial pointers (`same folder`, `same app`) before goal interpretation.
+* **Workspace Intelligence**: Performs dynamic directory crawling, metadata-indexing, dominant language and build tool detections, Git status parses, and exposes thread-safe cache coordinators.
 
 ### 2.3 Desktop Automation & Workflow Subsystem
 * **Desktop Capability**: Single capability wrapping Application Management (launch/close), Window Management (minimize/maximize/focus/close), System Controls (volume/brightness/power/network), Clipboard automation (read/write/clear), and Screenshot/Screen recording services.
@@ -113,4 +114,4 @@ Execute the entire Pytest suite:
 ```bash
 pytest
 ```
-Currently, the backend contains **478 unit and integration tests** verifying core flows, file operations, state transitions, speech, memory retrieval, brain orchestration, memory ranking, context windows, reference resolution, and integration pipeline steps.
+Currently, the backend contains **517 unit and integration tests** verifying core flows, file operations, state transitions, speech, memory retrieval, brain orchestration, memory ranking, context windows, reference resolution, workspace intelligence, and integration pipeline steps.
