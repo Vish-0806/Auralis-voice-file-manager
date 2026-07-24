@@ -161,6 +161,7 @@ class ContextWindowManager:
                 current_context=final_current_context,
                 preferences=final_preferences,
                 workspace_context=final_workspace_context,
+                workspace_analysis=context.workspace_analysis,
                 metadata=context.metadata,
             )
 
@@ -235,5 +236,6 @@ class ContextWindowManager:
             current_context=final_current_context,
             preferences=final_preferences,
             workspace_context=final_workspace_context,
+            workspace_analysis=context.workspace_analysis,
             metadata=context.metadata,
         )

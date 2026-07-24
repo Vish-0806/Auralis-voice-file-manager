@@ -338,3 +338,94 @@ async def test_context_window_session_only(mock_in_memory_service) -> None:
     # Executions and preferences must be completely skipped/empty
     assert context.recent_executions == []
     assert context.preferences == []
+
+
+@pytest.mark.anyio
+async def test_context_builder_workspace_attached(mock_in_memory_service) -> None:
+    """Verify that workspace_analysis is compiled and attached when active workspace path is available."""
+    from unittest.mock import MagicMock, AsyncMock
+    from memory.workspace import WorkspaceAnalysis
+
+    service = mock_in_memory_service
+    unique = "_attached"
+
+    # Seed current context with workspace_path in metadata
+    await service.save(MemoryEntry(
+        id=f"sess_active{unique}",
+        content="/home/active_workspace",
+        memory_type=MemoryType.SESSION,
+        metadata=MemoryMetadata(additional_info={"user_id": 789, "workspace_path": "/home/active_workspace"})
+    ))
+
+    # Mock Coordinator
+    mock_coord = MagicMock()
+    mock_coord.analyze = AsyncMock()
+
+    analysis_stub = WorkspaceAnalysis(
+        workspace_path="/home/active_workspace",
+        project_name="active_workspace",
+        project_type="python",
+        repository_type="git",
+        dominant_language="Python",
+        language_statistics={"Python": 1.0},
+        language_counts={"Python": 1},
+        build_system="pip",
+        recommended_build_command="pip install -r requirements.txt",
+        git_branch="main",
+        git_remote_available=True,
+        git_dirty=False,
+        git_has_unpushed_commits=False,
+        total_files=1,
+        total_directories=0,
+        maximum_depth=1,
+        total_size=100,
+        last_indexed=datetime.now(timezone.utc),
+        analysis_timestamp=datetime.now(timezone.utc),
+    )
+    mock_coord.analyze.return_value = analysis_stub
+
+    builder = ContextBuilder(service, coordinator=mock_coord)
+    context = await builder.build_context(user_id=789)
+
+    assert context.workspace_analysis == analysis_stub
+    mock_coord.analyze.assert_called_once_with("/home/active_workspace")
+
+
+@pytest.mark.anyio
+async def test_context_builder_workspace_absent(mock_in_memory_service) -> None:
+    """Verify that workspace_analysis is None when active workspace path is not available."""
+    from unittest.mock import MagicMock
+    service = mock_in_memory_service
+
+    mock_coord = MagicMock()
+    builder = ContextBuilder(service, coordinator=mock_coord)
+    context = await builder.build_context(user_id=789)
+
+    assert context.workspace_analysis is None
+    mock_coord.analyze.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_context_builder_workspace_failure(mock_in_memory_service) -> None:
+    """Verify that Workspace Intelligence exceptions do not block context aggregation."""
+    from unittest.mock import MagicMock, AsyncMock
+    service = mock_in_memory_service
+    unique = "_fail"
+
+    await service.save(MemoryEntry(
+        id=f"sess_active{unique}",
+        content="/home/err_workspace",
+        memory_type=MemoryType.SESSION,
+        metadata=MemoryMetadata(additional_info={"user_id": 789, "workspace_path": "/home/err_workspace"})
+    ))
+
+    # Mock Coordinator to raise exception
+    mock_coord = MagicMock()
+    mock_coord.analyze = AsyncMock()
+    mock_coord.analyze.side_effect = RuntimeError("Indexing timeout")
+
+    builder = ContextBuilder(service, coordinator=mock_coord)
+    context = await builder.build_context(user_id=789)
+
+    assert context.workspace_analysis is None
+

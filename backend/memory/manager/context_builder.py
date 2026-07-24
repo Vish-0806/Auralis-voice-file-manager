@@ -67,6 +67,7 @@ class ContextBuilder:
         ranker_config: Optional[MemoryRankerConfig] = None,
         window_config: Optional[ContextWindowConfig] = None,
         window_manager: Optional[Any] = None,
+        coordinator: Optional[Any] = None,
     ) -> None:
         """Initializes the ContextBuilder.
 
@@ -75,6 +76,7 @@ class ContextBuilder:
             ranker_config: Optional MemoryRankerConfig for ranking memories.
             window_config: Optional ContextWindowConfig for context window limits.
             window_manager: Optional custom ContextWindowManager instance.
+            coordinator: Optional custom WorkspaceIntelligenceCoordinator instance.
         """
         self.memory_service = memory_service
         self.ranker = MemoryRanker(ranker_config)
@@ -92,6 +94,10 @@ class ContextBuilder:
         # Local import to prevent circular dependencies
         from memory.manager.context_window_manager import ContextWindowManager
         self.window_manager = window_manager or ContextWindowManager(self.window_config)
+
+        # Initialize Workspace Intelligence Coordinator
+        from memory.workspace.workspace_coordinator import WorkspaceIntelligenceCoordinator
+        self.coordinator = coordinator or WorkspaceIntelligenceCoordinator()
 
     async def build_context(
         self,
@@ -215,6 +221,17 @@ class ContextBuilder:
                 )
                 workspace_context = None
 
+        # Workspace Intelligence Integration
+        workspace_analysis = None
+        if workspace_path:
+            try:
+                workspace_analysis = await self.coordinator.analyze(workspace_path)
+            except Exception as e:
+                logger.warning(
+                    f"Workspace Intelligence scan failed for path: {workspace_path}",
+                    exc_info=True,
+                )
+
         # Assemble the raw aggregated context
         raw_context = AssistantContext(
             recent_conversations=recent_conversations,
@@ -222,6 +239,7 @@ class ContextBuilder:
             current_context=current_context,
             preferences=preferences,
             workspace_context=workspace_context,
+            workspace_analysis=workspace_analysis,
             metadata={"user_id": user_id, "session_id": session_id},
         )
 

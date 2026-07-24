@@ -1,10 +1,12 @@
+from __future__ import annotations
 """Workspace profile manager implementation."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from memory.models.domain_models import WorkspaceProfileDomain
-from memory.repository.workspace_repository import WorkspaceRepository
+if TYPE_CHECKING:
+    from memory.models.domain_models import WorkspaceProfileDomain
+    from memory.repository.workspace_repository import WorkspaceRepository
 from memory.workspace.workspace_validator import WorkspaceValidator
 from memory.workspace.workspace_models import (
     WORKSPACE_TEMPLATES,
@@ -71,6 +73,7 @@ class WorkspaceManager:
             "Creating workspace profile",
             extra={"user_id": user_id, "profile_name": name, "path": path},
         )
+        from memory.models.domain_models import WorkspaceProfileDomain
         domain = WorkspaceProfileDomain(
             user_id=user_id,
             name=name,

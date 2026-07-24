@@ -9,6 +9,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
+from memory.workspace.workspace_analysis import WorkspaceAnalysis
 
 
 class MemoryType(str, Enum):
@@ -193,5 +194,5 @@ class AssistantContext(BaseModel):
     current_context: Optional[MemoryEntry] = None
     preferences: List[MemoryEntry] = Field(default_factory=list)
     workspace_context: Optional[MemoryEntry] = None
+    workspace_analysis: Optional[WorkspaceAnalysis] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
-

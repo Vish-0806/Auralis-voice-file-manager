@@ -1,9 +1,11 @@
+from __future__ import annotations
 """User Workspace Service public interface module."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from memory.models.domain_models import WorkspaceProfileDomain
+if TYPE_CHECKING:
+    from memory.models.domain_models import WorkspaceProfileDomain
 from memory.workspace.workspace_manager import WorkspaceManager
 from memory.workspace.workspace_launcher import WorkspaceLauncher
 from memory.workspace.workspace_snapshot import WorkspaceSnapshot
