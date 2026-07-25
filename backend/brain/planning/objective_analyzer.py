@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import logging
 from brain.reasoning.models import Objective, ReasoningResult
+from .objective_graph import ObjectiveGraph
 
 
 class ObjectiveAnalyzer:
-    """Extracts high-level execution objectives from ReasoningResult structures."""
+    """Extracts high-level execution objectives from ReasoningResult or ObjectiveGraph structures."""
 
     def __init__(self, logger: logging.Logger | None = None) -> None:
         """Initializes the ObjectiveAnalyzer.
@@ -17,17 +18,24 @@ class ObjectiveAnalyzer:
         """
         self._logger = logger or logging.getLogger(__name__)
 
-    def analyze(self, reasoning: ReasoningResult) -> Objective:
-        """Extracts the Objective from a ReasoningResult.
+    def analyze(self, target: ObjectiveGraph | ReasoningResult) -> Objective:
+        """Extracts the Objective from a ReasoningResult or ObjectiveGraph.
 
         Args:
-            reasoning: The structured reasoning from the Reasoning Engine.
+            target: The ObjectiveGraph or ReasoningResult source.
 
         Returns:
             The structured Objective.
         """
+        if isinstance(target, ReasoningResult):
+            self._logger.info(
+                "Extracting user objective from legacy ReasoningResult",
+                extra={"goal_name": target.goal_name, "objective_title": target.objective.title},
+            )
+            return target.objective
+
         self._logger.info(
-            "Extracting user objective",
-            extra={"goal_name": reasoning.goal_name, "objective_title": reasoning.objective.title},
+            "Extracting user objective from ObjectiveGraph root node",
+            extra={"root_id": target.root_id},
         )
-        return reasoning.objective
+        return target.nodes[target.root_id].objective

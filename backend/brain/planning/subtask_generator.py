@@ -7,10 +7,11 @@ import os
 from brain.reasoning.models import ReasoningResult
 from core.intents import Intent
 from .models import ExecutionStep
+from .objective_graph import ObjectiveGraph, ObjectiveNode
 
 
 class SubtaskGenerator:
-    """Converts reasoning results into a list of required ExecutionSteps."""
+    """Converts reasoning results or objective graphs into lists of required ExecutionSteps."""
 
     def __init__(self, logger: logging.Logger | None = None) -> None:
         """Initializes SubtaskGenerator.
@@ -20,15 +21,65 @@ class SubtaskGenerator:
         """
         self._logger = logger or logging.getLogger(__name__)
 
-    def generate_steps(self, reasoning: ReasoningResult) -> list[ExecutionStep]:
-        """Converts reasoning results and constraints into execution steps.
+    def generate_steps(self, target: ObjectiveGraph | ReasoningResult) -> list[ExecutionStep]:
+        """Converts reasoning result or objective graph into execution steps.
 
         Args:
-            reasoning: ReasoningResult structure from the reasoning engine.
+            target: The ObjectiveGraph or ReasoningResult input source.
 
         Returns:
             A list of ExecutionStep structures.
         """
+        if isinstance(target, ReasoningResult):
+            self._logger.info("Generating steps via legacy ReasoningResult path")
+            return self._generate_legacy_steps(target)
+
+        self._logger.info("Generating steps via ObjectiveGraph path")
+        steps: list[ExecutionStep] = []
+        for node_id, node in target.nodes.items():
+            step = self._generate_step_from_node(node)
+            steps.append(step)
+        return steps
+
+    def _generate_step_from_node(self, node: ObjectiveNode) -> ExecutionStep:
+        node_goal = node.goal_name.upper()
+        step_id = node.id
+        target_name = node.objective.target
+        parameters = node.parameters.copy()
+
+        if node_goal == "PREP_WIFI":
+            return ExecutionStep(step_id=step_id, intent=Intent.ENABLE_WIFI, parameters=parameters)
+        elif node_goal == "PREP_CREATE_DOWNLOADS":
+            downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
+            return ExecutionStep(step_id=step_id, intent=Intent.CREATE_FOLDER, target=downloads_path, parameters=parameters)
+        elif node_goal == "LAUNCH_VSCODE":
+            return ExecutionStep(step_id=step_id, intent=Intent.OPEN_APPLICATION, target="VS Code", parameters=parameters)
+        elif node_goal == "LAUNCH_TERMINAL":
+            return ExecutionStep(step_id=step_id, intent=Intent.OPEN_APPLICATION, target="Terminal", can_parallel=True, parameters=parameters)
+        elif node_goal == "SET_VOLUME":
+            return ExecutionStep(step_id=step_id, intent=Intent.SET_VOLUME, target="30", can_parallel=True, parameters=parameters)
+        elif node_goal == "LAUNCH_BROWSER":
+            return ExecutionStep(step_id=step_id, intent=Intent.OPEN_APPLICATION, target="Microsoft Edge", parameters=parameters)
+        elif node_goal == "MUTE":
+            return ExecutionStep(step_id=step_id, intent=Intent.MUTE, can_parallel=True, parameters=parameters)
+        elif node_goal == "LAUNCH_NOTEPAD":
+            return ExecutionStep(step_id=step_id, intent=Intent.OPEN_APPLICATION, target="Notepad", parameters=parameters)
+        elif node_goal == "SHOW_DESKTOP":
+            return ExecutionStep(step_id=step_id, intent=Intent.SHOW_DESKTOP, parameters=parameters)
+        elif node_goal == "ORGANIZE_DOWNLOADS":
+            return ExecutionStep(step_id=step_id, intent=Intent.ORGANIZE_FOLDER, target="Downloads", parameters=parameters)
+        elif node_goal == "CLOSE_CHROME":
+            return ExecutionStep(step_id=step_id, intent=Intent.CLOSE_APPLICATION, target="Chrome", parameters=parameters)
+        elif node_goal == "CLOSE_VSCODE":
+            return ExecutionStep(step_id=step_id, intent=Intent.CLOSE_APPLICATION, target="VS Code", can_parallel=True, parameters=parameters)
+        elif node_goal == "OPEN_APPLICATION":
+            return ExecutionStep(step_id=step_id, intent=Intent.OPEN_APPLICATION, target=target_name, parameters=parameters)
+        elif node_goal == "LOCK_COMPUTER":
+            return ExecutionStep(step_id=step_id, intent=Intent.LOCK_PC, parameters=parameters)
+        else:
+            return ExecutionStep(step_id=step_id, intent=Intent.UNKNOWN, target=target_name, parameters=parameters)
+
+    def _generate_legacy_steps(self, reasoning: ReasoningResult) -> list[ExecutionStep]:
         goal_name = reasoning.goal_name.upper()
         objective = reasoning.objective
         steps: list[ExecutionStep] = []
@@ -73,10 +124,6 @@ class SubtaskGenerator:
         else:
             steps.extend(self._generate_fallback(objective.target))
 
-        self._logger.debug(
-            "Generated execution steps",
-            extra={"goal_name": goal_name, "steps_count": len(steps)},
-        )
         return steps
 
     def _generate_start_coding(self) -> list[ExecutionStep]:

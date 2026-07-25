@@ -11,6 +11,10 @@ from .objective_analyzer import ObjectiveAnalyzer
 from .subtask_generator import SubtaskGenerator
 from .dependency_builder import DependencyBuilder
 from .workflow_compiler import WorkflowCompiler
+from .objective_graph import ObjectiveGraph, ObjectiveNode
+from .decomposition_rules import DecompositionRules
+from .decomposition_validator import DecompositionValidator
+from .goal_decomposer import GoalDecomposer
 
 __all__ = [
     "ExecutionStep",
@@ -24,4 +28,9 @@ __all__ = [
     "SubtaskGenerator",
     "DependencyBuilder",
     "WorkflowCompiler",
+    "ObjectiveGraph",
+    "ObjectiveNode",
+    "DecompositionRules",
+    "DecompositionValidator",
+    "GoalDecomposer",
 ]

@@ -14,6 +14,7 @@ from .models import ExecutionSequence
 from .plan_builder import PlanBuilder
 from .dependency_resolver import DependencyResolver
 from .plan_optimizer import PlanOptimizer
+from .goal_decomposer import GoalDecomposer
 from .objective_analyzer import ObjectiveAnalyzer
 from .subtask_generator import SubtaskGenerator
 from .dependency_builder import DependencyBuilder
@@ -24,7 +25,7 @@ class TaskPlanner:
     """Converts a ReasoningResult into an optimized, executable ExecutionPlan.
 
     Orchestrates the modular planning sequence:
-    ObjectiveAnalyzer -> SubtaskGenerator -> DependencyBuilder -> DependencyResolver -> PlanOptimizer -> WorkflowCompiler.
+    GoalDecomposer -> ObjectiveGraph -> ObjectiveAnalyzer -> SubtaskGenerator -> DependencyBuilder -> DependencyResolver -> PlanOptimizer -> WorkflowCompiler.
     """
 
     def __init__(
@@ -36,6 +37,7 @@ class TaskPlanner:
         subtask_generator: SubtaskGenerator | None = None,
         dependency_builder: DependencyBuilder | None = None,
         workflow_compiler: WorkflowCompiler | None = None,
+        goal_decomposer: GoalDecomposer | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """Initializes the TaskPlanner.
@@ -50,6 +52,7 @@ class TaskPlanner:
             subtask_generator: Subtask generator component.
             dependency_builder: Dependency builder component.
             workflow_compiler: Workflow compiler component.
+            goal_decomposer: Goal decomposer component.
             logger: Optional custom logger for planner diagnostics.
         """
         self._logger = logger or logging.getLogger(__name__)
@@ -57,6 +60,7 @@ class TaskPlanner:
         # Backward compatibility fallback
         self._plan_builder = plan_builder
 
+        self._goal_decomposer = goal_decomposer or GoalDecomposer(logger=self._logger)
         self._objective_analyzer = objective_analyzer or ObjectiveAnalyzer(logger=self._logger)
         self._subtask_generator = subtask_generator or SubtaskGenerator(logger=self._logger)
         self._dependency_builder = dependency_builder or DependencyBuilder(logger=self._logger)
@@ -79,22 +83,25 @@ class TaskPlanner:
         """
         self._logger.info("Planning execution steps", extra={"goal_name": reasoning.goal_name})
 
-        # 1. Objective Analyzer
-        _ = self._objective_analyzer.analyze(reasoning)
+        # 1. Goal Decomposer (produces ObjectiveGraph)
+        graph = self._goal_decomposer.decompose(reasoning)
 
-        # 2 & 3. Generate raw sequence
+        # 2. Objective Analyzer
+        _ = self._objective_analyzer.analyze(graph)
+
+        # 3 & 4. Generate raw sequence
         if self._plan_builder:
-            self._logger.debug("Delegating sequence generation to custom plan_builder fallback")
+            self._logger.debug("Delegating sequence generation to legacy plan_builder fallback")
             raw_sequence = self._plan_builder.build_steps(reasoning)
         else:
-            steps = self._subtask_generator.generate_steps(reasoning)
-            dependencies = self._dependency_builder.build_dependencies(reasoning, steps)
+            steps = self._subtask_generator.generate_steps(graph)
+            dependencies = self._dependency_builder.build_dependencies(graph, steps)
             raw_sequence = ExecutionSequence(steps=steps, dependencies=dependencies)
 
-        # 4. Dependency Resolver (Topological sort)
+        # 5. Dependency Resolver (Topological sort)
         ordered_steps = self._dependency_resolver.resolve_order(raw_sequence)
 
-        # 5. Plan Optimizer
+        # 6. Plan Optimizer
         optimized_steps = self._plan_optimizer.optimize_plan(ordered_steps)
 
         if not optimized_steps:
@@ -117,7 +124,7 @@ class TaskPlanner:
                 confidence=confidence,
             )
 
-        # 6. Workflow Compiler
+        # 7. Workflow Compiler
         self._logger.info(
             "Dynamic plan has multiple steps, compiling to workflow",
             extra={"steps_count": len(optimized_steps)},

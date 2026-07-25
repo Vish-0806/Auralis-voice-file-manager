@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from brain.reasoning.models import ReasoningResult
 from .models import ExecutionDependency, ExecutionStep
+from .objective_graph import ObjectiveGraph
 
 
 class DependencyBuilder:
@@ -19,17 +20,36 @@ class DependencyBuilder:
         self._logger = logger or logging.getLogger(__name__)
 
     def build_dependencies(
-        self, reasoning: ReasoningResult, steps: list[ExecutionStep]
+        self, target: ObjectiveGraph | ReasoningResult, steps: list[ExecutionStep]
     ) -> list[ExecutionDependency]:
         """Formulates dependency matrices for execution sequences.
 
         Args:
-            reasoning: ReasoningResult detailing goal types and attributes.
+            target: The ObjectiveGraph or ReasoningResult source context.
             steps: List of generated execution steps.
 
         Returns:
             A list of ExecutionDependency mappings.
         """
+        if isinstance(target, ReasoningResult):
+            self._logger.info("Building dependencies via legacy ReasoningResult path")
+            return self._legacy_build_dependencies(target, steps)
+
+        self._logger.info("Building dependencies via ObjectiveGraph path")
+        dependencies: list[ExecutionDependency] = []
+        for node_id, node in target.nodes.items():
+            if node.dependencies:
+                dependencies.append(
+                    ExecutionDependency(
+                        step_id=node_id,
+                        depends_on=node.dependencies.copy(),
+                    )
+                )
+        return dependencies
+
+    def _legacy_build_dependencies(
+        self, reasoning: ReasoningResult, steps: list[ExecutionStep]
+    ) -> list[ExecutionDependency]:
         goal_name = reasoning.goal_name.upper()
         dependencies: list[ExecutionDependency] = []
 
@@ -76,8 +96,4 @@ class DependencyBuilder:
                 )
             )
 
-        self._logger.debug(
-            "Compiled dependencies",
-            extra={"goal_name": goal_name, "dependencies_count": len(dependencies)},
-        )
         return dependencies
