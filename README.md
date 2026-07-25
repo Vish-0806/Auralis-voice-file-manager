@@ -91,6 +91,20 @@ Auralis Version 1.3.0 implements the complete **Workspace Intelligence Subsystem
 
 ---
 
+## Intelligent Planning & Reasoning Engine (v1.4.0)
+
+Auralis Version 1.4.0 implements the complete Phase 6 **Intelligent Planning & Reasoning Engine** including **Goal Decomposition**, **Workflow Library**, **Workflow Matcher**, **Workflow Composer**, and **Plan Optimizer**.
+
+### Key Additions:
+1. **Goal Decomposition Engine**: Created `GoalDecomposer`, rules-driven `DecompositionRules`, and DFS cycle-safe `DecompositionValidator` to map Reasoning results into validated, nested `ObjectiveGraph` models.
+2. **Workflow Library**: Created `WorkflowLibrary` wrapping `WorkflowRegistry` to dynamically register and index workflows with rich metadata, tags, and interface signatures.
+3. **Workflow Matcher**: Created deterministic `WorkflowMatcher` scoring matches by exact goal, name, intent, tags, and signatures, ranking results by normalized confidence values.
+4. **Workflow Composer**: Created `WorkflowComposer` merging library workflows and dynamic steps into unified, cycle-safe sequences while resolving parameters, exclusive actions, and ordering cycles.
+5. **Plan Optimizer**: Created production-grade `PlanOptimizer` executing deduplications, redundant preparation eliminations, parallel depth groupings, and time-reduction metrics.
+6. **Integrated Validation**: Added a comprehensive integration test suite verifying that all planning components participate correctly in the pipeline.
+
+---
+
 ## Architecture
 
 Auralis uses a modular architecture that separates voice capture, natural language understanding, memory context building, reference resolution, execution planning, and OS operations:
@@ -104,7 +118,17 @@ graph TD
     RefResolver -->|ResolvedRequest| GoalInterpreter[Goal Interpreter]
     GoalInterpreter -->|Goal| ReasoningEngine[Reasoning Engine]
     ReasoningEngine -->|Objectives| TaskPlanner[Dynamic Task Planner]
-    TaskPlanner -->|Execution Plan| Dispatcher[Action Dispatcher]
+    
+    subgraph Planning Engine
+        TaskPlanner --> GoalDecomposer[Goal Decomposer]
+        GoalDecomposer --> ObjectiveGraph[Objective Graph]
+        ObjectiveGraph --> WorkflowMatcher[Workflow Matcher]
+        WorkflowMatcher --> WorkflowComposer[Workflow Composer]
+        WorkflowComposer --> PlanOptimizer[Plan Optimizer]
+        PlanOptimizer --> WorkflowCompiler[Workflow Compiler]
+    end
+    
+    WorkflowCompiler -->|Execution Plan| Dispatcher[Action Dispatcher]
     
     Dispatcher --> FileIntel[File Intelligence]
     Dispatcher --> DesktopControl[Desktop Control]
@@ -158,7 +182,7 @@ Auralis/
 │   ├── core/                  # Assistant boundary, intent schemas, planner, and dispatcher
 │   ├── memory/                # Tiered Memory System (PostgresProvider, ContextBuilder, Ranker, Repositories)
 │   ├── voice/                 # Modular Voice Engine subsystems
-│   ├── tests/                 # 478 unit & integration tests
+│   ├── tests/                 # 541 unit & integration tests
 │   ├── main.py                # Backend entry point
 │   └── requirements.txt       # Python package dependencies
 ├── frontend/                  # Vite + React Client App
@@ -180,6 +204,7 @@ Track the development stages of Auralis:
 * [x] **Tiered Memory Platform (Phase 6):** Preference Engine, Context Memory, Workspace Profiles, Routine Learning n-gram mining, Personalization decider, and unified Memory Coordinator.
 * [x] **Advanced Memory Retrieval & Context Construction (Phase 4):** PostgreSQL ORM Repositories, `ContextBuilder`, `BrainController` context integration, `ReferenceResolver`, `MemoryRanker`, and `ContextWindowConfig`.
 * [x] **Workspace Intelligence & Awareness (Phase 5):** Asynchronous indexers, project detectors, thread-safe caching coordinators, context construction, and brain reasoning pipelines.
+* [x] **Intelligent Planning & Reasoning Engine (Phase 6):** Goal decomposition, workflow libraries matching and compositions, parallel optimizations, compiler registrants, and integrated test pipelines.
 * [ ] **Future Objectives:**
   * [ ] Document intelligence parser using local PyMuPDF extraction.
   * [ ] Plugin Marketplace for community extensions.
@@ -197,7 +222,7 @@ python -m venv venv
 # Install dependencies
 pip install -r backend/requirements.txt
 
-# Run complete test suite (517 tests)
+# Run complete test suite (541 tests)
 pytest backend/tests
 
 # Launch backend server
