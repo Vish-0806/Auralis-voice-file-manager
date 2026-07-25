@@ -21,6 +21,7 @@ from .dependency_builder import DependencyBuilder
 from .workflow_compiler import WorkflowCompiler
 from .workflow_library import WorkflowLibrary
 from .workflow_matcher import WorkflowMatcher
+from .workflow_composer import WorkflowComposer
 
 
 class TaskPlanner:
@@ -42,6 +43,7 @@ class TaskPlanner:
         goal_decomposer: GoalDecomposer | None = None,
         workflow_library: WorkflowLibrary | None = None,
         workflow_matcher: WorkflowMatcher | None = None,
+        workflow_composer: WorkflowComposer | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """Initializes the TaskPlanner.
@@ -59,6 +61,7 @@ class TaskPlanner:
             goal_decomposer: Goal decomposer component.
             workflow_library: Workflow library component.
             workflow_matcher: Workflow matcher component.
+            workflow_composer: Workflow composer component.
             logger: Optional custom logger for planner diagnostics.
         """
         self._logger = logger or logging.getLogger(__name__)
@@ -75,6 +78,9 @@ class TaskPlanner:
         self._workflow_compiler = workflow_compiler or WorkflowCompiler(logger=self._logger)
         self._workflow_library = workflow_library or WorkflowLibrary(logger=self._logger)
         self._workflow_matcher = workflow_matcher or WorkflowMatcher(logger=self._logger)
+        self._workflow_composer = workflow_composer or WorkflowComposer(
+            dependency_resolver=self._dependency_resolver, logger=self._logger
+        )
 
     def plan(
         self, reasoning: ReasoningResult, confidence: float = 1.0, context: Optional[AssistantContext] = None
