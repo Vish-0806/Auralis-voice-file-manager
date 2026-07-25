@@ -19,6 +19,8 @@ from .objective_analyzer import ObjectiveAnalyzer
 from .subtask_generator import SubtaskGenerator
 from .dependency_builder import DependencyBuilder
 from .workflow_compiler import WorkflowCompiler
+from .workflow_library import WorkflowLibrary
+from .workflow_matcher import WorkflowMatcher
 
 
 class TaskPlanner:
@@ -38,6 +40,8 @@ class TaskPlanner:
         dependency_builder: DependencyBuilder | None = None,
         workflow_compiler: WorkflowCompiler | None = None,
         goal_decomposer: GoalDecomposer | None = None,
+        workflow_library: WorkflowLibrary | None = None,
+        workflow_matcher: WorkflowMatcher | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """Initializes the TaskPlanner.
@@ -53,6 +57,8 @@ class TaskPlanner:
             dependency_builder: Dependency builder component.
             workflow_compiler: Workflow compiler component.
             goal_decomposer: Goal decomposer component.
+            workflow_library: Workflow library component.
+            workflow_matcher: Workflow matcher component.
             logger: Optional custom logger for planner diagnostics.
         """
         self._logger = logger or logging.getLogger(__name__)
@@ -67,6 +73,8 @@ class TaskPlanner:
         self._dependency_resolver = dependency_resolver or DependencyResolver(logger=self._logger)
         self._plan_optimizer = plan_optimizer or PlanOptimizer(logger=self._logger)
         self._workflow_compiler = workflow_compiler or WorkflowCompiler(logger=self._logger)
+        self._workflow_library = workflow_library or WorkflowLibrary(logger=self._logger)
+        self._workflow_matcher = workflow_matcher or WorkflowMatcher(logger=self._logger)
 
     def plan(
         self, reasoning: ReasoningResult, confidence: float = 1.0, context: Optional[AssistantContext] = None

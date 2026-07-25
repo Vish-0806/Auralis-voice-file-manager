@@ -16,6 +16,7 @@ from .decomposition_rules import DecompositionRules
 from .decomposition_validator import DecompositionValidator
 from .goal_decomposer import GoalDecomposer
 from .workflow_library import WorkflowLibrary, WorkflowMetadata, WorkflowSignature, WorkflowTag
+from .workflow_matcher import WorkflowMatcher, WorkflowMatch, WorkflowMatchScore, WorkflowMatchQuery
 
 __all__ = [
     "ExecutionStep",
@@ -38,4 +39,8 @@ __all__ = [
     "WorkflowMetadata",
     "WorkflowSignature",
     "WorkflowTag",
+    "WorkflowMatcher",
+    "WorkflowMatch",
+    "WorkflowMatchScore",
+    "WorkflowMatchQuery",
 ]
