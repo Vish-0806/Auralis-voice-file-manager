@@ -7,6 +7,10 @@ from .models import ExecutionStep, ExecutionDependency, ExecutionSequence
 from .plan_builder import PlanBuilder
 from .plan_optimizer import PlanOptimizer
 from .task_planner import TaskPlanner
+from .objective_analyzer import ObjectiveAnalyzer
+from .subtask_generator import SubtaskGenerator
+from .dependency_builder import DependencyBuilder
+from .workflow_compiler import WorkflowCompiler
 
 __all__ = [
     "ExecutionStep",
@@ -16,4 +20,8 @@ __all__ = [
     "DependencyResolver",
     "PlanOptimizer",
     "TaskPlanner",
+    "ObjectiveAnalyzer",
+    "SubtaskGenerator",
+    "DependencyBuilder",
+    "WorkflowCompiler",
 ]

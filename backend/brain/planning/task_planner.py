@@ -3,45 +3,66 @@
 from __future__ import annotations
 
 import logging
-import uuid
-from typing import Final, Optional
-# pyrefly: ignore [missing-import]
+from typing import Optional
 from memory import AssistantContext
 
-# pyrefly: ignore [missing-import]
 from brain.reasoning.models import ReasoningResult
 from core.models import ExecutionPlan as CoreExecutionPlan
 from core.intents import Intent
-from automation.workflow.models import WorkflowDefinition, WorkflowStep
-from automation.workflow.workflow_registry import WorkflowRegistry
 
+from .models import ExecutionSequence
 from .plan_builder import PlanBuilder
 from .dependency_resolver import DependencyResolver
 from .plan_optimizer import PlanOptimizer
+from .objective_analyzer import ObjectiveAnalyzer
+from .subtask_generator import SubtaskGenerator
+from .dependency_builder import DependencyBuilder
+from .workflow_compiler import WorkflowCompiler
 
 
 class TaskPlanner:
-    """Converts a ReasoningResult into an optimized, executable ExecutionPlan."""
+    """Converts a ReasoningResult into an optimized, executable ExecutionPlan.
+
+    Orchestrates the modular planning sequence:
+    ObjectiveAnalyzer -> SubtaskGenerator -> DependencyBuilder -> DependencyResolver -> PlanOptimizer -> WorkflowCompiler.
+    """
 
     def __init__(
         self,
         plan_builder: PlanBuilder | None = None,
         dependency_resolver: DependencyResolver | None = None,
         plan_optimizer: PlanOptimizer | None = None,
+        objective_analyzer: ObjectiveAnalyzer | None = None,
+        subtask_generator: SubtaskGenerator | None = None,
+        dependency_builder: DependencyBuilder | None = None,
+        workflow_compiler: WorkflowCompiler | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """Initializes the TaskPlanner.
 
+        Maintains backward compatibility if plan_builder is passed.
+
         Args:
-            plan_builder: Dynamic step builder.
+            plan_builder: Legacy/custom step builder (for backward compatibility).
             dependency_resolver: Topological sorting resolver.
             plan_optimizer: Deduplication and parallelizer optimizer.
+            objective_analyzer: Objective analyzer component.
+            subtask_generator: Subtask generator component.
+            dependency_builder: Dependency builder component.
+            workflow_compiler: Workflow compiler component.
             logger: Optional custom logger for planner diagnostics.
         """
         self._logger = logger or logging.getLogger(__name__)
-        self._plan_builder = plan_builder or PlanBuilder(logger=self._logger)
+
+        # Backward compatibility fallback
+        self._plan_builder = plan_builder
+
+        self._objective_analyzer = objective_analyzer or ObjectiveAnalyzer(logger=self._logger)
+        self._subtask_generator = subtask_generator or SubtaskGenerator(logger=self._logger)
+        self._dependency_builder = dependency_builder or DependencyBuilder(logger=self._logger)
         self._dependency_resolver = dependency_resolver or DependencyResolver(logger=self._logger)
         self._plan_optimizer = plan_optimizer or PlanOptimizer(logger=self._logger)
+        self._workflow_compiler = workflow_compiler or WorkflowCompiler(logger=self._logger)
 
     def plan(
         self, reasoning: ReasoningResult, confidence: float = 1.0, context: Optional[AssistantContext] = None
@@ -58,8 +79,22 @@ class TaskPlanner:
         """
         self._logger.info("Planning execution steps", extra={"goal_name": reasoning.goal_name})
 
-        raw_sequence = self._plan_builder.build_steps(reasoning)
+        # 1. Objective Analyzer
+        _ = self._objective_analyzer.analyze(reasoning)
+
+        # 2 & 3. Generate raw sequence
+        if self._plan_builder:
+            self._logger.debug("Delegating sequence generation to custom plan_builder fallback")
+            raw_sequence = self._plan_builder.build_steps(reasoning)
+        else:
+            steps = self._subtask_generator.generate_steps(reasoning)
+            dependencies = self._dependency_builder.build_dependencies(reasoning, steps)
+            raw_sequence = ExecutionSequence(steps=steps, dependencies=dependencies)
+
+        # 4. Dependency Resolver (Topological sort)
         ordered_steps = self._dependency_resolver.resolve_order(raw_sequence)
+
+        # 5. Plan Optimizer
         optimized_steps = self._plan_optimizer.optimize_plan(ordered_steps)
 
         if not optimized_steps:
@@ -82,56 +117,9 @@ class TaskPlanner:
                 confidence=confidence,
             )
 
+        # 6. Workflow Compiler
         self._logger.info(
             "Dynamic plan has multiple steps, compiling to workflow",
             extra={"steps_count": len(optimized_steps)},
         )
-
-        wf_steps = [
-            WorkflowStep(
-                intent=step.intent,
-                target=step.target,
-                parameters=step.parameters,
-            )
-            for step in optimized_steps
-        ]
-
-        # Use canonical workflow name if it maps to a default built-in workflow
-        goal_to_workflow_name: Final[dict[str, str]] = {
-            "START_CODING": "Start Coding",
-            "STUDY": "Study Mode",
-            "MEETING": "Meeting Mode",
-            "CLEAN_WORKSPACE": "Clean Workspace",
-        }
-        workflow_name = goal_to_workflow_name.get(
-            reasoning.goal_name.upper(),
-            f"DynamicWorkflow_{uuid.uuid4().hex[:8]}"
-        )
-
-        workflow_def = WorkflowDefinition(
-            name=workflow_name,
-            description=f"Dynamically generated execution workflow for goal: {reasoning.goal_name}",
-            steps=wf_steps,
-        )
-
-        WorkflowRegistry._dynamic_registry[workflow_name] = workflow_def
-        self._logger.debug("Registered dynamic workflow definition", extra={"workflow_name": workflow_name})
-
-        return CoreExecutionPlan(
-            intent=Intent.RUN_WORKFLOW,
-            target=workflow_name,
-            parameters={
-                "dynamic_workflow": True,
-                "goal_name": reasoning.goal_name,
-                "original_steps": [
-                    {
-                        "step_id": s.step_id,
-                        "intent": s.intent.value,
-                        "target": s.target,
-                        "parameters": s.parameters,
-                    }
-                    for s in optimized_steps
-                ],
-            },
-            confidence=confidence,
-        )
+        return self._workflow_compiler.compile(optimized_steps, reasoning.goal_name, confidence)
