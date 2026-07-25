@@ -15,6 +15,7 @@ from .objective_graph import ObjectiveGraph, ObjectiveNode
 from .decomposition_rules import DecompositionRules
 from .decomposition_validator import DecompositionValidator
 from .goal_decomposer import GoalDecomposer
+from .workflow_library import WorkflowLibrary, WorkflowMetadata, WorkflowSignature, WorkflowTag
 
 __all__ = [
     "ExecutionStep",
@@ -33,4 +34,8 @@ __all__ = [
     "DecompositionRules",
     "DecompositionValidator",
     "GoalDecomposer",
+    "WorkflowLibrary",
+    "WorkflowMetadata",
+    "WorkflowSignature",
+    "WorkflowTag",
 ]
