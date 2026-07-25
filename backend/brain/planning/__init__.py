@@ -5,7 +5,7 @@ from __future__ import annotations
 from .dependency_resolver import DependencyResolver
 from .models import ExecutionStep, ExecutionDependency, ExecutionSequence
 from .plan_builder import PlanBuilder
-from .plan_optimizer import PlanOptimizer
+from .plan_optimizer import PlanOptimizer, OptimizationResult, OptimizationReport, OptimizationRule
 from .task_planner import TaskPlanner
 from .objective_analyzer import ObjectiveAnalyzer
 from .subtask_generator import SubtaskGenerator
@@ -26,6 +26,9 @@ __all__ = [
     "PlanBuilder",
     "DependencyResolver",
     "PlanOptimizer",
+    "OptimizationResult",
+    "OptimizationReport",
+    "OptimizationRule",
     "TaskPlanner",
     "ObjectiveAnalyzer",
     "SubtaskGenerator",

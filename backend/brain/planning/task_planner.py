@@ -116,7 +116,14 @@ class TaskPlanner:
         ordered_steps = self._dependency_resolver.resolve_order(raw_sequence)
 
         # 6. Plan Optimizer
-        optimized_steps = self._plan_optimizer.optimize_plan(ordered_steps)
+        opt_res = self._plan_optimizer.optimize_plan(
+            steps=ordered_steps,
+            dependencies=raw_sequence.dependencies if hasattr(raw_sequence, "dependencies") else [],
+        )
+        if isinstance(opt_res, list):
+            optimized_steps = opt_res
+        else:
+            optimized_steps = opt_res.steps
 
         if not optimized_steps:
             self._logger.warning("Generated execution plan is empty", extra={"goal_name": reasoning.goal_name})
