@@ -34,6 +34,7 @@ class ExecutionEngine:
         recovery_engine: RecoveryEngine | None = None,
         progress_monitor: ProgressMonitor | None = None,
         logger: logging.Logger | None = None,
+        workflow_observer: Any = None,
     ) -> None:
         """Initializes the ExecutionEngine.
 
@@ -44,6 +45,7 @@ class ExecutionEngine:
             recovery_engine: Injected RecoveryEngine instance.
             progress_monitor: Injected ProgressMonitor instance.
             logger: Optional custom logger.
+            workflow_observer: Optional injected WorkflowObserver instance.
         """
         self._logger = logger or logging.getLogger(__name__)
         self._validator = validator or ExecutionValidator(logger=self._logger)
@@ -53,7 +55,34 @@ class ExecutionEngine:
         self._recovery_engine = recovery_engine or RecoveryEngine(logger=self._logger)
         self._progress_monitor = progress_monitor or ProgressMonitor(logger=self._logger)
 
-    def execute_plan(self, plan: RoutedExecutionPlan, dispatcher: Any) -> ExecutionSummary:
+        # Inject or dynamically build default WorkflowObserver
+        self._workflow_observer = workflow_observer
+        if self._workflow_observer is None:
+            try:
+                from memory import MemoryService
+                from memory.workflows import WorkflowObserver, SequenceBuilder, ObservationRepository
+                mem_service = MemoryService()
+                provider = getattr(mem_service._manager._repository, "_provider", None)
+                if provider:
+                    self._workflow_observer = WorkflowObserver(SequenceBuilder(), ObservationRepository(provider))
+            except Exception as e:
+                self._logger.warning("Could not initialize default WorkflowObserver in ExecutionEngine", exc_info=e)
+
+    def _run_async(self, coro) -> Any:
+        """Runs a coroutine synchronously or schedules it on a running event loop."""
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        if loop.is_running():
+            return loop.create_task(coro)
+        else:
+            return loop.run_until_complete(coro)
+
+    def execute_plan(self, plan: RoutedExecutionPlan, dispatcher: Any, user_id: int = 0) -> ExecutionSummary:
         """Validates and executes a RoutedExecutionPlan step-by-step through the dispatcher.
 
         Args:
@@ -230,4 +259,109 @@ class ExecutionEngine:
                 "duration_ms": int(total_duration * 1000),
             },
         )
+
+        # Trigger User Preference Learning
+        try:
+            from datetime import datetime, timezone
+            from memory import MemoryEntry, MemoryMetadata, MemoryType, MemoryService
+            from memory.preferences import (
+                PreferenceObservation,
+                PreferenceLearningCoordinator,
+                PreferenceLearner,
+                PreferenceScorer,
+                PreferenceConflictResolver
+            )
+
+            self._logger.info("Preference Learning Triggered", extra={"user_id": user_id, "execution_id": execution_id})
+
+            # Create PreferenceObservation objects and log them
+            observed_categories = set()
+            obs_payloads = []
+            
+            for record in records:
+                step_data = steps_map.get(record.step_id) if 'steps_map' in locals() else None
+                params = step_data.get("parameters") if step_data else {}
+                for category, param_key in [("Shell", "shell"), ("Browser", "browser"), ("IDE", "ide")]:
+                    val = params.get(param_key) if params else None
+                    if val and (category, val) not in observed_categories:
+                        self._logger.info("Preference Observation Recorded", extra={"category": category, "value": val, "user_id": user_id})
+                        observed_categories.add((category, val))
+                        obs_payloads.append({
+                            "category": category,
+                            "value": val,
+                            "is_override": False
+                        })
+
+            mem_service = MemoryService()
+            
+            activity_entry = MemoryEntry(
+                id=execution_id + "_activity",
+                content=f"Execution completed for plan: {plan.intent.value}",
+                memory_type=MemoryType.ACTIVITY,
+                metadata=MemoryMetadata(
+                    created_at=datetime.now(timezone.utc),
+                    additional_info={
+                        "status": "COMPLETED" if overall_success else "FAILED",
+                        "duration_ms": int(total_duration * 1000),
+                        "input_parameters": plan.parameters or {},
+                        "output_result": {"success": overall_success, "error": summary_error},
+                        "user_id": user_id,
+                        "preference_observation": obs_payloads[0] if obs_payloads else None
+                    }
+                )
+            )
+            self._run_async(mem_service.save(activity_entry))
+
+            learner = PreferenceLearner()
+            scorer = PreferenceScorer()
+            conflict_resolver = PreferenceConflictResolver()
+            learning_coordinator = PreferenceLearningCoordinator(
+                learner=learner,
+                scorer=scorer,
+                conflict_resolver=conflict_resolver,
+                memory_service=mem_service
+            )
+            self._run_async(learning_coordinator.process_new_execution(user_id, execution_id))
+
+        except Exception as pref_err:
+            self._logger.warning("Failed to trigger preference learning", exc_info=pref_err)
+
+        # Trigger Workflow Observation
+        try:
+            if self._workflow_observer:
+                step_obs_list = []
+                for record in records:
+                    step_data = steps_map.get(record.step_id) if 'steps_map' in locals() else None
+                    params = step_data.get("parameters") if step_data else {}
+                    from memory.workflows import WorkflowStepObservation
+                    step_obs = WorkflowStepObservation(
+                        step_id=record.step_id,
+                        intent=record.intent.value if hasattr(record.intent, "value") else str(record.intent),
+                        target=step_data.get("target") if step_data else None,
+                        parameters=params or {},
+                        status=record.status.value if hasattr(record.status, "value") else str(record.status),
+                        duration_ms=record.duration * 1000.0,
+                        timestamp=datetime.now(timezone.utc)
+                    )
+                    step_obs_list.append(step_obs)
+
+                if step_obs_list:
+                    obs_time = datetime.now(timezone.utc)
+                    async def safe_observe():
+                        try:
+                            await self._workflow_observer.observe_execution(
+                                user_id=user_id,
+                                execution_id=execution_id,
+                                steps=step_obs_list,
+                                success=overall_success,
+                                timestamp=obs_time,
+                                context_metadata={"session_id": execution_id}
+                            )
+                        except Exception as inner_err:
+                            self._logger.warning("Workflow observation recording encountered a failure", exc_info=inner_err)
+
+                    self._run_async(safe_observe())
+        except Exception as wf_err:
+            self._logger.warning("Workflow observation recording encountered a failure", exc_info=wf_err)
+
         return summary

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 
@@ -58,6 +58,7 @@ class BrainResponse(BaseModel):
         plan: The executed RoutedExecutionPlan.
         summary: Optional summary execution stats.
         metrics: Optional performance metrics compiled.
+        recommendations: Active recommended workflow options.
     """
 
     success: bool = Field(description="Success indicator")
@@ -67,6 +68,7 @@ class BrainResponse(BaseModel):
     summary: Optional[Any] = Field(None, description="Detailed multi-step ExecutionSummary")
     metrics: Optional[Any] = Field(None, description="Aggregated ExecutionMetrics statistics")
     workspace_summary: Optional[str] = Field(None, description="Concise workspace summary string")
+    recommendations: Optional[List[Any]] = Field(default=None, description="Active recommended workflow options")
 
 
 class ResolvedRequest(BaseModel):

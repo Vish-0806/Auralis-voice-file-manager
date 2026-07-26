@@ -5,7 +5,7 @@ subsystems interacting with Auralis memory (e.g., the AI Brain).
 """
 
 import logging
-from typing import List, Optional
+from typing import Any, List, Optional
 from memory.models.domain_models import MemoryEntry, MemoryQuery, MemoryResult
 from memory.manager.memory_manager import MemoryManager
 from memory.repository.memory_repository import MemoryRepository
@@ -173,3 +173,57 @@ class MemoryService:
 
     async def get_user_preferences(self, user_id: int) -> List[MemoryEntry]:
         return await self._manager.get_user_preferences(user_id)
+
+    async def get_resolved_preferences(self, user_id: int) -> dict:
+        return await self._manager.get_resolved_preferences(user_id)
+
+    async def save_resolved_preference(self, resolved_pref: Any) -> None:
+        await self._manager.save_resolved_preference(resolved_pref)
+
+    async def get_preference_observations(self, user_id: int, limit: int = 100) -> list:
+        return await self._manager.get_preference_observations(user_id, limit)
+
+    async def save_workflow_observation(self, observation: Any) -> None:
+        """Saves a workflow observation."""
+        await self._manager.save_workflow_observation(observation)
+
+    async def get_workflow_observations(self, user_id: int) -> list:
+        """Retrieves all workflow observations for a user."""
+        return await self._manager.get_workflow_observations(user_id)
+
+    async def get_workflow_sequences(self, user_id: int) -> list:
+        """Retrieves all distinct workflow sequences observed for a user."""
+        return await self._manager.get_workflow_sequences(user_id)
+
+    async def record_recommendation_feedback(self, user_id: int, workflow_id: str, feedback_status: str) -> None:
+        """Records user feedback (accepted, rejected, ignored) for a recommended workflow."""
+        from memory.models.domain_models import MemoryEntry, MemoryType, MemoryMetadata
+        from datetime import datetime, timezone
+        import uuid
+        entry = MemoryEntry(
+            id=f"rec_fb_{workflow_id}_{user_id}_{uuid.uuid4().hex[:8]}",
+            content=feedback_status,
+            memory_type=MemoryType.PREFERENCE,
+            metadata=MemoryMetadata(
+                additional_info={
+                    "user_id": user_id,
+                    "workflow_id": workflow_id,
+                    "type": "recommendation_feedback",
+                    "status": feedback_status,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+            )
+        )
+        await self.save(entry)
+
+    async def record_recommendation_acceptance(self, user_id: int, workflow_id: str) -> None:
+        """Records that a workflow recommendation was accepted by the user."""
+        await self.record_recommendation_feedback(user_id, workflow_id, "accepted")
+
+    async def record_recommendation_rejection(self, user_id: int, workflow_id: str) -> None:
+        """Records that a workflow recommendation was rejected by the user."""
+        await self.record_recommendation_feedback(user_id, workflow_id, "rejected")
+
+    async def record_recommendation_ignored(self, user_id: int, workflow_id: str) -> None:
+        """Records that a workflow recommendation was ignored by the user."""
+        await self.record_recommendation_feedback(user_id, workflow_id, "ignored")
