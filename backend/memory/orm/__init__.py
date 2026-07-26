@@ -13,6 +13,7 @@ from memory.orm.routine import RoutineLearning
 from memory.orm.execution import ExecutionHistory
 from memory.orm.memory_event import MemoryEvent
 from memory.orm.routine_definition import RoutineDefinition
+from memory.orm.proactive_recommendation import ProactiveRecommendation
 
 __all__ = [
     "User",
@@ -24,4 +25,5 @@ __all__ = [
     "ExecutionHistory",
     "MemoryEvent",
     "RoutineDefinition",
+    "ProactiveRecommendation",
 ]
