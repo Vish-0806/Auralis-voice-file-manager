@@ -280,6 +280,8 @@ class MemoryManager:
         if provider:
             repo = ObservationRepository(provider)
             await repo.save(observation)
+            import asyncio
+            asyncio.create_task(self._run_mining(observation.user_id))
 
     async def get_workflow_observations(self, user_id: int) -> list:
         """Retrieves all workflow observations for a user."""
@@ -299,3 +301,35 @@ class MemoryManager:
             if seq.sequence_hash not in unique_sequences:
                 unique_sequences[seq.sequence_hash] = seq
         return list(unique_sequences.values())
+
+    async def _run_mining(self, user_id: int) -> None:
+        """Asynchronously executes workflow mining and dynamically registers promoted definitions."""
+        try:
+            logger.info("Starting workflow mining pass", extra={"user_id": user_id})
+            sequences = await self.get_workflow_sequences(user_id)
+            if not sequences:
+                logger.info("No workflow sequences available for mining", extra={"user_id": user_id})
+                return
+
+            from memory.workflows import WorkflowMiner
+            miner = WorkflowMiner()
+
+            logger.info("Analyzing sequences for candidate discovery", extra={"user_id": user_id, "sequences_count": len(sequences)})
+            candidates = miner.build_candidates(sequences)
+            logger.info("Candidates identified", extra={"user_id": user_id, "candidates_count": len(candidates)})
+
+            promoted_count = 0
+            from automation.workflow.workflow_registry import WorkflowRegistry
+            for candidate in candidates:
+                validation_res = miner.validator.validate_candidate(candidate)
+                if validation_res.is_valid:
+                    logger.info("Promoting workflow candidate", extra={"user_id": user_id, "candidate_id": candidate.candidate_id})
+                    definition = miner.promote_candidate(candidate)
+                    WorkflowRegistry._dynamic_registry[definition.name] = definition
+                    promoted_count += 1
+                else:
+                    logger.debug("Candidate failed validation", extra={"user_id": user_id, "candidate_id": candidate.candidate_id, "issues": validation_res.issues})
+
+            logger.info("Workflow mining pass completed", extra={"user_id": user_id, "promoted_count": promoted_count})
+        except Exception as e:
+            logger.warning("Workflow mining execution failed gracefully", exc_info=e)
