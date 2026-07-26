@@ -1,5 +1,6 @@
 """Production-ready Pydantic models for the Workflow Observation subsystem."""
 
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 # pyrefly: ignore [missing-import]
@@ -46,11 +47,17 @@ class WorkflowStepObservation(BaseModel):
         ...,
         description="Timezone-aware timestamp when this step was executed."
     )
+    started_at: Optional[datetime] = Field(
+        default=None,
+        description="Timezone-aware timestamp when the step execution started."
+    )
 
-    @field_validator("timestamp", mode="before")
+    @field_validator("timestamp", "started_at", mode="before")
     @classmethod
-    def validate_timestamp(cls, v: Any) -> Optional[datetime]:
-        """Validates and enforces UTC timezone on timestamp."""
+    def validate_timestamps(cls, v: Any) -> Optional[datetime]:
+        """Validates and enforces UTC timezone on timestamps."""
+        if v is None:
+            return None
         if isinstance(v, str):
             v = datetime.fromisoformat(v)
         return ensure_utc(v)
@@ -62,6 +69,10 @@ class WorkflowSequence(BaseModel):
     steps: list[WorkflowStepObservation] = Field(
         default_factory=list,
         description="Ordered list of step observations in the sequence."
+    )
+    sequence_id: str = Field(
+        default_factory=lambda: str(uuid.uuid4()),
+        description="Unique ID for this sequence instance."
     )
     sequence_hash: str = Field(
         ...,
