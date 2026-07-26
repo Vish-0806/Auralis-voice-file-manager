@@ -197,3 +197,5 @@ class AssistantContext(BaseModel):
     workspace_analysis: Optional[WorkspaceAnalysis] = None
     resolved_preferences: Dict[str, Any] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    recent_workflows: List[str] = Field(default_factory=list)
+    historical_feedback: Dict[str, List[str]] = Field(default_factory=dict)

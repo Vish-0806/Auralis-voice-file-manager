@@ -1,6 +1,7 @@
 """Context builder service for aggregating information from the memory subsystem."""
 
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from memory.models.domain_models import MemoryEntry, AssistantContext
 from memory.manager.memory_service import MemoryService
@@ -241,6 +242,56 @@ class ContextBuilder:
                     exc_info=True,
                 )
 
+        # Retrieve historical workflow observations to build recent_workflows list
+        recent_workflows = []
+        try:
+            import inspect
+            obs_res = self.memory_service.get_workflow_observations(user_id)
+            if inspect.iscoroutine(obs_res):
+                recent_obs = await obs_res
+            else:
+                recent_obs = obs_res
+
+            if isinstance(recent_obs, list):
+                recent_obs = list(recent_obs)
+                recent_obs.sort(key=lambda o: getattr(o, "timestamp", datetime.now(timezone.utc)), reverse=True)
+                for obs in recent_obs:
+                    if hasattr(obs, "sequence") and hasattr(obs.sequence, "sequence_hash"):
+                        wf_hash = obs.sequence.sequence_hash
+                        wf_id = f"wf_{wf_hash[:12]}"
+                        recent_workflows.append(f"Mined Workflow {wf_id}")
+        except Exception:
+            logger.warning("Failed to retrieve workflow observations for rec context", exc_info=True)
+
+        # Retrieve historical recommendation feedback
+        historical_feedback = {}
+        try:
+            from memory.models.domain_models import MemoryQuery, MemoryType
+            fb_query = MemoryQuery(
+                text="",
+                memory_type=MemoryType.PREFERENCE,
+                filters={"type": "recommendation_feedback", "user_id": user_id}
+            )
+            import inspect
+            search_res = self.memory_service.search(fb_query)
+            if inspect.iscoroutine(search_res):
+                fb_results = await search_res
+            else:
+                fb_results = search_res
+
+            if isinstance(fb_results, list):
+                for res in fb_results:
+                    if hasattr(res, "entry") and hasattr(res.entry, "metadata") and hasattr(res.entry.metadata, "additional_info"):
+                        info = res.entry.metadata.additional_info
+                        wf_id = info.get("workflow_id")
+                        status = info.get("status")
+                        if wf_id and status:
+                            if wf_id not in historical_feedback:
+                                historical_feedback[wf_id] = []
+                            historical_feedback[wf_id].append(status)
+        except Exception:
+            logger.warning("Failed to retrieve historical recommendation feedback", exc_info=True)
+
         # Assemble the raw aggregated context
         raw_context = AssistantContext(
             recent_conversations=recent_conversations,
@@ -251,6 +302,8 @@ class ContextBuilder:
             workspace_analysis=workspace_analysis,
             resolved_preferences=resolved_preferences,
             metadata={"user_id": user_id, "session_id": session_id},
+            recent_workflows=recent_workflows,
+            historical_feedback=historical_feedback,
         )
 
         # Optimize context window before passing to AI Brain (single authority)

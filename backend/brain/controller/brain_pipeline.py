@@ -137,6 +137,65 @@ class BrainPipeline:
 
             metrics = self._execution_engine._progress_monitor._metrics_collector.get_metrics()
 
+            # Run workflow recommendations pipeline
+            accepted_recs = []
+            try:
+                from memory.recommendations import RecommendationContext, RecommendationEngine, RecommendationPolicyEngine
+                from automation.workflow.workflow_registry import WorkflowRegistry
+
+                user_id = context.metadata.get("user_id", 1) if context else 1
+                session_id = context.metadata.get("session_id", "default") if context else "default"
+
+                workspace_analysis = {}
+                if context and context.workspace_analysis:
+                    workspace_analysis = context.workspace_analysis.model_dump()
+                if context and context.current_context and context.current_context.metadata:
+                    info = context.current_context.metadata.additional_info
+                    if "active_window" in info:
+                        workspace_analysis["active_window"] = info.get("active_window")
+                    if "active_directory" in info:
+                        workspace_analysis["active_directory"] = info.get("active_directory")
+                    elif "workspace_path" in info:
+                        workspace_analysis["active_directory"] = info.get("workspace_path")
+
+                resolved_prefs = context.resolved_preferences if context else {}
+                recent_workflows = getattr(context, "recent_workflows", []) if context else []
+                historical_feedback = getattr(context, "historical_feedback", {}) if context else {}
+
+                rec_ctx = RecommendationContext(
+                    user_id=user_id,
+                    session_id=session_id,
+                    workspace_analysis=workspace_analysis,
+                    resolved_preferences=resolved_prefs,
+                    recent_workflows=recent_workflows,
+                    current_request=message,
+                    historical_feedback=historical_feedback
+                )
+
+                registry = WorkflowRegistry()
+                all_workflows = registry.list_workflows()
+
+                rec_engine = RecommendationEngine()
+                recommendations = rec_engine.recommend(rec_ctx, all_workflows)
+
+                policy_engine = RecommendationPolicyEngine()
+                for wf_id, fb_statuses in historical_feedback.items():
+                    for status in fb_statuses:
+                        if status == "accepted":
+                            policy_engine.record_shown(wf_id)
+                        elif status == "rejected":
+                            policy_engine.record_rejection(wf_id)
+                        elif status == "ignored":
+                            policy_engine.record_shown(wf_id)
+
+                for rec in recommendations:
+                    decision = policy_engine.evaluate_policy(rec)
+                    if decision.should_show:
+                        accepted_recs.append(rec)
+            except Exception as e:
+                self._logger.warning("Recommendation pipeline execution failed gracefully", exc_info=e)
+                accepted_recs = []
+
             message_out = (
                 "Pipeline completed successfully."
                 if summary.success
@@ -151,6 +210,7 @@ class BrainPipeline:
                 summary=summary,
                 metrics=metrics,
                 workspace_summary=workspace_summary,
+                recommendations=accepted_recs,
             )
 
         except Exception as exc:
@@ -160,4 +220,5 @@ class BrainPipeline:
                 message=f"Pipeline exception: {str(exc)}",
                 goal_name=goal_name,
                 workspace_summary=workspace_summary,
+                recommendations=[],
             )

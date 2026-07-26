@@ -194,3 +194,36 @@ class MemoryService:
     async def get_workflow_sequences(self, user_id: int) -> list:
         """Retrieves all distinct workflow sequences observed for a user."""
         return await self._manager.get_workflow_sequences(user_id)
+
+    async def record_recommendation_feedback(self, user_id: int, workflow_id: str, feedback_status: str) -> None:
+        """Records user feedback (accepted, rejected, ignored) for a recommended workflow."""
+        from memory.models.domain_models import MemoryEntry, MemoryType, MemoryMetadata
+        from datetime import datetime, timezone
+        import uuid
+        entry = MemoryEntry(
+            id=f"rec_fb_{workflow_id}_{user_id}_{uuid.uuid4().hex[:8]}",
+            content=feedback_status,
+            memory_type=MemoryType.PREFERENCE,
+            metadata=MemoryMetadata(
+                additional_info={
+                    "user_id": user_id,
+                    "workflow_id": workflow_id,
+                    "type": "recommendation_feedback",
+                    "status": feedback_status,
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                }
+            )
+        )
+        await self.save(entry)
+
+    async def record_recommendation_acceptance(self, user_id: int, workflow_id: str) -> None:
+        """Records that a workflow recommendation was accepted by the user."""
+        await self.record_recommendation_feedback(user_id, workflow_id, "accepted")
+
+    async def record_recommendation_rejection(self, user_id: int, workflow_id: str) -> None:
+        """Records that a workflow recommendation was rejected by the user."""
+        await self.record_recommendation_feedback(user_id, workflow_id, "rejected")
+
+    async def record_recommendation_ignored(self, user_id: int, workflow_id: str) -> None:
+        """Records that a workflow recommendation was ignored by the user."""
+        await self.record_recommendation_feedback(user_id, workflow_id, "ignored")

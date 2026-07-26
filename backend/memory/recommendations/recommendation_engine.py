@@ -31,6 +31,7 @@ class RecommendationContext(BaseModel):
     resolved_preferences: dict[str, Any] = Field(default_factory=dict, description="Current resolved user preference settings.")
     recent_workflows: list[str] = Field(default_factory=list, description="Chronological history of recently executed workflow names/IDs.")
     current_request: str = Field("", description="Current user text command request query.")
+    historical_feedback: dict[str, list[str]] = Field(default_factory=dict, description="Map of workflow_id to list of historical feedback status strings ('accepted', 'rejected', 'ignored').")
 
 
 class RecommendationScore(BaseModel):
@@ -183,12 +184,26 @@ class RecommendationEngine:
             else:
                 final_score = 0.0
 
+            # Apply historical feedback adjustments to final_score
+            feedbacks = context.historical_feedback.get(wf_id, [])
+            adjusted_score = final_score
+            for fb in feedbacks:
+                if fb == "accepted":
+                    adjusted_score += 0.1
+                elif fb == "rejected":
+                    adjusted_score -= 0.2
+                elif fb == "ignored":
+                    adjusted_score -= 0.05
+            
+            # Clamp between 0.0 and 1.0
+            adjusted_score = max(0.0, min(adjusted_score, 1.0))
+
             score = RecommendationScore(
                 frequency_score=frequency_score,
                 recency_score=recency_score,
                 workspace_score=workspace_score,
                 preference_score=preference_score,
-                final_score=final_score
+                final_score=adjusted_score
             )
             scored_list.append((wf, score))
 
