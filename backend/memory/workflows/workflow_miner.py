@@ -1,5 +1,6 @@
 """Pydantic schemas and orchestration module for Auralis Workflow Mining."""
 
+import hashlib
 from datetime import datetime, timezone
 from typing import Any, List, Optional
 # pyrefly: ignore [missing-import]
@@ -49,6 +50,12 @@ class WorkflowPattern(BaseModel):
         default=0,
         ge=0,
         description="Frequency count of pattern occurrence in the mined logs."
+    )
+    confidence: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Calculated confidence probability of this recurrent pattern."
     )
     success_rate: float = Field(
         default=0.0,
@@ -136,9 +143,8 @@ class WorkflowMiner:
 
     def mine(self, sequences: list[WorkflowSequence]) -> list[WorkflowPattern]:
         """Performs full end-to-end workflow pattern mining on input sequences."""
-        # Orchestration skeleton - returns placeholder pattern list
         start_time = datetime.now(timezone.utc)
-        
+
         candidates = self.build_candidates(sequences)
         patterns = self.find_patterns(sequences)
 
@@ -154,13 +160,124 @@ class WorkflowMiner:
 
     def find_patterns(self, sequences: list[WorkflowSequence]) -> list[WorkflowPattern]:
         """Finds recurrent patterns filtering by support and confidence limits."""
-        # Orchestration placeholder
-        return []
+        if not sequences:
+            return []
+
+        freq_map = {}
+        support_map = {}
+        duration_map = {}
+        success_map = {}
+
+        for seq_idx, sequence in enumerate(sequences):
+            intents = [step.intent for step in sequence.steps]
+            n = len(intents)
+            seen_in_seq = set()
+            for L in range(1, self.config.max_sequence_length + 1):
+                for i in range(n - L + 1):
+                    sub_seq = tuple(intents[i : i + L])
+                    matched_steps = sequence.steps[i : i + L]
+
+                    duration = sum(step.duration_ms for step in matched_steps)
+                    success = all(step.status == "SUCCESS" for step in matched_steps)
+
+                    freq_map[sub_seq] = freq_map.get(sub_seq, 0) + 1
+                    duration_map[sub_seq] = duration_map.get(sub_seq, 0.0) + duration
+                    if success:
+                        success_map[sub_seq] = success_map.get(sub_seq, 0) + 1
+
+                    if sub_seq not in seen_in_seq:
+                        seen_in_seq.add(sub_seq)
+                        if sub_seq not in support_map:
+                            support_map[sub_seq] = set()
+                        support_map[sub_seq].add(seq_idx)
+
+        patterns = []
+        for sub_seq, freq in freq_map.items():
+            L = len(sub_seq)
+            if self.config.min_sequence_length <= L <= self.config.max_sequence_length:
+                support = len(support_map[sub_seq])
+                if support < self.config.min_support:
+                    continue
+
+                if L == 1:
+                    confidence = 1.0
+                else:
+                    prefix = sub_seq[:-1]
+                    prefix_freq = freq_map.get(prefix, 0)
+                    confidence = freq / prefix_freq if prefix_freq > 0 else 0.0
+
+                if confidence < self.config.min_confidence:
+                    continue
+
+                avg_duration = duration_map[sub_seq] / freq if freq > 0 else 0.0
+                success_rate = success_map.get(sub_seq, 0) / freq if freq > 0 else 0.0
+
+                intents_str = ",".join(sub_seq)
+                seq_hash = hashlib.sha256(intents_str.encode("utf-8")).hexdigest()
+
+                patterns.append(
+                    WorkflowPattern(
+                        sequence_hash=seq_hash,
+                        intents=list(sub_seq),
+                        frequency=freq,
+                        confidence=confidence,
+                        success_rate=success_rate,
+                        average_duration_ms=avg_duration
+                    )
+                )
+
+        # Sort by confidence desc, frequency desc, sequence length desc, then sequence_hash asc
+        patterns.sort(key=lambda p: (-p.confidence, -p.frequency, -len(p.intents), p.sequence_hash))
+        return patterns
 
     def build_candidates(self, sequences: list[WorkflowSequence]) -> list[WorkflowCandidate]:
         """Builds potential candidate patterns from sequence occurrences."""
-        # Orchestration placeholder
-        return []
+        if not sequences:
+            return []
+
+        freq_map = {}
+        support_map = {}
+
+        for seq_idx, sequence in enumerate(sequences):
+            intents = [step.intent for step in sequence.steps]
+            n = len(intents)
+            seen_in_seq = set()
+            for L in range(1, self.config.max_sequence_length + 1):
+                for i in range(n - L + 1):
+                    sub_seq = tuple(intents[i : i + L])
+                    freq_map[sub_seq] = freq_map.get(sub_seq, 0) + 1
+                    if sub_seq not in seen_in_seq:
+                        seen_in_seq.add(sub_seq)
+                        if sub_seq not in support_map:
+                            support_map[sub_seq] = set()
+                        support_map[sub_seq].add(seq_idx)
+
+        candidates = []
+        for sub_seq, freq in freq_map.items():
+            L = len(sub_seq)
+            if self.config.min_sequence_length <= L <= self.config.max_sequence_length:
+                if L == 1:
+                    confidence = 1.0
+                else:
+                    prefix = sub_seq[:-1]
+                    prefix_freq = freq_map.get(prefix, 0)
+                    confidence = freq / prefix_freq if prefix_freq > 0 else 0.0
+
+                intents_str = ",".join(sub_seq)
+                seq_hash = hashlib.sha256(intents_str.encode("utf-8")).hexdigest()
+
+                candidates.append(
+                    WorkflowCandidate(
+                        sequence_hash=seq_hash,
+                        steps=[{"intent": intent} for intent in sub_seq],
+                        support_count=len(support_map[sub_seq]),
+                        confidence=confidence
+                    )
+                )
+
+        # Order candidates deterministically
+        candidates.sort(key=lambda c: (-c.confidence, -c.support_count, -len(c.steps), c.sequence_hash))
+        return candidates
 
     def statistics(self) -> MiningStatistics:
         """Retrieves statistics from the most recent mining execution run."""
