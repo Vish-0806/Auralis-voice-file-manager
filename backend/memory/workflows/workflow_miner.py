@@ -162,9 +162,14 @@ class MiningStatistics(BaseModel):
 class WorkflowMiner:
     """Orchestrates sequence pattern mining from recorded workflow runs."""
 
-    def __init__(self, config: Optional[WorkflowMiningConfig] = None) -> None:
-        """Initializes the miner with configuration guidelines."""
+    def __init__(self, config: Optional[WorkflowMiningConfig] = None, validator: Optional[Any] = None) -> None:
+        """Initializes the miner with configuration guidelines and optional validator."""
         self.config = config or WorkflowMiningConfig()
+        from memory.workflows.workflow_validator import WorkflowValidator
+        self.validator = validator or WorkflowValidator(
+            min_support=self.config.min_support,
+            min_confidence=self.config.min_confidence
+        )
         self._last_stats: Optional[MiningStatistics] = None
 
     def mine(self, sequences: list[WorkflowSequence]) -> list[WorkflowPattern]:
@@ -174,15 +179,31 @@ class WorkflowMiner:
         candidates = self.build_candidates(sequences)
         patterns = self.find_patterns(sequences)
 
+        valid_patterns = []
+        for pat in patterns:
+            # Reconstruct candidate to validate it
+            candidate_steps = [{"intent": intent} for intent in pat.intents]
+            mock_cand = WorkflowCandidate(
+                sequence_hash=pat.sequence_hash,
+                steps=candidate_steps,
+                support_count=pat.frequency,
+                confidence=pat.confidence,
+                frequency=pat.frequency,
+                candidate_id=f"wf_{pat.sequence_hash[:12]}"
+            )
+            validation_res = self.validator.validate_candidate(mock_cand)
+            if validation_res.is_valid:
+                valid_patterns.append(pat)
+
         run_time = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000.0
         self._last_stats = MiningStatistics(
             sequences_analyzed=len(sequences),
             candidates_identified=len(candidates),
-            patterns_mined=len(patterns),
+            patterns_mined=len(valid_patterns),
             run_duration_ms=run_time,
             timestamp=datetime.now(timezone.utc)
         )
-        return patterns
+        return valid_patterns
 
     def find_patterns(self, sequences: list[WorkflowSequence]) -> list[WorkflowPattern]:
         """Finds recurrent patterns filtering by support and confidence limits."""
@@ -275,12 +296,10 @@ class WorkflowMiner:
                     sub_seq = tuple(intents[i : i + L])
                     freq_map[sub_seq] = freq_map.get(sub_seq, 0) + 1
 
-                    # Collect occurrence timestamps (timestamp of the first step of this occurrence)
                     if sub_seq not in occurrence_times:
                         occurrence_times[sub_seq] = []
                     occurrence_times[sub_seq].append(sequence.steps[i].timestamp)
 
-                    # Trace sequence IDs
                     if sub_seq not in seq_refs_map:
                         seq_refs_map[sub_seq] = set()
                     if sequence.sequence_id:
@@ -298,7 +317,6 @@ class WorkflowMiner:
             if self.config.min_sequence_length <= L <= self.config.max_sequence_length:
                 support_count = len(support_map[sub_seq])
 
-                # Reject support threshold failures early
                 if support_count < self.config.min_support:
                     continue
 
@@ -309,11 +327,9 @@ class WorkflowMiner:
                     prefix_freq = freq_map.get(prefix, 0)
                     confidence = freq / prefix_freq if prefix_freq > 0 else 0.0
 
-                # Reject confidence threshold failures early
                 if confidence < self.config.min_confidence:
                     continue
 
-                # Compute timeline stats
                 times = sorted(occurrence_times[sub_seq])
                 first_seen = times[0]
                 last_seen = times[-1]
@@ -358,3 +374,41 @@ class WorkflowMiner:
                 timestamp=datetime.now(timezone.utc)
             )
         return self._last_stats
+
+    def promote_candidate(self, candidate: WorkflowCandidate) -> Any:
+        """Promotes a validated WorkflowCandidate to a WorkflowDefinition."""
+        validation_res = self.validator.validate_candidate(candidate)
+        if not validation_res.is_valid:
+            errors = [i.message for i in validation_res.issues if i.severity == "ERROR"]
+            raise ValueError(f"Cannot promote invalid candidate: {'; '.join(errors)}")
+
+        from automation.workflow.models import WorkflowStep, WorkflowDefinition
+        from core.intents import Intent
+
+        steps = []
+        for s in candidate.steps:
+            intent_str = s.get("intent")
+            try:
+                intent_enum = Intent(intent_str)
+            except ValueError:
+                raise ValueError(f"Invalid intent '{intent_str}' during candidate promotion.")
+
+            steps.append(
+                WorkflowStep(
+                    intent=intent_enum,
+                    target=s.get("target"),
+                    parameters=s.get("parameters", {})
+                )
+            )
+
+        name = f"Mined Workflow {candidate.candidate_id}"
+        description = (
+            f"Mined workflow from logs. Support count: {candidate.support_count}, "
+            f"confidence: {candidate.confidence:.2f}, frequency: {candidate.frequency}."
+        )
+
+        return WorkflowDefinition(
+            name=name,
+            description=description,
+            steps=steps
+        )

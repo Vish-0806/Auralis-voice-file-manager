@@ -17,6 +17,11 @@ from memory.workflows.workflow_miner import (
     MiningStatistics,
     WorkflowMiner,
 )
+from memory.workflows.workflow_validator import (
+    WorkflowValidationIssue,
+    WorkflowValidationResult,
+    WorkflowValidator,
+)
 
 __all__ = [
     "WorkflowStepObservation",
@@ -32,4 +37,7 @@ __all__ = [
     "WorkflowCandidate",
     "MiningStatistics",
     "WorkflowMiner",
+    "WorkflowValidationIssue",
+    "WorkflowValidationResult",
+    "WorkflowValidator",
 ]
