@@ -10,6 +10,13 @@ from memory.workflows.workflow_models import (
 from memory.workflows.sequence_builder import SequenceBuilder
 from memory.workflows.workflow_observer import WorkflowObserver
 from memory.workflows.observation_repository import ObservationRepository
+from memory.workflows.workflow_miner import (
+    WorkflowMiningConfig,
+    WorkflowPattern,
+    WorkflowCandidate,
+    MiningStatistics,
+    WorkflowMiner,
+)
 
 __all__ = [
     "WorkflowStepObservation",
@@ -20,4 +27,9 @@ __all__ = [
     "SequenceBuilder",
     "WorkflowObserver",
     "ObservationRepository",
+    "WorkflowMiningConfig",
+    "WorkflowPattern",
+    "WorkflowCandidate",
+    "MiningStatistics",
+    "WorkflowMiner",
 ]
