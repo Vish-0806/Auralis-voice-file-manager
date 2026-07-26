@@ -12,6 +12,7 @@ from memory.orm.conversation import ConversationHistory
 from memory.orm.routine import RoutineLearning
 from memory.orm.execution import ExecutionHistory
 from memory.orm.memory_event import MemoryEvent
+from memory.orm.routine_definition import RoutineDefinition
 
 __all__ = [
     "User",
@@ -22,4 +23,5 @@ __all__ = [
     "RoutineLearning",
     "ExecutionHistory",
     "MemoryEvent",
+    "RoutineDefinition",
 ]
