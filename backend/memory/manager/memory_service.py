@@ -182,3 +182,15 @@ class MemoryService:
 
     async def get_preference_observations(self, user_id: int, limit: int = 100) -> list:
         return await self._manager.get_preference_observations(user_id, limit)
+
+    async def save_workflow_observation(self, observation: Any) -> None:
+        """Saves a workflow observation."""
+        await self._manager.save_workflow_observation(observation)
+
+    async def get_workflow_observations(self, user_id: int) -> list:
+        """Retrieves all workflow observations for a user."""
+        return await self._manager.get_workflow_observations(user_id)
+
+    async def get_workflow_sequences(self, user_id: int) -> list:
+        """Retrieves all distinct workflow sequences observed for a user."""
+        return await self._manager.get_workflow_sequences(user_id)

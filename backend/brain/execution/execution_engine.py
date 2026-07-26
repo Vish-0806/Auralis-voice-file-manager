@@ -34,6 +34,7 @@ class ExecutionEngine:
         recovery_engine: RecoveryEngine | None = None,
         progress_monitor: ProgressMonitor | None = None,
         logger: logging.Logger | None = None,
+        workflow_observer: Any = None,
     ) -> None:
         """Initializes the ExecutionEngine.
 
@@ -44,6 +45,7 @@ class ExecutionEngine:
             recovery_engine: Injected RecoveryEngine instance.
             progress_monitor: Injected ProgressMonitor instance.
             logger: Optional custom logger.
+            workflow_observer: Optional injected WorkflowObserver instance.
         """
         self._logger = logger or logging.getLogger(__name__)
         self._validator = validator or ExecutionValidator(logger=self._logger)
@@ -52,6 +54,19 @@ class ExecutionEngine:
         self._matcher = CapabilityMatcher(logger=self._logger)
         self._recovery_engine = recovery_engine or RecoveryEngine(logger=self._logger)
         self._progress_monitor = progress_monitor or ProgressMonitor(logger=self._logger)
+
+        # Inject or dynamically build default WorkflowObserver
+        self._workflow_observer = workflow_observer
+        if self._workflow_observer is None:
+            try:
+                from memory import MemoryService
+                from memory.workflows import WorkflowObserver, SequenceBuilder, ObservationRepository
+                mem_service = MemoryService()
+                provider = getattr(mem_service._manager._repository, "_provider", None)
+                if provider:
+                    self._workflow_observer = WorkflowObserver(SequenceBuilder(), ObservationRepository(provider))
+            except Exception as e:
+                self._logger.warning("Could not initialize default WorkflowObserver in ExecutionEngine", exc_info=e)
 
     def _run_async(self, coro) -> Any:
         """Runs a coroutine synchronously or schedules it on a running event loop."""
@@ -310,5 +325,43 @@ class ExecutionEngine:
 
         except Exception as pref_err:
             self._logger.warning("Failed to trigger preference learning", exc_info=pref_err)
+
+        # Trigger Workflow Observation
+        try:
+            if self._workflow_observer:
+                step_obs_list = []
+                for record in records:
+                    step_data = steps_map.get(record.step_id) if 'steps_map' in locals() else None
+                    params = step_data.get("parameters") if step_data else {}
+                    from memory.workflows import WorkflowStepObservation
+                    step_obs = WorkflowStepObservation(
+                        step_id=record.step_id,
+                        intent=record.intent.value if hasattr(record.intent, "value") else str(record.intent),
+                        target=step_data.get("target") if step_data else None,
+                        parameters=params or {},
+                        status=record.status.value if hasattr(record.status, "value") else str(record.status),
+                        duration_ms=record.duration * 1000.0,
+                        timestamp=datetime.now(timezone.utc)
+                    )
+                    step_obs_list.append(step_obs)
+
+                if step_obs_list:
+                    obs_time = datetime.now(timezone.utc)
+                    async def safe_observe():
+                        try:
+                            await self._workflow_observer.observe_execution(
+                                user_id=user_id,
+                                execution_id=execution_id,
+                                steps=step_obs_list,
+                                success=overall_success,
+                                timestamp=obs_time,
+                                context_metadata={"session_id": execution_id}
+                            )
+                        except Exception as inner_err:
+                            self._logger.warning("Workflow observation recording encountered a failure", exc_info=inner_err)
+
+                    self._run_async(safe_observe())
+        except Exception as wf_err:
+            self._logger.warning("Workflow observation recording encountered a failure", exc_info=wf_err)
 
         return summary

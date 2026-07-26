@@ -272,3 +272,30 @@ class MemoryManager:
                 context_metadata=params
             )
         return None
+
+    async def save_workflow_observation(self, observation: Any) -> None:
+        """Saves a workflow observation to the repository."""
+        from memory.workflows import ObservationRepository
+        provider = getattr(self._repository, "_provider", None)
+        if provider:
+            repo = ObservationRepository(provider)
+            await repo.save(observation)
+
+    async def get_workflow_observations(self, user_id: int) -> list:
+        """Retrieves all workflow observations for a user."""
+        from memory.workflows import ObservationRepository
+        provider = getattr(self._repository, "_provider", None)
+        if provider:
+            repo = ObservationRepository(provider)
+            return await repo.list_by_user(user_id)
+        return []
+
+    async def get_workflow_sequences(self, user_id: int) -> list:
+        """Retrieves all distinct workflow sequences observed for a user."""
+        observations = await self.get_workflow_observations(user_id)
+        unique_sequences = {}
+        for obs in observations:
+            seq = obs.sequence
+            if seq.sequence_hash not in unique_sequences:
+                unique_sequences[seq.sequence_hash] = seq
+        return list(unique_sequences.values())
