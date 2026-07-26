@@ -92,6 +92,32 @@ class WorkflowCandidate(BaseModel):
         le=1.0,
         description="Calculated confidence probability of this candidate pattern."
     )
+    frequency: int = Field(
+        default=0,
+        ge=0,
+        description="Frequency count of pattern occurrence in the logs."
+    )
+    average_execution_interval: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="Average execution interval in seconds between pattern occurrences."
+    )
+    first_seen: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp of the first occurrence of this pattern."
+    )
+    last_seen: Optional[datetime] = Field(
+        default=None,
+        description="Timestamp of the last occurrence of this pattern."
+    )
+    source_sequence_references: list[str] = Field(
+        default_factory=list,
+        description="List of sequence IDs where this pattern was observed."
+    )
+    candidate_id: str = Field(
+        ...,
+        description="Stable, deterministically generated workflow identifier."
+    )
 
 
 class MiningStatistics(BaseModel):
@@ -237,6 +263,8 @@ class WorkflowMiner:
 
         freq_map = {}
         support_map = {}
+        occurrence_times = {}
+        seq_refs_map = {}
 
         for seq_idx, sequence in enumerate(sequences):
             intents = [step.intent for step in sequence.steps]
@@ -246,6 +274,18 @@ class WorkflowMiner:
                 for i in range(n - L + 1):
                     sub_seq = tuple(intents[i : i + L])
                     freq_map[sub_seq] = freq_map.get(sub_seq, 0) + 1
+
+                    # Collect occurrence timestamps (timestamp of the first step of this occurrence)
+                    if sub_seq not in occurrence_times:
+                        occurrence_times[sub_seq] = []
+                    occurrence_times[sub_seq].append(sequence.steps[i].timestamp)
+
+                    # Trace sequence IDs
+                    if sub_seq not in seq_refs_map:
+                        seq_refs_map[sub_seq] = set()
+                    if sequence.sequence_id:
+                        seq_refs_map[sub_seq].add(sequence.sequence_id)
+
                     if sub_seq not in seen_in_seq:
                         seen_in_seq.add(sub_seq)
                         if sub_seq not in support_map:
@@ -256,6 +296,12 @@ class WorkflowMiner:
         for sub_seq, freq in freq_map.items():
             L = len(sub_seq)
             if self.config.min_sequence_length <= L <= self.config.max_sequence_length:
+                support_count = len(support_map[sub_seq])
+
+                # Reject support threshold failures early
+                if support_count < self.config.min_support:
+                    continue
+
                 if L == 1:
                     confidence = 1.0
                 else:
@@ -263,20 +309,42 @@ class WorkflowMiner:
                     prefix_freq = freq_map.get(prefix, 0)
                     confidence = freq / prefix_freq if prefix_freq > 0 else 0.0
 
+                # Reject confidence threshold failures early
+                if confidence < self.config.min_confidence:
+                    continue
+
+                # Compute timeline stats
+                times = sorted(occurrence_times[sub_seq])
+                first_seen = times[0]
+                last_seen = times[-1]
+
+                if len(times) >= 2:
+                    intervals = [(times[j+1] - times[j]).total_seconds() for j in range(len(times) - 1)]
+                    avg_interval = sum(intervals) / len(intervals)
+                else:
+                    avg_interval = 0.0
+
                 intents_str = ",".join(sub_seq)
                 seq_hash = hashlib.sha256(intents_str.encode("utf-8")).hexdigest()
+                candidate_id = f"wf_{seq_hash[:12]}"
 
                 candidates.append(
                     WorkflowCandidate(
                         sequence_hash=seq_hash,
                         steps=[{"intent": intent} for intent in sub_seq],
-                        support_count=len(support_map[sub_seq]),
-                        confidence=confidence
+                        support_count=support_count,
+                        confidence=confidence,
+                        frequency=freq,
+                        average_execution_interval=avg_interval,
+                        first_seen=first_seen,
+                        last_seen=last_seen,
+                        source_sequence_references=list(sorted(seq_refs_map[sub_seq])),
+                        candidate_id=candidate_id
                     )
                 )
 
-        # Order candidates deterministically
-        candidates.sort(key=lambda c: (-c.confidence, -c.support_count, -len(c.steps), c.sequence_hash))
+        # Order candidates deterministically: confidence desc, support desc, length desc, candidate_id asc
+        candidates.sort(key=lambda c: (-c.confidence, -c.support_count, -len(c.steps), c.candidate_id))
         return candidates
 
     def statistics(self) -> MiningStatistics:

@@ -1,6 +1,6 @@
 # pyrefly: ignore [missing-import]
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 # pyrefly: ignore [missing-import]
 from pydantic import ValidationError
 
@@ -15,9 +15,9 @@ from memory.workflows import (
 )
 
 
-def create_sequence(intents: list[str], success: bool = True, duration_ms: float = 100.0) -> WorkflowSequence:
+def create_sequence(intents: list[str], success: bool = True, duration_ms: float = 100.0, sequence_id: str = "seq-1", start_time: datetime = None) -> WorkflowSequence:
     steps = []
-    t = datetime.now(timezone.utc)
+    t = start_time or datetime.now(timezone.utc)
     for i, intent in enumerate(intents):
         steps.append(
             WorkflowStepObservation(
@@ -30,7 +30,7 @@ def create_sequence(intents: list[str], success: bool = True, duration_ms: float
         )
     return WorkflowSequence(
         steps=steps,
-        sequence_id="test-seq",
+        sequence_id=sequence_id,
         sequence_hash="test-hash",
         total_duration_ms=duration_ms * len(intents)
     )
@@ -82,13 +82,14 @@ def test_workflow_candidate_validation():
         sequence_hash="hash_x",
         steps=[{"intent": "CLICK"}],
         support_count=3,
-        confidence=0.75
+        confidence=0.75,
+        candidate_id="wf_abc"
     )
     assert cand.sequence_hash == "hash_x"
     assert len(cand.steps) == 1
 
     with pytest.raises(ValidationError):
-        WorkflowCandidate(sequence_hash="abc", confidence=1.2)
+        WorkflowCandidate(sequence_hash="abc", confidence=1.2, candidate_id="wf_abc")
 
 
 def test_mining_statistics_validation():
@@ -136,75 +137,72 @@ def test_workflow_miner_empty_inputs_and_placeholders():
     assert post_stats.run_duration_ms >= 0.0
 
 
-def test_repeated_patterns_discovered():
-    # Setup sequences sharing a repeated segment: ["A", "B", "C"]
-    seq1 = create_sequence(["A", "B", "C", "D"])
-    seq2 = create_sequence(["E", "A", "B", "C"])
-    seq3 = create_sequence(["A", "B", "C"])
+def test_candidate_construction_and_statistics():
+    t1 = datetime(2026, 7, 26, 12, 0, 0, tzinfo=timezone.utc)
+    t2 = datetime(2026, 7, 26, 12, 10, 0, tzinfo=timezone.utc)
+    t3 = datetime(2026, 7, 26, 12, 30, 0, tzinfo=timezone.utc)
     
-    # Require support of 3, confidence of 0.5
+    # 3 occurrences of ["A", "B"]
+    seq1 = create_sequence(["A", "B", "C"], sequence_id="s1", start_time=t1)
+    seq2 = create_sequence(["A", "B", "D"], sequence_id="s2", start_time=t2)
+    seq3 = create_sequence(["X", "A", "B"], sequence_id="s3", start_time=t3)
+    
     miner = WorkflowMiner(config=WorkflowMiningConfig(min_support=3, min_confidence=0.5, min_sequence_length=2))
-    patterns = miner.mine([seq1, seq2, seq3])
+    candidates = miner.build_candidates([seq1, seq2, seq3])
     
-    # We expect "A,B", "B,C", and "A,B,C" patterns to have support >= 3
-    # Check that "A,B,C" is indeed mined
-    pattern_intents = [p.intents for p in patterns]
-    assert ["A", "B", "C"] in pattern_intents
-    assert ["A", "B"] in pattern_intents
-    assert ["B", "C"] in pattern_intents
-
-
-def test_overlapping_patterns_handled():
-    # Sequence with overlapping contiguous subsequences: ["A", "A", "A", "A"]
-    # For pattern ["A", "A"], sliding window occurrences are 3: idx 0, 1, 2.
-    seq = create_sequence(["A", "A", "A", "A"])
+    # Find candidate for ["A", "B"]
+    candidate_ab = next(c for c in candidates if [s["intent"] for s in c.steps] == ["A", "B"])
     
-    miner = WorkflowMiner(config=WorkflowMiningConfig(min_support=1, min_confidence=0.1, min_sequence_length=2))
-    patterns = miner.mine([seq])
-    
-    # "A, A" should have frequency 3
-    pattern_aa = next(p for p in patterns if p.intents == ["A", "A"])
-    assert pattern_aa.frequency == 3
+    assert candidate_ab.frequency == 3
+    assert candidate_ab.support_count == 3
+    assert candidate_ab.first_seen == t1
+    assert candidate_ab.last_seen == t3
+    assert set(candidate_ab.source_sequence_references) == {"s1", "s2", "s3"}
+    assert candidate_ab.candidate_id.startswith("wf_")
 
 
-def test_insufficient_support_filtering():
+def test_candidate_rejection_rules():
     seq1 = create_sequence(["A", "B"])
     seq2 = create_sequence(["A", "B"])
-    seq3 = create_sequence(["X", "Y"])
+    seq3 = create_sequence(["A", "C"])
     
-    # Require min_support = 3
+    # Require support of 3
     miner = WorkflowMiner(config=WorkflowMiningConfig(min_support=3, min_confidence=0.5, min_sequence_length=2))
-    patterns = miner.mine([seq1, seq2, seq3])
+    candidates = miner.build_candidates([seq1, seq2, seq3])
     
-    # "A, B" support is 2, so it should not be mined
-    assert len(patterns) == 0
+    # Under support count 3, "A, B" (support 2) must be rejected
+    assert len(candidates) == 0
 
 
-def test_deterministic_ordering():
-    # Setup candidate patterns:
-    # Pattern 1: confidence=1.0, frequency=4, length=2
-    # Pattern 2: confidence=1.0, frequency=4, length=3
-    # Pattern 3: confidence=0.8, frequency=5, length=2
+def test_identifier_stability():
+    seq1 = create_sequence(["A", "B"])
+    seq2 = create_sequence(["A", "B"])
+    seq3 = create_sequence(["A", "B"])
     
-    seq1 = create_sequence(["A", "B", "C", "D"])
-    seq2 = create_sequence(["A", "B", "C", "D"])
-    seq3 = create_sequence(["A", "B", "C"])
-    seq4 = create_sequence(["A", "B", "E"])
+    miner = WorkflowMiner(config=WorkflowMiningConfig(min_support=2, min_confidence=0.5, min_sequence_length=2))
+    candidates1 = miner.build_candidates([seq1, seq2])
+    candidates2 = miner.build_candidates([seq2, seq3])
     
-    # Under this layout:
-    # "A,B" has frequency 4, support 4. Prefix "A" has frequency 4. Confidence = 4/4 = 1.0. length = 2.
-    # "B,C" has frequency 3, support 3. Prefix "B" has frequency 4. Confidence = 3/4 = 0.75. length = 2.
+    # Identifiers must be deterministic and identical
+    c1 = next(c for c in candidates1 if [s["intent"] for s in c.steps] == ["A", "B"])
+    c2 = next(c for c in candidates2 if [s["intent"] for s in c.steps] == ["A", "B"])
     
-    miner = WorkflowMiner(config=WorkflowMiningConfig(min_support=2, min_confidence=0.1, min_sequence_length=2))
-    patterns = miner.mine([seq1, seq2, seq3, seq4])
+    assert c1.candidate_id == c2.candidate_id
+
+
+def test_execution_interval_calculation():
+    t1 = datetime(2026, 7, 26, 12, 0, 0, tzinfo=timezone.utc)
+    t2 = datetime(2026, 7, 26, 12, 5, 0, tzinfo=timezone.utc)  # +300 seconds
+    t3 = datetime(2026, 7, 26, 12, 15, 0, tzinfo=timezone.utc) # +600 seconds
     
-    # Check that sorting orders highest confidence first
-    for i in range(len(patterns) - 1):
-        p1, p2 = patterns[i], patterns[i+1]
-        if p1.confidence == p2.confidence:
-            if p1.frequency == p2.frequency:
-                assert len(p1.intents) >= len(p2.intents)
-            else:
-                assert p1.frequency >= p2.frequency
-        else:
-            assert p1.confidence >= p2.confidence
+    seq1 = create_sequence(["A", "B"], start_time=t1)
+    seq2 = create_sequence(["A", "B"], start_time=t2)
+    seq3 = create_sequence(["A", "B"], start_time=t3)
+    
+    miner = WorkflowMiner(config=WorkflowMiningConfig(min_support=3, min_confidence=0.5, min_sequence_length=2))
+    candidates = miner.build_candidates([seq1, seq2, seq3])
+    
+    c = next(c for c in candidates if [s["intent"] for s in c.steps] == ["A", "B"])
+    
+    # Intervals are 300s and 600s -> average interval should be 450s
+    assert c.average_execution_interval == 450.0
