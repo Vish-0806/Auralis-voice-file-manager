@@ -21,6 +21,7 @@ from memory.preferences.preference_learning import (
     PreferenceLearner,
     PreferenceConflictResolver,
     PreferenceLearningCoordinator,
+    PreferenceResolver,
     ensure_utc,
 )
 
@@ -44,5 +45,6 @@ __all__ = [
     "PreferenceLearner",
     "PreferenceConflictResolver",
     "PreferenceLearningCoordinator",
+    "PreferenceResolver",
     "ensure_utc",
 ]

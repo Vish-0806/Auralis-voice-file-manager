@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field, field_validator
 
-from memory.models.domain_models import MemoryEntry, MemoryMetadata, MemoryType
+from memory.models.domain_models import MemoryEntry, MemoryMetadata, MemoryType, AssistantContext
 
 logger = logging.getLogger(__name__)
 
@@ -270,6 +270,86 @@ class PreferenceLearner:
         """Determines if a candidate preference score exceeds the stabilization threshold."""
         score = scorer.compute_score(candidate, observations, current_time=current_time)
         return score >= self.stabilization_threshold
+
+
+class PreferenceResolver:
+    """Resolves the preferred option for a category, supporting both async and sync retrieval."""
+
+    def __init__(self, memory_service: Any) -> None:
+        self.memory_service = memory_service
+
+    async def resolve_preference(
+        self,
+        user_id: int,
+        category: str,
+        context: Optional[AssistantContext] = None
+    ) -> Optional[ResolvedPreference]:
+        """Asynchronously resolves the preference for a category."""
+        # Query memory service for resolved preferences
+        resolved_prefs = await self.memory_service.get_resolved_preferences(user_id)
+        if category in resolved_prefs:
+            val = resolved_prefs[category]
+            entry = await self.memory_service.get_preference_by_key(user_id, category)
+            score = 1.0
+            source = "explicit_override"
+            meta = {}
+            if entry and entry.metadata and entry.metadata.additional_info:
+                score = entry.metadata.additional_info.get("confidence_score", 1.0)
+                source = entry.metadata.additional_info.get("source", "learned_stable")
+                meta = entry.metadata.additional_info.get("metadata", {})
+            return ResolvedPreference(
+                user_id=user_id,
+                category=category,
+                value=val,
+                confidence_score=score,
+                resolved_at=entry.metadata.created_at if entry else datetime.now(timezone.utc),
+                source=source,
+                metadata=meta
+            )
+        
+        # System defaults fallback
+        SYSTEM_DEFAULTS = {
+            "Browser": "Chrome",
+            "IDE": "VS Code",
+            "Shell": "PowerShell"
+        }
+        if category in SYSTEM_DEFAULTS:
+            return ResolvedPreference(
+                user_id=user_id,
+                category=category,
+                value=SYSTEM_DEFAULTS[category],
+                confidence_score=0.5,
+                resolved_at=datetime.now(timezone.utc),
+                source="default_fallback"
+            )
+        return None
+
+    def resolve_preference_sync(
+        self,
+        user_id: int,
+        category: str,
+        context: Optional[AssistantContext] = None
+    ) -> Optional[str]:
+        """Synchronously resolves a preference value using pre-loaded context or defaults."""
+        SYSTEM_DEFAULTS = {
+            "Browser": "Chrome",
+            "IDE": "VS Code",
+            "Shell": "PowerShell"
+        }
+        if context:
+            resolved_prefs = getattr(context, "resolved_preferences", {}) or {}
+            if not resolved_prefs and context.metadata:
+                resolved_prefs = context.metadata.get("resolved_preferences", {})
+            if category in resolved_prefs:
+                return resolved_prefs[category]
+
+        if context and context.preferences:
+            for entry in context.preferences:
+                if entry.id == category:
+                    val = entry.metadata.additional_info.get("value") if entry.metadata.additional_info else None
+                    return val if val is not None else entry.content
+
+        return SYSTEM_DEFAULTS.get(category)
 
 
 class PreferenceConflictResolver:

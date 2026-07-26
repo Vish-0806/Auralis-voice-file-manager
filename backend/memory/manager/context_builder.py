@@ -198,12 +198,21 @@ class ContextBuilder:
 
         # 4. Retrieve user preferences
         preferences = []
+        resolved_preferences = {}
         if not session_only:
+            logger.info("Loading User Preferences")
             try:
                 preferences = await self.memory_service.get_user_preferences(user_id)
             except Exception as e:
                 logger.warning(
                     "ContextBuilder failed to retrieve user preferences",
+                    exc_info=True,
+                )
+            try:
+                resolved_preferences = await self.memory_service.get_resolved_preferences(user_id)
+            except Exception as e:
+                logger.warning(
+                    "ContextBuilder failed to retrieve resolved preferences",
                     exc_info=True,
                 )
 
@@ -240,6 +249,7 @@ class ContextBuilder:
             preferences=preferences,
             workspace_context=workspace_context,
             workspace_analysis=workspace_analysis,
+            resolved_preferences=resolved_preferences,
             metadata={"user_id": user_id, "session_id": session_id},
         )
 

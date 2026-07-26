@@ -125,6 +125,42 @@ class TaskPlanner:
         else:
             optimized_steps = opt_res.steps
 
+        # Apply user preferences to unspecified parameters in optimized steps
+        try:
+            from memory.preferences import PreferenceResolver
+            from memory import MemoryService
+            resolver = PreferenceResolver(MemoryService())
+            user_id = 0
+            if context and context.metadata:
+                user_id = context.metadata.get("user_id", 0)
+
+            for step in optimized_steps:
+                if not hasattr(step, "parameters") or step.parameters is None:
+                    step.parameters = {}
+                
+                # Resolve Shell
+                if "shell" not in step.parameters or step.parameters.get("shell") is None:
+                    pref_shell = resolver.resolve_preference_sync(user_id, "Shell", context)
+                    if pref_shell:
+                        step.parameters["shell"] = pref_shell
+                        self._logger.info("Preference Applied", extra={"category": "Shell", "value": pref_shell})
+
+                # Resolve Browser
+                if "browser" not in step.parameters or step.parameters.get("browser") is None:
+                    pref_browser = resolver.resolve_preference_sync(user_id, "Browser", context)
+                    if pref_browser:
+                        step.parameters["browser"] = pref_browser
+                        self._logger.info("Preference Applied", extra={"category": "Browser", "value": pref_browser})
+
+                # Resolve IDE
+                if "ide" not in step.parameters or step.parameters.get("ide") is None:
+                    pref_ide = resolver.resolve_preference_sync(user_id, "IDE", context)
+                    if pref_ide:
+                        step.parameters["ide"] = pref_ide
+                        self._logger.info("Preference Applied", extra={"category": "IDE", "value": pref_ide})
+        except Exception as pref_err:
+            self._logger.warning("Failed to apply user preferences in TaskPlanner", exc_info=pref_err)
+
         if not optimized_steps:
             self._logger.warning("Generated execution plan is empty", extra={"goal_name": reasoning.goal_name})
             return CoreExecutionPlan(

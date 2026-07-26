@@ -120,13 +120,20 @@ class BrainPipeline:
         )
 
         try:
+            # Load resolved preferences for the planning context
+            resolved_prefs = getattr(context, "resolved_preferences", {}) or {}
+            if not resolved_prefs and context and context.metadata:
+                resolved_prefs = context.metadata.get("resolved_preferences", {})
+            self._logger.info("Resolved Preferences Loaded", extra={"preferences_count": len(resolved_prefs)})
+
             reasoning_result = self._reasoning_engine.reason(goal_result.goal, context=context)
 
             plan = self._planner.plan(reasoning_result, confidence=goal_result.confidence.score, context=context)
 
             routed_plan = self._capability_selector.select_capabilities(plan)
 
-            summary = self._execution_engine.execute_plan(routed_plan, dispatcher)
+            user_id = context.metadata.get("user_id", 0) if context else 0
+            summary = self._execution_engine.execute_plan(routed_plan, dispatcher, user_id=user_id)
 
             metrics = self._execution_engine._progress_monitor._metrics_collector.get_metrics()
 

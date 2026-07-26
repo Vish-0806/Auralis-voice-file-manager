@@ -5,7 +5,7 @@ subsystems interacting with Auralis memory (e.g., the AI Brain).
 """
 
 import logging
-from typing import List, Optional
+from typing import Any, List, Optional
 from memory.models.domain_models import MemoryEntry, MemoryQuery, MemoryResult
 from memory.manager.memory_manager import MemoryManager
 from memory.repository.memory_repository import MemoryRepository
@@ -173,3 +173,12 @@ class MemoryService:
 
     async def get_user_preferences(self, user_id: int) -> List[MemoryEntry]:
         return await self._manager.get_user_preferences(user_id)
+
+    async def get_resolved_preferences(self, user_id: int) -> dict:
+        return await self._manager.get_resolved_preferences(user_id)
+
+    async def save_resolved_preference(self, resolved_pref: Any) -> None:
+        await self._manager.save_resolved_preference(resolved_pref)
+
+    async def get_preference_observations(self, user_id: int, limit: int = 100) -> list:
+        return await self._manager.get_preference_observations(user_id, limit)

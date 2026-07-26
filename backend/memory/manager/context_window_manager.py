@@ -237,5 +237,6 @@ class ContextWindowManager:
             preferences=final_preferences,
             workspace_context=final_workspace_context,
             workspace_analysis=context.workspace_analysis,
+            resolved_preferences=getattr(context, "resolved_preferences", {}),
             metadata=context.metadata,
         )
