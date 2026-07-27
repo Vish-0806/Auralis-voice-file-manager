@@ -21,6 +21,7 @@ from .execution_context import ExecutionContext
 from .execution_history import ExecutionHistory
 from .execution_validator import ExecutionValidator
 from .execution_scheduler import ExecutionScheduler
+from .execution_state_manager import ExecutionStateManager
 
 
 class ExecutionEngine:
@@ -35,6 +36,7 @@ class ExecutionEngine:
         progress_monitor: ProgressMonitor | None = None,
         logger: logging.Logger | None = None,
         workflow_observer: Any = None,
+        state_manager: ExecutionStateManager | None = None,
     ) -> None:
         """Initializes the ExecutionEngine.
 
@@ -46,6 +48,7 @@ class ExecutionEngine:
             progress_monitor: Injected ProgressMonitor instance.
             logger: Optional custom logger.
             workflow_observer: Optional injected WorkflowObserver instance.
+            state_manager: Optional injected ExecutionStateManager.
         """
         self._logger = logger or logging.getLogger(__name__)
         self._validator = validator or ExecutionValidator(logger=self._logger)
@@ -54,6 +57,7 @@ class ExecutionEngine:
         self._matcher = CapabilityMatcher(logger=self._logger)
         self._recovery_engine = recovery_engine or RecoveryEngine(logger=self._logger)
         self._progress_monitor = progress_monitor or ProgressMonitor(logger=self._logger)
+        self._state_manager = state_manager or ExecutionStateManager()
 
         # Inject or dynamically build default WorkflowObserver
         self._workflow_observer = workflow_observer
@@ -67,6 +71,63 @@ class ExecutionEngine:
                     self._workflow_observer = WorkflowObserver(SequenceBuilder(), ObservationRepository(provider))
             except Exception as e:
                 self._logger.warning("Could not initialize default WorkflowObserver in ExecutionEngine", exc_info=e)
+
+    def _safe_create_execution(self, execution_id: str, user_id: int, workflow_id: str | None = None, metadata: dict[str, Any] | None = None) -> None:
+        try:
+            self._state_manager.create_execution(execution_id, user_id, workflow_id, metadata)
+            self._logger.info("Execution Created", extra={"execution_id": execution_id})
+        except Exception as e:
+            self._logger.error("Failed to create execution in state manager", exc_info=e)
+
+    def _safe_mark_running(self, execution_id: str) -> None:
+        try:
+            self._state_manager.mark_running(execution_id)
+            self._logger.info("Execution Running", extra={"execution_id": execution_id})
+        except Exception as e:
+            self._logger.error("Failed to mark execution running in state manager", exc_info=e)
+
+    def _safe_update_progress(
+        self,
+        execution_id: str,
+        percentage: float,
+        current_step: int,
+        total_steps: int,
+        current_operation: str | None = None,
+        estimated_remaining_seconds: float | None = None,
+    ) -> None:
+        try:
+            self._state_manager.update_progress(
+                execution_id=execution_id,
+                percentage=percentage,
+                current_step=current_step,
+                total_steps=total_steps,
+                current_operation=current_operation,
+                estimated_remaining_seconds=estimated_remaining_seconds,
+            )
+            self._logger.info("Execution Progress Updated", extra={"execution_id": execution_id, "percentage": percentage})
+        except Exception as e:
+            self._logger.error("Failed to update progress in state manager", exc_info=e)
+
+    def _safe_mark_completed(self, execution_id: str) -> None:
+        try:
+            self._state_manager.mark_completed(execution_id)
+            self._logger.info("Execution Completed", extra={"execution_id": execution_id})
+        except Exception as e:
+            self._logger.error("Failed to mark execution completed in state manager", exc_info=e)
+
+    def _safe_mark_failed(self, execution_id: str, error_message: str) -> None:
+        try:
+            self._state_manager.mark_failed(execution_id, error_message)
+            self._logger.info("Execution Failed", extra={"execution_id": execution_id, "error": error_message})
+        except Exception as e:
+            self._logger.error("Failed to mark execution failed in state manager", exc_info=e)
+
+    def _safe_mark_retrying(self, execution_id: str) -> None:
+        try:
+            self._state_manager.mark_retrying(execution_id)
+            self._logger.info("Execution Retrying", extra={"execution_id": execution_id})
+        except Exception as e:
+            self._logger.error("Failed to mark execution retrying in state manager", exc_info=e)
 
     def _run_async(self, coro) -> Any:
         """Runs a coroutine synchronously or schedules it on a running event loop."""
@@ -92,13 +153,42 @@ class ExecutionEngine:
         Returns:
             An ExecutionSummary detailing the run results.
         """
-        execution_id = f"exec_{uuid.uuid4().hex[:8]}"
+        # Determine execution_id
+        execution_id = None
+        if isinstance(plan.parameters, dict):
+            execution_id = plan.parameters.get("execution_id")
+            if not execution_id:
+                metadata = plan.parameters.get("metadata")
+                if isinstance(metadata, dict):
+                    execution_id = metadata.get("execution_id")
+            if not execution_id:
+                req_metadata = plan.parameters.get("request_metadata")
+                if isinstance(req_metadata, dict):
+                    execution_id = req_metadata.get("execution_id")
+
+        if not execution_id:
+            try:
+                execution_id = str(uuid.UUID(plan.execution_id))
+            except Exception:
+                execution_id = str(uuid.uuid4())
+
         self._logger.info("Starting execution session", extra={"execution_id": execution_id, "intent": plan.intent.value})
+
+        # Register execution and start running
+        workflow_id = plan.target if plan.intent == Intent.RUN_WORKFLOW else None
+        self._safe_create_execution(
+            execution_id=execution_id,
+            user_id=user_id,
+            workflow_id=workflow_id,
+            metadata=plan.parameters,
+        )
+        self._safe_mark_running(execution_id)
 
         try:
             self._validator.validate_plan(plan, dispatcher)
         except Exception as val_err:
             self._logger.error("Plan validation failed", exc_info=val_err)
+            self._safe_mark_failed(execution_id, f"Validation failed: {str(val_err)}")
             return ExecutionSummary(
                 execution_id=execution_id,
                 success=False,
@@ -114,6 +204,7 @@ class ExecutionEngine:
         summary_error = None
 
         scheduled_routes = self._scheduler.schedule_steps(plan.routes)
+        total_steps = len(scheduled_routes)
         
         step_ids = [route.step_id or "main" for route in scheduled_routes]
         self._progress_monitor.start_session(execution_id, step_ids)
@@ -139,12 +230,22 @@ class ExecutionEngine:
                     "parameters": plan.parameters,
                 }
 
-        for route in scheduled_routes:
+        for i, route in enumerate(scheduled_routes):
             step_id = route.step_id or "main"
             step_data = steps_map.get(step_id)
             if not step_data:
                 self._logger.warning("Step data not found in plan maps", extra={"step_id": step_id})
                 continue
+
+            # Update progress before step begins
+            percentage = (i / total_steps * 100.0) if total_steps > 0 else 0.0
+            self._safe_update_progress(
+                execution_id=execution_id,
+                percentage=percentage,
+                current_step=i + 1,
+                total_steps=total_steps,
+                current_operation=step_id,
+            )
 
             context.start_step(step_id, route.capability_name)
             step_start_time = time.perf_counter()
@@ -208,6 +309,8 @@ class ExecutionEngine:
                 self._logger.info("Attempting automatic self-correction and recovery", extra={"step_id": step_id})
                 self._progress_monitor.start_recovery()
 
+                self._safe_mark_retrying(execution_id)
+
                 recovery_result = self._recovery_engine.recover(
                     step_id=step_id,
                     intent=step_plan.intent,
@@ -237,7 +340,22 @@ class ExecutionEngine:
                     )
                     overall_success = False
                     summary_error = f"Step '{step_id}' failed: {step_error}. Recovery failed: {recovery_result.error}"
+                    self._safe_mark_failed(execution_id, summary_error)
                     break
+
+            if step_status == ExecutionStatus.SUCCESS:
+                # Update progress after completed/recovered step
+                percentage = (((i + 1) / total_steps) * 100.0) if total_steps > 0 else 100.0
+                self._safe_update_progress(
+                    execution_id=execution_id,
+                    percentage=percentage,
+                    current_step=i + 1,
+                    total_steps=total_steps,
+                    current_operation=step_id,
+                )
+
+        if overall_success:
+            self._safe_mark_completed(execution_id)
 
         total_duration = time.perf_counter() - session_start_time
         summary = ExecutionSummary(
