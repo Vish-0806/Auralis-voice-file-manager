@@ -107,7 +107,7 @@ class FailureRecoveryEngine:
             return FailureCategory.PERMISSION_DENIED
         if "TimeoutError" in exc_str or "timed out" in exc_str:
             return FailureCategory.TIMEOUT
-        if "ConnectionError" in exc_str or "network" in exc_str or "connection refused" in exc_str:
+        if "ConnectionError" in exc_str or "network" in exc_str or "connection refused" in exc_str or "Connection lost" in exc_str:
             return FailureCategory.NETWORK_ERROR
 
         return FailureCategory.UNKNOWN

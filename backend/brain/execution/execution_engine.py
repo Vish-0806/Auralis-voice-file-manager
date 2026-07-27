@@ -23,6 +23,7 @@ from .execution_validator import ExecutionValidator
 from .execution_scheduler import ExecutionScheduler
 from .execution_state_manager import ExecutionStateManager
 from .decision_engine import DecisionEngine, DecisionContext, DecisionType, DecisionReason, ExecutionDecision
+from .failure_recovery import FailureRecoveryEngine, RecoveryContext
 
 
 class ExecutionEngine:
@@ -39,6 +40,7 @@ class ExecutionEngine:
         workflow_observer: Any = None,
         state_manager: ExecutionStateManager | None = None,
         decision_engine: DecisionEngine | None = None,
+        failure_recovery_engine: FailureRecoveryEngine | None = None,
     ) -> None:
         """Initializes the ExecutionEngine.
 
@@ -52,6 +54,7 @@ class ExecutionEngine:
             workflow_observer: Optional injected WorkflowObserver instance.
             state_manager: Optional injected ExecutionStateManager.
             decision_engine: Optional injected DecisionEngine.
+            failure_recovery_engine: Optional injected FailureRecoveryEngine.
         """
         self._logger = logger or logging.getLogger(__name__)
         self._validator = validator or ExecutionValidator(logger=self._logger)
@@ -62,6 +65,7 @@ class ExecutionEngine:
         self._progress_monitor = progress_monitor or ProgressMonitor(logger=self._logger)
         self._state_manager = state_manager or ExecutionStateManager()
         self._decision_engine = decision_engine or DecisionEngine()
+        self._failure_recovery_engine = failure_recovery_engine or FailureRecoveryEngine()
 
         # Inject or dynamically build default WorkflowObserver
         self._workflow_observer = workflow_observer
@@ -178,6 +182,49 @@ class ExecutionEngine:
                 confidence=1.0,
                 message="Decision engine evaluation failure fallback to EXECUTE.",
             )
+
+    def _safe_analyse_and_record_failure(
+        self,
+        execution_id: str,
+        step_id: str,
+        step_plan: CoreExecutionPlan,
+        plan_parameters: dict,
+        exception: Exception,
+    ) -> None:
+        try:
+            exec_state = self._state_manager.get_execution(execution_id)
+            retry_count = exec_state.retry_count if exec_state else 0
+            
+            # 1. Build RecoveryContext
+            context = RecoveryContext(
+                execution_state=exec_state,
+                execution_step=step_plan,
+                resolved_preferences=plan_parameters.get("resolved_preferences") or plan_parameters,
+                exception=exception,
+                retry_count=retry_count,
+            )
+
+            # 2. Pass context to build_recovery_plan
+            plan = self._failure_recovery_engine.build_recovery_plan(context)
+            analysis = self._failure_recovery_engine.analyse_failure(context)
+
+            # 3. Attach recovery info to execution metadata
+            if exec_state:
+                exec_state.metadata["failure_category"] = analysis.failure_category.value
+                exec_state.metadata["recovery_strategy"] = plan.strategy.value
+                exec_state.metadata["recovery_reason"] = plan.reason
+                exec_state.metadata["recovery_confidence"] = analysis.confidence
+                exec_state.metadata["recoverable"] = analysis.recoverable
+
+            # 4. Log structured events
+            self._logger.info("Recovery Analysis Completed", extra={"execution_id": execution_id})
+            self._logger.info("Failure Category", extra={"execution_id": execution_id, "category": analysis.failure_category.value})
+            self._logger.info("Recovery Strategy Selected", extra={"execution_id": execution_id, "strategy": plan.strategy.value})
+            self._logger.info("Recoverable", extra={"execution_id": execution_id, "recoverable": analysis.recoverable})
+            self._logger.info("Recovery Deferred", extra={"execution_id": execution_id})
+
+        except Exception as e:
+            self._logger.warning("FailureRecoveryEngine encountered execution exception", exc_info=e)
 
     def _run_async(self, coro) -> Any:
         """Runs a coroutine synchronously or schedules it on a running event loop."""
@@ -454,6 +501,7 @@ class ExecutionEngine:
             step_status = ExecutionStatus.SUCCESS
             step_response = None
             step_error = None
+            disp_err = None
 
             self._progress_monitor.start_step(step_id)
 
@@ -468,11 +516,12 @@ class ExecutionEngine:
                     step_response = result.response
                     context.complete_step(step_id, {"response": result.response, "data": result.data})
                     self._progress_monitor.complete_step(step_id, duration)
-            except Exception as disp_err:
+            except Exception as e:
+                disp_err = e
                 duration = time.perf_counter() - step_start_time
                 step_status = ExecutionStatus.FAILED
-                step_error = str(disp_err)
-                self._logger.error("Dispatcher encountered execution exception", exc_info=disp_err)
+                step_error = str(e)
+                self._logger.error("Dispatcher encountered execution exception", exc_info=e)
 
             record = ExecutionRecord(
                 step_id=step_id,
@@ -488,6 +537,16 @@ class ExecutionEngine:
             records.append(record)
 
             if step_status == ExecutionStatus.FAILED:
+                # Trigger failure analysis and record it
+                exc = disp_err if disp_err is not None else RuntimeError(step_error or "Unknown failure")
+                self._safe_analyse_and_record_failure(
+                    execution_id=execution_id,
+                    step_id=step_id,
+                    step_plan=step_plan,
+                    plan_parameters=plan.parameters,
+                    exception=exc,
+                )
+
                 self._progress_monitor.fail_step(step_id, duration)
 
                 self._logger.info("Attempting automatic self-correction and recovery", extra={"step_id": step_id})
