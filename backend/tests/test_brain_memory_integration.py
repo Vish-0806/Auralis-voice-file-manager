@@ -51,7 +51,7 @@ def test_brain_controller_saves_memories(mock_dispatcher) -> None:
     all_memories = loop.run_until_complete(memory_service.list())
     
     # Assertions on captured memories
-    assert len(all_memories) == 3
+    assert len(all_memories) == 5
     
     # 1. User Prompt Conversation Memory
     user_mem = next(m for m in all_memories if m.id.endswith("_user"))

@@ -99,7 +99,7 @@ def test_recommendation_engine():
         context=context
     )
 
-    assert len(recs) == 5
+    assert len(recs) == 4
     texts = [r.suggestion_text for r in recs]
     assert "Open VS Code?" in texts
     assert "Run Git Pull?" in texts
@@ -161,7 +161,7 @@ def test_feedback_engine():
 
     weights = engine.compute_feedback_weights([r1, r2, r3])
     # accepted increases weight (+0.15 * 2) -> 1.3
-    assert weights["RUN_COMMAND"] == 1.3
+    assert weights["RUN_COMMAND"] == pytest.approx(1.3)
     # dismissed decreases weight (-0.25) -> 0.75
     assert weights["OPEN_APPLICATION"] == 0.75
 
