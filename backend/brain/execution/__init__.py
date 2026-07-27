@@ -29,6 +29,14 @@ from .decision_engine import (
     DecisionContext,
     DecisionEngine,
 )
+from .failure_recovery import (
+    FailureCategory,
+    RecoveryStrategy,
+    FailureAnalysis,
+    RecoveryPlan,
+    RecoveryContext,
+    FailureRecoveryEngine,
+)
 
 __all__ = [
     "ExecutionStatus",
@@ -52,4 +60,10 @@ __all__ = [
     "ExecutionDecision",
     "DecisionContext",
     "DecisionEngine",
+    "FailureCategory",
+    "RecoveryStrategy",
+    "FailureAnalysis",
+    "RecoveryPlan",
+    "RecoveryContext",
+    "FailureRecoveryEngine",
 ]
