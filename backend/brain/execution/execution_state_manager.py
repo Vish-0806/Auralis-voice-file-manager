@@ -252,6 +252,24 @@ class ExecutionStateManager:
                     pass
             return True
 
+    def mark_waiting_for_confirmation(self, execution_id: str) -> bool:
+        """Transitions status to WAITING_FOR_CONFIRMATION.
+
+        Args:
+            execution_id: Unique identifier for the execution.
+
+        Returns:
+            True if transitioned, False if ID is unknown.
+        """
+        with self._lock:
+            state = self._active_executions.get(execution_id)
+            if not state:
+                return False
+            state.status = ExecutionStatus.WAITING_FOR_CONFIRMATION
+            state.waiting_for_confirmation = True
+            self._create_snapshot(state)
+            return True
+
     def remove_execution(self, execution_id: str) -> bool:
         """Deletes execution record and its history.
 

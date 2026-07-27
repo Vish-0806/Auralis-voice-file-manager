@@ -47,6 +47,13 @@ class ExecutionSummary(BaseModel):
     completion_percentage: float = Field(description="Final completion percentage achieved")
     started_at: Optional[datetime] = Field(None, description="Start timestamp")
     completed_at: Optional[datetime] = Field(None, description="Completion/termination timestamp")
+    
+    # Recovery additions
+    recovery_attempts: int = Field(default=0, description="Total count of active recovery attempts")
+    successful_recoveries: int = Field(default=0, description="Total successful recovery count")
+    failed_recoveries: int = Field(default=0, description="Total failed recovery count")
+    fallback_usage: int = Field(default=0, description="Total fallback resource usages count")
+    skipped_steps: int = Field(default=0, description="Total skipped steps count")
 
 
 class ExecutionStatistics(BaseModel):
@@ -60,6 +67,14 @@ class ExecutionStatistics(BaseModel):
     average_duration: float = Field(description="Average duration of terminal executions in seconds")
     success_rate: float = Field(description="Percentage of completed executions (0.0 to 1.0)")
     retry_rate: float = Field(description="Percentage of executions with retries (0.0 to 1.0)")
+    
+    # Recovery additions
+    recovery_attempts: int = Field(default=0, description="Total recovery attempts count")
+    successful_recoveries: int = Field(default=0, description="Total successful recovery count")
+    failed_recoveries: int = Field(default=0, description="Total failed recovery count")
+    fallback_usage: int = Field(default=0, description="Total fallback resource usages count")
+    skipped_steps: int = Field(default=0, description="Total skipped steps count")
+    retry_counts: int = Field(default=0, description="Total count of all retries made")
 
 
 class ExecutionMonitor:
@@ -182,10 +197,23 @@ class ExecutionMonitor:
         with self._lock:
             mgr = state_manager or self._state_manager
             running_count = 0
+            total_recovery_attempts = sum(s.recovery_attempts for s in self._completed_history)
+            total_successful_recoveries = sum(s.successful_recoveries for s in self._completed_history)
+            total_failed_recoveries = sum(s.failed_recoveries for s in self._completed_history)
+            total_fallback_usage = sum(s.fallback_usage for s in self._completed_history)
+            total_skipped_steps = sum(s.skipped_steps for s in self._completed_history)
+            total_retry_counts = sum(s.retry_count for s in self._completed_history)
+
             if mgr is not None:
                 try:
                     active_list = mgr.list_active()
                     running_count = sum(1 for s in active_list if s.status == ExecutionStatus.RUNNING)
+                    total_recovery_attempts += sum(s.recovery_attempts for s in active_list)
+                    total_skipped_steps += sum(len(s.skipped_steps) for s in active_list)
+                    total_retry_counts += sum(s.retry_count for s in active_list)
+                    total_successful_recoveries += sum(s.metadata.get("successful_recoveries", 0) for s in active_list)
+                    total_failed_recoveries += sum(s.metadata.get("failed_recoveries", 0) for s in active_list)
+                    total_fallback_usage += sum(s.metadata.get("fallback_usage", 0) for s in active_list)
                 except Exception:
                     pass
 
@@ -219,6 +247,12 @@ class ExecutionMonitor:
                 average_duration=avg_duration,
                 success_rate=success_rate,
                 retry_rate=retry_rate,
+                recovery_attempts=total_recovery_attempts,
+                successful_recoveries=total_successful_recoveries,
+                failed_recoveries=total_failed_recoveries,
+                fallback_usage=total_fallback_usage,
+                skipped_steps=total_skipped_steps,
+                retry_counts=total_retry_counts,
             )
 
     def clear_history(self) -> None:
@@ -245,6 +279,11 @@ class ExecutionMonitor:
                 completion_percentage=state.progress.percentage,
                 started_at=state.progress.started_at,
                 completed_at=state.progress.completed_at,
+                recovery_attempts=state.recovery_attempts,
+                successful_recoveries=state.metadata.get("successful_recoveries", 0),
+                failed_recoveries=state.metadata.get("failed_recoveries", 0),
+                fallback_usage=state.metadata.get("fallback_usage", 0),
+                skipped_steps=len(state.skipped_steps),
             )
 
             self._completed_history.append(summary)

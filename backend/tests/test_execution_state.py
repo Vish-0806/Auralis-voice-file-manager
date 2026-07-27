@@ -29,6 +29,7 @@ def test_execution_status_enum() -> None:
         "FAILED",
         "CANCELLED",
         "TIMEOUT",
+        "WAITING_FOR_CONFIRMATION",
     }
     assert {status.value for status in ExecutionStatus} == expected_values
 

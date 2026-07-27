@@ -21,6 +21,7 @@ class ExecutionStatus(str, Enum):
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
     TIMEOUT = "TIMEOUT"
+    WAITING_FOR_CONFIRMATION = "WAITING_FOR_CONFIRMATION"
 
 
 class ExecutionProgress(BaseModel):
@@ -28,23 +29,16 @@ class ExecutionProgress(BaseModel):
 
     percentage: float = Field(default=0.0, ge=0.0, le=100.0, description="Progress percentage from 0 to 100")
     current_step: int = Field(default=0, ge=0, description="Index of the currently active step")
-    total_steps: int = Field(default=0, ge=0, description="Total number of steps in the task sequence")
-    current_operation: Optional[str] = Field(default=None, description="Optional description of the active operation")
-    estimated_remaining_seconds: Optional[float] = Field(default=None, description="Estimated time remaining in seconds")
-    started_at: Optional[datetime] = Field(default=None, description="Timestamp of when execution started")
-    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Timestamp of the last update")
-    completed_at: Optional[datetime] = Field(default=None, description="Timestamp of completion or termination")
+    total_steps: int = Field(default=0, ge=0, description="Total number of steps in plan")
+    current_operation: Optional[str] = Field(default=None, description="Active operation description")
+    estimated_remaining_seconds: Optional[float] = Field(default=None, description="Estimated seconds remaining")
+    started_at: Optional[datetime] = Field(default=None, description="Start timestamp")
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Last progress update timestamp")
+    completed_at: Optional[datetime] = Field(default=None, description="Timestamp of completion/termination")
 
-    def update_progress(
-        self,
-        percentage: float,
-        current_step: int,
-        total_steps: int,
-        current_operation: Optional[str] = None,
-        estimated_remaining_seconds: Optional[float] = None,
-    ) -> None:
-        """Updates the active progress metrics and updates the last_updated timestamp."""
-        self.percentage = max(0.0, min(100.0, percentage))
+    def update_progress(self, percentage: float, current_step: int, total_steps: int, current_operation: Optional[str] = None, estimated_remaining_seconds: Optional[float] = None) -> None:
+        """Helper to update all progress fields thread-safely or in-place."""
+        self.percentage = percentage
         self.current_step = current_step
         self.total_steps = total_steps
         self.current_operation = current_operation
@@ -82,6 +76,13 @@ class ExecutionState(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Creation timestamp")
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Last update timestamp")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Custom metadata attributes dictionary")
+    
+    # Autonomous Recovery additions
+    skipped_steps: List[str] = Field(default_factory=list, description="IDs of skipped execution steps")
+    ignored_failures: List[str] = Field(default_factory=list, description="Descriptions of ignored failure steps")
+    recovery_attempts: int = Field(default=0, ge=0, description="Total count of active recovery attempts")
+    last_recovery_strategy: Optional[str] = Field(default=None, description="Type/strategy of last recovery attempt")
+    waiting_for_confirmation: bool = Field(default=False, description="Flag indicating step requires user confirmation")
 
     def is_active(self) -> bool:
         """Returns True if the execution is in an active (non-terminal) state."""
@@ -91,6 +92,7 @@ class ExecutionState(BaseModel):
             ExecutionStatus.RETRYING,
             ExecutionStatus.WAITING,
             ExecutionStatus.PAUSED,
+            ExecutionStatus.WAITING_FOR_CONFIRMATION,
         )
 
     def is_finished(self) -> bool:
