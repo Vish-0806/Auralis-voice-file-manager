@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .models import ExecutionSummary, ExecutionRecord
+from .models import ExecutionRecord
 from .execution_context import ExecutionContext
 from .execution_history import ExecutionHistory
 from .execution_validator import ExecutionValidator
@@ -16,12 +16,17 @@ from .execution_state import (
     ExecutionStateConfig,
 )
 from .execution_state_manager import ExecutionStateManager
+from .execution_monitor import (
+    ExecutionMetrics,
+    ExecutionSummary,
+    ExecutionStatistics,
+    ExecutionMonitor,
+)
 
 __all__ = [
     "ExecutionStatus",
     "ExecutionRecord",
     "ExecutionContext",
-    "ExecutionSummary",
     "ExecutionHistory",
     "ExecutionValidator",
     "ExecutionScheduler",
@@ -31,4 +36,8 @@ __all__ = [
     "ExecutionSnapshot",
     "ExecutionStateConfig",
     "ExecutionStateManager",
+    "ExecutionMetrics",
+    "ExecutionSummary",
+    "ExecutionStatistics",
+    "ExecutionMonitor",
 ]

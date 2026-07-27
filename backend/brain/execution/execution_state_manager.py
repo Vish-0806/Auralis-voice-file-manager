@@ -19,9 +19,10 @@ from brain.execution.execution_state import (
 class ExecutionStateManager:
     """Manages active executions and their snapshots in-memory with thread safety."""
 
-    def __init__(self, config: Optional[ExecutionStateConfig] = None) -> None:
+    def __init__(self, config: Optional[ExecutionStateConfig] = None, monitor: Optional[Any] = None) -> None:
         """Initializes the manager with in-memory stores and a reentrant lock."""
         self._config = config or ExecutionStateConfig()
+        self._monitor = monitor
         self._lock = threading.RLock()
         self._active_executions: Dict[str, ExecutionState] = {}
         self._snapshot_history: Dict[str, deque[ExecutionSnapshot]] = {}
@@ -199,6 +200,11 @@ class ExecutionStateManager:
                 return False
             state.mark_completed()
             self._create_snapshot(state)
+            if self._monitor is not None:
+                try:
+                    self._monitor.record_completion(state)
+                except Exception:
+                    pass
             return True
 
     def mark_failed(self, execution_id: str, error_message: str) -> bool:
@@ -217,6 +223,11 @@ class ExecutionStateManager:
                 return False
             state.mark_failed(error_message)
             self._create_snapshot(state)
+            if self._monitor is not None:
+                try:
+                    self._monitor.record_failure(state)
+                except Exception:
+                    pass
             return True
 
     def mark_cancelled(self, execution_id: str) -> bool:
@@ -234,6 +245,11 @@ class ExecutionStateManager:
                 return False
             state.mark_cancelled()
             self._create_snapshot(state)
+            if self._monitor is not None:
+                try:
+                    self._monitor.record_cancellation(state)
+                except Exception:
+                    pass
             return True
 
     def remove_execution(self, execution_id: str) -> bool:
