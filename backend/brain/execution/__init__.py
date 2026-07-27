@@ -22,6 +22,13 @@ from .execution_monitor import (
     ExecutionStatistics,
     ExecutionMonitor,
 )
+from .decision_engine import (
+    DecisionType,
+    DecisionReason,
+    ExecutionDecision,
+    DecisionContext,
+    DecisionEngine,
+)
 
 __all__ = [
     "ExecutionStatus",
@@ -40,4 +47,9 @@ __all__ = [
     "ExecutionSummary",
     "ExecutionStatistics",
     "ExecutionMonitor",
+    "DecisionType",
+    "DecisionReason",
+    "ExecutionDecision",
+    "DecisionContext",
+    "DecisionEngine",
 ]
