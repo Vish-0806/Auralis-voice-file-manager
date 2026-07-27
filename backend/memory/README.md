@@ -42,7 +42,12 @@ graph TD
 - **Context Builder (`manager/context_builder.py`):** Aggregates recent conversations, executions, workspace state, preferences, and workspace profiles into an `AssistantContext` domain model.
 - **Memory Ranker (`manager/memory_ranker.py`):** Scores retrieved memories using exponential recency decay, session affinity, workspace path matches, entity token overlap, and command verb similarity.
 - **Context Window Config (`manager/context_builder.py`):** Restricts database query limits via `ContextWindowConfig` (`short_term_limit`, `long_term_limit`, `session_limit`) and provides high-performance `session_only` context loading.
-- **Repository Pattern (`repository/`):** Decouples business logic from specific persistence clients using SQLAlchemy ORM repositories (`ConversationRepository`, `ExecutionRepository`, `ContextRepository`, `PreferenceRepository`, `MemoryEventRepository`).
+- **Repository Pattern (`repository/`):** Decouples business logic from specific persistence clients using SQLAlchemy ORM repositories (`ConversationRepository`, `ExecutionRepository`, `ContextRepository`, `PreferenceRepository`, `MemoryEventRepository`, `RoutineDefinitionRepository`, `ProactiveRecommendationRepository`).
+- **Autonomous Routines (`routines/`):** Automatically discovers repeated user behavior, converts repeated execution patterns into reusable routines, safely recommends routine creation, executes approved routines, and monitors performance over time.
+- **Proactive Assistant (`proactive/`):** Analyzes historical activity, workspace state, and user feedback to predict user needs and recommend automation suggestions before commands are issued using deterministic scoring.
+- **Adaptive Recommendations (`recommendations/`):** Evaluates runtime context and environmental triggers (`WorkspaceOpened`, `ApplicationOpened`, etc.) against confidence thresholds and cooldown policies to suggest workflows.
+- **Workflow Mining & Observation (`workflows/`):** Observes real-time execution steps, mines n-gram action patterns, and validates workflow candidates for routine promotion.
+- **Workspace Intelligence (`workspace/`):** Asynchronously discovers, scans, and caches workspace folder statistics, Git branch states, and dominant project languages/build tools.
 - **Provider Pattern (`providers/`):** Adapts specific database/cache clients to the memory subsystem.
   - `BaseProvider`: Abstract contract defining standard persistence layer APIs.
   - `InMemoryProvider`: Transient, thread-safe in-memory store for local testing and bootstrapping.

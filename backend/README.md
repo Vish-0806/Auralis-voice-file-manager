@@ -23,19 +23,24 @@ backend/
 │   ├── execution/     # Multi-Step Execution Engine
 │   ├── recovery/      # Self-Correction & Recovery Engine
 │   ├── monitoring/    # Progress Monitoring
-│   └── controller/    # Brain Controller orchestrator
+│   ├── controller/    # Brain Controller orchestrator
+│   └── conversation_intelligence/ # Multi-Turn Dialog, Entity Linking, & Ambiguity Resolver
 ├── memory/            # Tiered Memory Subsystem
 │   ├── config.py      # Memory settings and provider resolution
 │   ├── models/        # Domain models (MemoryEntry, AssistantContext, etc.)
 │   ├── manager/       # MemoryService, ContextBuilder, MemoryRanker, ContextWindowConfig
-│   ├── repository/    # ORM Repositories (Conversation, Execution, Context, Preference)
+│   ├── repository/    # ORM Repositories (Conversation, Execution, Context, Preference, etc.)
 │   ├── providers/     # InMemoryProvider and PostgresProvider
 │   ├── preferences/   # Preference Engine
 │   ├── context/       # Short-term Context Memory
 │   ├── workspace/     # Workspace Profiles & Intelligence Subsystem
 │   ├── learning/      # Routine Learning Engine
 │   ├── personalization/ # Personalization Engine
-│   └── coordinator/   # Memory Coordinator
+│   ├── coordinator/   # Memory Coordinator
+│   ├── routines/      # Autonomous Routine Engine (detection, library, matching, scheduling)
+│   ├── proactive/     # Proactive Assistant Engine (prediction, suggestions, scoring, feedback)
+│   ├── recommendations/ # Adaptive Recommendation triggers and policy evaluation
+│   └── workflows/     # Workflow mining and runtime observation
 ├── voice/             # Modular Voice Engine subsystems
 │   ├── speech/        # PyAudio device interactions and Speech-to-Text transcription
 │   ├── conversation/  # Voice session state machine and inactivity tracking
@@ -81,6 +86,14 @@ backend/
 * **Voice UX**: Standardizes states (`SLEEPING`, `LISTENING`, `PROCESSING`, `SPEAKING`, `WAITING`, `ERROR`) and triggers platform chimes.
 * **Voice Integration Pipeline**: Continuously listens for wake phrases, loops follow-up speech-to-intent pipelines, and handles system failures (mic disconnection, recognition timeouts, planner/capability exceptions, speech interruption).
 
+### 2.5 Autonomous Routines & Proactive Assistant
+* **Autonomous Routine Engine**: Automatically discovers repeated user behavior, converts repeated execution patterns into reusable routines, safely recommends routine creation, executes approved routines, monitors their performance, optimizes them over time, and persists them as long-term knowledge.
+* **Proactive Assistant Engine**: Transforms Auralis into a proactive desktop assistant capable of predicting user needs before commands are issued using deterministic activity prediction, recommendation scoring, prioritization, history tracking, and user feedback learning.
+* **Adaptive Recommendation Engine**: Evaluates runtime context and environmental triggers (`WorkspaceOpened`, `ApplicationOpened`, etc.) against confidence thresholds and cooldown policies to suggest workflows without interrupting execution.
+
+### 2.6 Conversational Intelligence Subsystem
+* **Conversational Intelligence Engine**: Manages multi-turn conversation state, links entities across turns (e.g., resolving `"it"`, `"them"`, `"the second folder"` to previous actions), resolves command ambiguity, formulates interactive clarification requests, and handles conversational error recovery.
+
 ---
 
 ## 3. Getting Started
@@ -114,4 +127,4 @@ Execute the entire Pytest suite:
 ```bash
 pytest
 ```
-Currently, the backend contains **517 unit and integration tests** verifying core flows, file operations, state transitions, speech, memory retrieval, brain orchestration, memory ranking, context windows, reference resolution, workspace intelligence, and integration pipeline steps.
+Currently, the backend contains **644 unit and integration tests** verifying core flows, file operations, state transitions, speech, memory retrieval, brain orchestration, memory ranking, context windows, reference resolution, workspace intelligence, autonomous routines, proactive assistant, conversational intelligence, and integration pipeline steps.

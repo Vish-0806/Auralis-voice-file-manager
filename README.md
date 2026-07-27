@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/Vish-0806/Auralis-voice-file-manager"><img src="https://img.shields.io/badge/status-active-brightgreen?style=flat-square" alt="Status"></a>
-  <a href="https://github.com/Vish-0806/Auralis-voice-file-manager/releases"><img src="https://img.shields.io/badge/version-1.3.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/Vish-0806/Auralis-voice-file-manager/releases"><img src="https://img.shields.io/badge/version-1.5.0-blue?style=flat-square" alt="Version"></a>
   <a href="file:///d:/Auralis-voice-file-manager/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/python-3.8%2B-blue?style=flat-square" alt="Python"></a>
   <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-0.136.1-red?style=flat-square" alt="FastAPI"></a>
@@ -46,6 +46,9 @@ Auralis offers a broad set of capabilities designed for productivity and ease of
 | **Document Intelligence** | PDF & Text Summarization | Extract key points, actions, and metadata from local files without opening external apps. |
 | **Semantic Search** | Vector-Based Discovery | Find files based on meaning, topic, or content rather than just matching exact filenames. |
 | **Workflow Automation** | Multi-Step Chains | Combine multiple operations (e.g., "Clean my desktop and backup active projects") into single commands. |
+| **Autonomous Routines** | Pattern Mining & Execution | Automatically discovers repeated user workflows, recommends routine creation, and schedules background execution. |
+| **Proactive Assistant** | Predictive Action Suggestions | Predicts likely next user actions using historical activity analysis and deterministic scoring without LLM overhead. |
+| **Conversational Intelligence** | Multi-Turn Dialog & Entity Linking | Resolves ambiguity across turns, links entities, and manages clarification requests and dialogue recovery. |
 | **Memory Engine** | Tiered Memory & Persistence | Manages short-term context, workspace profiles, user preferences, n-gram routine mining, and PostgreSQL ORM storage. |
 | **Privacy First** | Local Execution | Keeps your files, voice data, and operational logs securely on your local system. |
 
@@ -105,17 +108,29 @@ Auralis Version 1.4.0 implements the complete Phase 6 **Intelligent Planning & R
 
 ---
 
+## Autonomous Routine & Proactive Assistant Engine (v1.5.0)
+
+Auralis Version 1.5.0 implements the complete **Autonomous Routine Engine**, **Proactive Assistant Engine**, and **Conversational Intelligence Engine**.
+
+### Key Additions:
+1. **Autonomous Routine Engine (Phase 7.4)**: Automatically discovers repeated user behavior, converts repeated execution patterns into reusable routines, safely recommends routine creation, executes approved routines, monitors their performance, optimizes them over time, and persists them in PostgreSQL.
+2. **Proactive Assistant Engine (Phase 7.5)**: Transforms Auralis from a reactive assistant into a proactive desktop assistant capable of predicting user needs before commands are issued using deterministic activity prediction, recommendation scoring, prioritization, history tracking, and user feedback learning.
+3. **Conversational Intelligence Engine (Phase 7.6)**: Manages multi-turn dialogue state, active tasks, phases, cross-turn entity linking, deterministic follow-up resolution, ambiguity detection, clarification management, and session context recovery.
+4. **Adaptive Recommendation Pipeline**: Triggers workflows based on environmental events (`WorkspaceOpened`, `ApplicationOpened`, `TimeOfDay`, `PreviousWorkflowCompleted`) evaluated through deterministic confidence and cooldown policies.
+
+---
+
 ## Architecture
 
-Auralis uses a modular architecture that separates voice capture, natural language understanding, memory context building, reference resolution, execution planning, and OS operations:
+Auralis uses a modular architecture that separates voice capture, natural language understanding, memory context building, conversational intelligence and state tracking, execution planning, and OS operations:
 
 ```mermaid
 graph TD
     User([User]) -->|Voice / Text Command| VoiceEngine[Voice Engine]
     VoiceEngine -->|BrainRequest| BrainController[Brain Controller]
     BrainController -->|Fetch Memory| ContextBuilder[ContextBuilder]
-    ContextBuilder -->|AssistantContext| RefResolver[ReferenceResolver]
-    RefResolver -->|ResolvedRequest| GoalInterpreter[Goal Interpreter]
+    ContextBuilder -->|AssistantContext| ConvIntel[Conversational Intelligence Engine]
+    ConvIntel -->|ResolvedRequest| GoalInterpreter[Goal Interpreter]
     GoalInterpreter -->|Goal| ReasoningEngine[Reasoning Engine]
     ReasoningEngine -->|Objectives| TaskPlanner[Dynamic Task Planner]
     
@@ -177,12 +192,12 @@ The project utilizes modern libraries and frameworks across both frontend and ba
 Auralis/
 ├── backend/                   # FastAPI Backend Application
 │   ├── api/                   # Router declarations and API endpoints
-│   ├── brain/                 # AI Brain Orchestration (Goal, Reasoning, Planning, Recovery, Controller)
+│   ├── brain/                 # AI Brain Orchestration (Goal, Reasoning, Planning, Recovery, Conversation Intelligence, Controller)
 │   ├── capabilities/          # OS capabilities (files, desktop, automation, developer)
 │   ├── core/                  # Assistant boundary, intent schemas, planner, and dispatcher
-│   ├── memory/                # Tiered Memory System (PostgresProvider, ContextBuilder, Ranker, Repositories)
+│   ├── memory/                # Tiered Memory System (PostgresProvider, ContextBuilder, Routines, Proactive, Recommendations)
 │   ├── voice/                 # Modular Voice Engine subsystems
-│   ├── tests/                 # 541 unit & integration tests
+│   ├── tests/                 # 644 unit & integration tests
 │   ├── main.py                # Backend entry point
 │   └── requirements.txt       # Python package dependencies
 ├── frontend/                  # Vite + React Client App
@@ -205,6 +220,9 @@ Track the development stages of Auralis:
 * [x] **Advanced Memory Retrieval & Context Construction (Phase 4):** PostgreSQL ORM Repositories, `ContextBuilder`, `BrainController` context integration, `ReferenceResolver`, `MemoryRanker`, and `ContextWindowConfig`.
 * [x] **Workspace Intelligence & Awareness (Phase 5):** Asynchronous indexers, project detectors, thread-safe caching coordinators, context construction, and brain reasoning pipelines.
 * [x] **Intelligent Planning & Reasoning Engine (Phase 6):** Goal decomposition, workflow libraries matching and compositions, parallel optimizations, compiler registrants, and integrated test pipelines.
+* [x] **Autonomous Routine Engine (Phase 7.4):** Pattern detection, validation, optimization, routine library, matching, background scheduling, monitoring, and database persistence.
+* [x] **Proactive Assistant Engine (Phase 7.5):** Activity prediction, suggestion recommendation, deterministic scoring, prioritization, history tracking, user feedback learning, and coordinator integration.
+* [x] **Conversational Intelligence Engine:** Multi-turn context tracking, entity linking, ambiguity resolution, follow-up clarification, and session state management.
 * [ ] **Future Objectives:**
   * [ ] Document intelligence parser using local PyMuPDF extraction.
   * [ ] Plugin Marketplace for community extensions.
@@ -222,7 +240,7 @@ python -m venv venv
 # Install dependencies
 pip install -r backend/requirements.txt
 
-# Run complete test suite (541 tests)
+# Run complete test suite (644 tests)
 pytest backend/tests
 
 # Launch backend server

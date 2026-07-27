@@ -47,6 +47,12 @@ class BrainController:
         self._memory_service = memory_service or MemoryService()
         self._active_executions: dict[str, BrainExecution] = {}
         self._register_subsystems()
+        try:
+            from brain.conversation_intelligence.runtime import ConversationalIntelligenceEngine
+            self._conv_engine = ConversationalIntelligenceEngine(self._memory_service)
+        except Exception as e:
+            self._logger.warning("Failed to initialize ConversationalIntelligenceEngine: %s", e)
+            self._conv_engine = None
 
     def _run_async(self, coro) -> Any:
         """Runs a coroutine synchronously or schedules it on a running event loop."""
@@ -142,30 +148,6 @@ class BrainController:
                 }
             )
 
-        # Resolve references using ReferenceResolver
-        try:
-            from brain.planning.reference_resolver import ReferenceResolver
-            resolver = ReferenceResolver()
-            resolved_req = resolver.resolve(request.message, assistant_context)
-            resolved_message = resolved_req.resolved_request
-            self._logger.info(
-                "Reference resolution completed",
-                extra={
-                    "execution_id": execution_id,
-                    "original_request": request.message,
-                    "resolved_request": resolved_message,
-                    "entities": resolved_req.resolved_entities,
-                    "confidence": resolved_req.confidence_score,
-                }
-            )
-        except Exception:
-            self._logger.warning(
-                "Failed to run ReferenceResolver; falling back to original request",
-                exc_info=True,
-                extra={"execution_id": execution_id}
-            )
-            resolved_message = request.message
-
         pipeline = BrainPipeline(
             config=self._config,
             interpreter=self._registry.get_module("GoalInterpreter"),
@@ -177,7 +159,40 @@ class BrainController:
         )
 
         execution.status = BrainStatus.EXECUTING
-        response = pipeline.execute(resolved_message, dispatcher, context=assistant_context)
+
+        session_id = request.correlation_id or "default"
+        if request.context and "session_id" in request.context:
+            session_id = request.context["session_id"]
+
+        if self._conv_engine:
+            try:
+                response = self._conv_engine.process_turn(
+                    command=request.message,
+                    session_id=session_id,
+                    user_id=user_id,
+                    assistant_context=assistant_context,
+                    dispatcher=dispatcher,
+                    brain_pipeline=pipeline,
+                )
+            except Exception as e:
+                self._logger.exception("ConversationalIntelligenceEngine failed, falling back to standard pipeline")
+                try:
+                    from brain.planning.reference_resolver import ReferenceResolver
+                    resolver = ReferenceResolver()
+                    resolved_req = resolver.resolve(request.message, assistant_context)
+                    resolved_message = resolved_req.resolved_request
+                except Exception:
+                    resolved_message = request.message
+                response = pipeline.execute(resolved_message, dispatcher, context=assistant_context)
+        else:
+            try:
+                from brain.planning.reference_resolver import ReferenceResolver
+                resolver = ReferenceResolver()
+                resolved_req = resolver.resolve(request.message, assistant_context)
+                resolved_message = resolved_req.resolved_request
+            except Exception:
+                resolved_message = request.message
+            response = pipeline.execute(resolved_message, dispatcher, context=assistant_context)
 
         execution.status = BrainStatus.COMPLETED if response.success else BrainStatus.FAILED
         execution.end_time = time.time()

@@ -2,20 +2,82 @@
 
 from __future__ import annotations
 
-from .models import ExecutionSummary, ExecutionStatus, ExecutionRecord
+from .models import ExecutionRecord
 from .execution_context import ExecutionContext
 from .execution_history import ExecutionHistory
 from .execution_validator import ExecutionValidator
 from .execution_scheduler import ExecutionScheduler
 from .execution_engine import ExecutionEngine
+from .execution_state import (
+    ExecutionStatus,
+    ExecutionProgress,
+    ExecutionState,
+    ExecutionSnapshot,
+    ExecutionStateConfig,
+)
+from .execution_state_manager import ExecutionStateManager
+from .execution_monitor import (
+    ExecutionMetrics,
+    ExecutionSummary,
+    ExecutionStatistics,
+    ExecutionMonitor,
+)
+from .decision_engine import (
+    DecisionType,
+    DecisionReason,
+    ExecutionDecision,
+    DecisionContext,
+    DecisionEngine,
+)
+from .failure_recovery import (
+    FailureCategory,
+    RecoveryStrategy,
+    FailureAnalysis,
+    RecoveryPlan,
+    RecoveryContext,
+    FailureRecoveryEngine,
+)
+from .clarification_engine import (
+    ClarificationType,
+    ClarificationChoice,
+    ClarificationRequest,
+    ClarificationResponse,
+    ClarificationContext,
+    ClarificationEngine,
+)
 
 __all__ = [
     "ExecutionStatus",
     "ExecutionRecord",
     "ExecutionContext",
-    "ExecutionSummary",
     "ExecutionHistory",
     "ExecutionValidator",
     "ExecutionScheduler",
     "ExecutionEngine",
+    "ExecutionProgress",
+    "ExecutionState",
+    "ExecutionSnapshot",
+    "ExecutionStateConfig",
+    "ExecutionStateManager",
+    "ExecutionMetrics",
+    "ExecutionSummary",
+    "ExecutionStatistics",
+    "ExecutionMonitor",
+    "DecisionType",
+    "DecisionReason",
+    "ExecutionDecision",
+    "DecisionContext",
+    "DecisionEngine",
+    "FailureCategory",
+    "RecoveryStrategy",
+    "FailureAnalysis",
+    "RecoveryPlan",
+    "RecoveryContext",
+    "FailureRecoveryEngine",
+    "ClarificationType",
+    "ClarificationChoice",
+    "ClarificationRequest",
+    "ClarificationResponse",
+    "ClarificationContext",
+    "ClarificationEngine",
 ]

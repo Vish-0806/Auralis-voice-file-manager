@@ -9,8 +9,8 @@ The AI Brain is structured as a series of independent, single-responsibility lay
 ```mermaid
 graph TD
     Request[User Message / BrainRequest] --> Builder[ContextBuilder]
-    Builder -->|AssistantContext| Resolver[ReferenceResolver]
-    Resolver -->|ResolvedRequest| Interpreter[Goal Interpreter]
+    Builder -->|AssistantContext| ConvIntel[Conversational Intelligence Engine]
+    ConvIntel -->|ResolvedRequest| Interpreter[Goal Interpreter]
     Interpreter --> |Goal Result| Reasoning[Reasoning Engine]
     Reasoning --> |Reasoning Result| Planner[Dynamic Task Planner]
     Planner --> |Core Execution Plan| Selector[Capability Selector]
@@ -36,6 +36,7 @@ graph TD
 | [recovery/](file:///c:/Users/Vishal S Naik/MyProjects/Auralis-voice-file-manager/backend/brain/recovery) | **Self-Correction & Recovery** | Analyzes step failures, maps fallback strategies (e.g. launching Edge if Chrome is missing), and recovers steps. |
 | [monitoring/](file:///c:/Users/Vishal S Naik/MyProjects/Auralis-voice-file-manager/backend/brain/monitoring) | **Progress Monitoring** | Observes execution status, provides percentage estimations, detects stalls, and records execution metrics. |
 | [controller/](file:///c:/Users/Vishal S Naik/MyProjects/Auralis-voice-file-manager/backend/brain/controller) | **AI Brain Controller** | Orchestrates the entire pipeline, retrieving context, resolving references, and exposing the centralized execution gateway `process_request`. |
+| [conversation_intelligence/](file:///c:/Users/Vishal S Naik/MyProjects/Auralis-voice-file-manager/backend/brain/conversation_intelligence) | **Conversational Intelligence Engine** | Manages multi-turn conversation state, links entities across turns, resolves ambiguity, generates clarification requests, and recovers from dialogue errors. |
 
 ## Core Integration Flow
 
@@ -43,7 +44,7 @@ The AI Brain integrates seamlessly into Auralis' main entry point, `AuralisAssis
 
 1. When a request is received, the assistant wraps it into a `BrainRequest` and sends it to the `BrainController`.
 2. The controller invokes `ContextBuilder` to aggregate and rank an `AssistantContext` (conversations, executions, preferences, workspace state).
-3. The controller runs `ReferenceResolver` to replace pronouns (`it`, `them`) and spatial pointers (`same folder`) with concrete entity paths.
-4. The controller processes the resolved request through the pipeline stages (Goal Interpreter, Reasoning, Planner, Capability Selector, Execution Engine).
+3. The controller routes the request to the `ConversationalIntelligenceEngine` to manage dialogue state, check pending clarifications, resolve contextual follow-ups, link entities, and detect ambiguities.
+4. If ambiguous, the engine registers a pending clarification in the dialogue state and prompts the user; otherwise, the resolved request is processed through the pipeline stages (Goal Interpreter, Reasoning, Planner, Capability Selector, Execution Engine).
 5. If the Goal Interpreter returns low confidence or an `UNKNOWN` goal classification, the controller bypasses the AI Brain and falls back to legacy rule-based execution.
 6. If a step fails during execution, the Multi-Step Execution Engine intercepts the failure, invokes the Recovery Engine to apply safe remediations, and resumes execution seamlessly.
