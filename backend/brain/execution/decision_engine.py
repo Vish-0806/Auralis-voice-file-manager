@@ -63,6 +63,10 @@ class DecisionContext(BaseModel):
 class DecisionEngine:
     """Evaluates context parameters to dynamically suggest safe and efficient task execution strategies."""
 
+    def __init__(self, clarification_engine: Any | None = None) -> None:
+        from brain.execution.clarification_engine import ClarificationEngine
+        self._clarification_engine = clarification_engine or ClarificationEngine()
+
     def evaluate(self, context: Optional[DecisionContext]) -> ExecutionDecision:
         """Evaluates the context and returns the optimal execution strategy.
 
@@ -78,6 +82,48 @@ class DecisionEngine:
                 reason=DecisionReason.UNKNOWN,
                 confidence=0.0,
                 message="Invalid or empty context provided.",
+            )
+
+        # Consult ClarificationEngine to detect ambiguity/confirmations
+        step_obj = None
+        if context.workflow_metadata or context.execution_state:
+            from core.intents import Intent
+            meta_src = context.workflow_metadata or {}
+            target_val = meta_src.get("target")
+            if not target_val and context.execution_state:
+                target_val = context.execution_state.metadata.get("target") or context.execution_state.current_step_id
+                
+            intent_val = meta_src.get("intent")
+            if not intent_val and context.execution_state:
+                intent_val = context.execution_state.metadata.get("intent")
+                
+            if not intent_val:
+                intent_enum = None
+            else:
+                intent_enum = Intent(intent_val) if intent_val in Intent.__members__ or intent_val in [v.value for v in Intent] else Intent.UNKNOWN
+            
+            class HelperStep:
+                def __init__(self, target, intent, parameters):
+                    self.target = target
+                    self.intent = intent
+                    self.parameters = parameters or {}
+            step_obj = HelperStep(target_val, intent_enum, meta_src.get("parameters") or (context.execution_state.metadata if context.execution_state else {}))
+
+        from brain.execution.clarification_engine import ClarificationContext as ClarCtx
+        clar_context = ClarCtx(
+            assistant_context=context.assistant_context if isinstance(context.assistant_context, dict) else None,
+            execution_step=step_obj,
+            workspace_analysis=context.workspace_analysis if isinstance(context.workspace_analysis, dict) else None,
+            resolved_preferences=context.resolved_preferences,
+            metadata=context.execution_state.metadata if context.execution_state else {},
+        )
+        if self._clarification_engine.detect_clarification(clar_context):
+            return ExecutionDecision(
+                decision_type=DecisionType.ASK_USER,
+                reason=DecisionReason.USER_CONFIRMATION_REQUIRED,
+                confidence=1.0,
+                message="Clarification required before task execution.",
+                recommended_action="Ask user for clarification",
             )
 
         # 1. Evaluate user confirmation (ASK_USER)

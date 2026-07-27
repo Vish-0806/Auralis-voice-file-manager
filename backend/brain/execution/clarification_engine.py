@@ -88,7 +88,8 @@ class ClarificationEngine:
 
         # Rule 1: MISSING_TARGET
         if not target and intent:
-            return True
+            if context.metadata.get("missing_target") or intent in (Intent.OPEN_APPLICATION, Intent.CLOSE_APPLICATION, Intent.OPEN_FILE, Intent.OPEN_FOLDER, Intent.DELETE_FOLDER):
+                return True
 
         # Rule 2: WORKSPACE_SELECTION (Multiple projects)
         if target == "project" and context.workspace_analysis and len(context.workspace_analysis.get("projects", [])) > 1:
@@ -108,8 +109,8 @@ class ClarificationEngine:
         if context.metadata.get("multiple_files") or (context.workspace_analysis and context.workspace_analysis.get("multiple_files")):
             return True
 
-        # Rule 5: CONFIRMATION (High-risk operations)
-        if target == "Downloads" or context.metadata.get("needs_confirmation") or (step and step.parameters and step.parameters.get("confirm_required")):
+        # Rule 5: CONFIRMATION (High-risk operations via explicit metadata flags)
+        if context.metadata.get("needs_confirmation") or (step and step.parameters and step.parameters.get("confirm_required")):
             return True
 
         # Rule 6: MISSING_PARAMETER (No destination parameter)
@@ -121,6 +122,12 @@ class ClarificationEngine:
         # Rule 7: AMBIGUOUS_INTENT
         if context.metadata.get("ambiguous_intent") or intent == Intent.UNKNOWN or str(intent) == "UNKNOWN" or "UNKNOWN" in str(intent):
             return True
+
+        # Rule 8: If decision says ASK_USER
+        if context.decision and hasattr(context.decision, "decision_type"):
+            dt = context.decision.decision_type
+            if dt == "ASK_USER" or (hasattr(dt, "value") and dt.value == "ASK_USER"):
+                return True
 
         return False
 
@@ -202,11 +209,11 @@ class ClarificationEngine:
             )
 
         # Case 5: CONFIRMATION
-        if target == "Downloads" or context.metadata.get("needs_confirmation") or (step and step.parameters and step.parameters.get("confirm_required")):
+        if context.metadata.get("needs_confirmation") or (step and step.parameters and step.parameters.get("confirm_required")):
             return ClarificationRequest(
                 clarification_id=clarification_id,
                 type=ClarificationType.CONFIRMATION,
-                question=f"Are you sure you want to proceed with this operation on {target or 'Downloads'}?",
+                question=f"Are you sure you want to proceed with this operation on {target or 'the target'}?",
                 choices=[
                     ClarificationChoice(id="yes", label="Yes", description="Proceed with execution"),
                     ClarificationChoice(id="no", label="No", description="Cancel execution"),
@@ -227,6 +234,22 @@ class ClarificationEngine:
                     ClarificationChoice(id="dest_b", label="/dest/b", description="Destination path B"),
                 ],
                 default_choice="dest_a",
+                required=True,
+                timeout_seconds=timeout_seconds,
+            )
+
+        # Case 8: ASK_USER from DecisionEngine
+        if context.decision and hasattr(context.decision, "decision_type") and (context.decision.decision_type == "ASK_USER" or (hasattr(context.decision.decision_type, "value") and context.decision.decision_type.value == "ASK_USER")):
+            reason_msg = getattr(context.decision, "message", "User confirmation required.")
+            return ClarificationRequest(
+                clarification_id=clarification_id,
+                type=ClarificationType.CONFIRMATION,
+                question=f"{reason_msg} Do you want to proceed?",
+                choices=[
+                    ClarificationChoice(id="yes", label="Yes", description="Proceed with execution"),
+                    ClarificationChoice(id="no", label="No", description="Cancel execution"),
+                ],
+                default_choice="no",
                 required=True,
                 timeout_seconds=timeout_seconds,
             )

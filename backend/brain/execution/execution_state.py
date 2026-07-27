@@ -83,6 +83,9 @@ class ExecutionState(BaseModel):
     recovery_attempts: int = Field(default=0, ge=0, description="Total count of active recovery attempts")
     last_recovery_strategy: Optional[str] = Field(default=None, description="Type/strategy of last recovery attempt")
     waiting_for_confirmation: bool = Field(default=False, description="Flag indicating step requires user confirmation")
+    clarification_request_id: Optional[str] = Field(default=None, description="ID of active clarification request")
+    clarification_timestamp: Optional[datetime] = Field(default=None, description="Timestamp when clarification request was generated")
+    clarification_reason: Optional[str] = Field(default=None, description="Reason why clarification is required")
 
     def is_active(self) -> bool:
         """Returns True if the execution is in an active (non-terminal) state."""

@@ -178,7 +178,7 @@ def test_runtime_ask_user_decision() -> None:
 
     state = engine._state_manager.get_execution("exec_ask")
     assert state is not None
-    assert state.status == ExecutionStatus.PAUSED
+    assert state.status in (ExecutionStatus.PAUSED, ExecutionStatus.WAITING_FOR_CONFIRMATION)
 
 
 def test_runtime_cancel_execution() -> None:

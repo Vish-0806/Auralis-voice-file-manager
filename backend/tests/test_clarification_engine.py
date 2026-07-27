@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+# pyrefly: ignore [missing-import]
 import pytest
 from typing import Any
 
@@ -89,10 +90,10 @@ def test_clarification_file_selection() -> None:
 
 
 def test_clarification_confirmation_required() -> None:
-    """Verifies that CONFIRMATION type is generated for high-risk targets."""
+    """Verifies that CONFIRMATION type is generated for high-risk operations via metadata flags."""
     engine = ClarificationEngine()
     step = MockExecutionStep(intent=Intent.DELETE_FOLDER, target="Downloads")
-    context = ClarificationContext(execution_step=step)
+    context = ClarificationContext(execution_step=step, metadata={"needs_confirmation": True})
 
     assert engine.detect_clarification(context) is True
     req = engine.generate_request(context)
@@ -221,14 +222,14 @@ def test_clarification_timeout_defaults() -> None:
     engine = ClarificationEngine()
     step = MockExecutionStep(intent=Intent.DELETE_FOLDER, target="Downloads")
     # Timeout override in metadata
-    context = ClarificationContext(execution_step=step, metadata={"timeout_seconds": 120})
+    context = ClarificationContext(execution_step=step, metadata={"timeout_seconds": 120, "needs_confirmation": True})
 
     req = engine.generate_request(context)
     assert req is not None
     assert req.timeout_seconds == 120
 
     # Default timeout check
-    context_default = ClarificationContext(execution_step=step)
+    context_default = ClarificationContext(execution_step=step, metadata={"needs_confirmation": True})
     req_default = engine.generate_request(context_default)
     assert req_default is not None
     assert req_default.timeout_seconds == 60

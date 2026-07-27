@@ -24,6 +24,7 @@ from .execution_scheduler import ExecutionScheduler
 from .execution_state_manager import ExecutionStateManager
 from .decision_engine import DecisionEngine, DecisionContext, DecisionType, DecisionReason, ExecutionDecision
 from .failure_recovery import FailureRecoveryEngine, RecoveryContext, RecoveryStrategy
+from .clarification_engine import ClarificationEngine, ClarificationContext, ClarificationRequest
 
 
 class ExecutionEngine:
@@ -41,6 +42,7 @@ class ExecutionEngine:
         state_manager: ExecutionStateManager | None = None,
         decision_engine: DecisionEngine | None = None,
         failure_recovery_engine: FailureRecoveryEngine | None = None,
+        clarification_engine: ClarificationEngine | None = None,
     ) -> None:
         """Initializes the ExecutionEngine.
 
@@ -55,6 +57,7 @@ class ExecutionEngine:
             state_manager: Optional injected ExecutionStateManager.
             decision_engine: Optional injected DecisionEngine.
             failure_recovery_engine: Optional injected FailureRecoveryEngine.
+            clarification_engine: Optional injected ClarificationEngine.
         """
         self._logger = logger or logging.getLogger(__name__)
         self._validator = validator or ExecutionValidator(logger=self._logger)
@@ -64,8 +67,9 @@ class ExecutionEngine:
         self._recovery_engine = recovery_engine or RecoveryEngine(logger=self._logger)
         self._progress_monitor = progress_monitor or ProgressMonitor(logger=self._logger)
         self._state_manager = state_manager or ExecutionStateManager()
-        self._decision_engine = decision_engine or DecisionEngine()
+        self._decision_engine = decision_engine or DecisionEngine(clarification_engine=clarification_engine)
         self._failure_recovery_engine = failure_recovery_engine or FailureRecoveryEngine()
+        self._clarification_engine = clarification_engine or ClarificationEngine()
 
         # Inject or dynamically build default WorkflowObserver
         self._workflow_observer = workflow_observer
@@ -542,10 +546,54 @@ class ExecutionEngine:
             elif decision.decision_type == DecisionType.ASK_USER:
                 self._logger.info("Decision Applied", extra={"execution_id": execution_id, "decision": "ASK_USER"})
                 self._logger.info("Confirmation Required", extra={"execution_id": execution_id})
-                self._safe_mark_paused(execution_id)
-                overall_success = False
-                summary_error = f"User confirmation required: {decision.message}"
-                break
+                
+                try:
+                    from brain.execution.clarification_engine import ClarificationContext as ClarCtx
+                    clar_metadata = {}
+                    if exec_state and hasattr(exec_state, 'metadata') and exec_state.metadata:
+                        clar_metadata.update(exec_state.metadata)
+                    if plan.parameters:
+                        clar_metadata.update(plan.parameters)
+                    clar_context = ClarCtx(
+                        assistant_context=decision_context.assistant_context if isinstance(decision_context.assistant_context, dict) else None,
+                        execution_step=step_plan,
+                        workspace_analysis=decision_context.workspace_analysis if isinstance(decision_context.workspace_analysis, dict) else None,
+                        resolved_preferences=decision_context.resolved_preferences,
+                        decision=decision,
+                        metadata=clar_metadata,
+                    )
+                    req = self._clarification_engine.generate_request(clar_context)
+                    if req:
+                        self._logger.info("Clarification Requested", extra={"execution_id": execution_id})
+                        self._logger.info("Execution Suspended", extra={"execution_id": execution_id})
+                        self._logger.info("Awaiting User Confirmation", extra={"execution_id": execution_id})
+                        
+                        if exec_state:
+                            from datetime import datetime, timezone
+                            from .execution_state import ExecutionStatus as StateStatus
+                            exec_state.waiting_for_confirmation = True
+                            exec_state.clarification_request_id = req.clarification_id
+                            exec_state.clarification_timestamp = datetime.now(timezone.utc)
+                            exec_state.clarification_reason = decision.message
+                            exec_state.status = StateStatus.WAITING_FOR_CONFIRMATION
+                            exec_state._touch()
+                        
+                        overall_success = False
+                        summary_error = f"User confirmation required: {decision.message}"
+                        break
+                    else:
+                        self._logger.info("Clarification Not Required", extra={"execution_id": execution_id})
+                        self._logger.info("Execution Resumed Ready", extra={"execution_id": execution_id})
+                        self._safe_mark_paused(execution_id)
+                        overall_success = False
+                        summary_error = f"User confirmation required: {decision.message}"
+                        break
+                except Exception as e:
+                    self._logger.warning("ClarificationEngine failed, continuing without blocking", exc_info=e)
+                    self._safe_mark_paused(execution_id)
+                    overall_success = False
+                    summary_error = f"User confirmation required: {decision.message}"
+                    break
 
             elif decision.decision_type == DecisionType.SKIP:
                 self._logger.info("Decision Applied", extra={"execution_id": execution_id, "decision": "SKIP"})
