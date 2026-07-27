@@ -37,6 +37,14 @@ from .failure_recovery import (
     RecoveryContext,
     FailureRecoveryEngine,
 )
+from .clarification_engine import (
+    ClarificationType,
+    ClarificationChoice,
+    ClarificationRequest,
+    ClarificationResponse,
+    ClarificationContext,
+    ClarificationEngine,
+)
 
 __all__ = [
     "ExecutionStatus",
@@ -66,4 +74,10 @@ __all__ = [
     "RecoveryPlan",
     "RecoveryContext",
     "FailureRecoveryEngine",
+    "ClarificationType",
+    "ClarificationChoice",
+    "ClarificationRequest",
+    "ClarificationResponse",
+    "ClarificationContext",
+    "ClarificationEngine",
 ]
