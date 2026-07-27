@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
-from .models import ExecutionSummary, ExecutionStatus, ExecutionRecord
+from .models import ExecutionSummary, ExecutionRecord
 from .execution_context import ExecutionContext
 from .execution_history import ExecutionHistory
 from .execution_validator import ExecutionValidator
 from .execution_scheduler import ExecutionScheduler
 from .execution_engine import ExecutionEngine
+from .execution_state import (
+    ExecutionStatus,
+    ExecutionProgress,
+    ExecutionState,
+    ExecutionSnapshot,
+    ExecutionStateConfig,
+)
 
 __all__ = [
     "ExecutionStatus",
@@ -18,4 +25,8 @@ __all__ = [
     "ExecutionValidator",
     "ExecutionScheduler",
     "ExecutionEngine",
+    "ExecutionProgress",
+    "ExecutionState",
+    "ExecutionSnapshot",
+    "ExecutionStateConfig",
 ]
