@@ -22,6 +22,7 @@ from .execution_history import ExecutionHistory
 from .execution_validator import ExecutionValidator
 from .execution_scheduler import ExecutionScheduler
 from .execution_state_manager import ExecutionStateManager
+from .decision_engine import DecisionEngine, DecisionContext, DecisionType, DecisionReason, ExecutionDecision
 
 
 class ExecutionEngine:
@@ -37,6 +38,7 @@ class ExecutionEngine:
         logger: logging.Logger | None = None,
         workflow_observer: Any = None,
         state_manager: ExecutionStateManager | None = None,
+        decision_engine: DecisionEngine | None = None,
     ) -> None:
         """Initializes the ExecutionEngine.
 
@@ -49,6 +51,7 @@ class ExecutionEngine:
             logger: Optional custom logger.
             workflow_observer: Optional injected WorkflowObserver instance.
             state_manager: Optional injected ExecutionStateManager.
+            decision_engine: Optional injected DecisionEngine.
         """
         self._logger = logger or logging.getLogger(__name__)
         self._validator = validator or ExecutionValidator(logger=self._logger)
@@ -58,6 +61,7 @@ class ExecutionEngine:
         self._recovery_engine = recovery_engine or RecoveryEngine(logger=self._logger)
         self._progress_monitor = progress_monitor or ProgressMonitor(logger=self._logger)
         self._state_manager = state_manager or ExecutionStateManager()
+        self._decision_engine = decision_engine or DecisionEngine()
 
         # Inject or dynamically build default WorkflowObserver
         self._workflow_observer = workflow_observer
@@ -128,6 +132,52 @@ class ExecutionEngine:
             self._logger.info("Execution Retrying", extra={"execution_id": execution_id})
         except Exception as e:
             self._logger.error("Failed to mark execution retrying in state manager", exc_info=e)
+
+    def _safe_mark_cancelled(self, execution_id: str) -> None:
+        try:
+            self._state_manager.mark_cancelled(execution_id)
+            self._logger.info("Execution Cancelled", extra={"execution_id": execution_id})
+        except Exception as e:
+            self._logger.error("Failed to mark execution cancelled in state manager", exc_info=e)
+
+    def _safe_mark_paused(self, execution_id: str) -> None:
+        try:
+            self._state_manager.mark_paused(execution_id)
+            self._logger.info("Execution Paused", extra={"execution_id": execution_id})
+        except Exception as e:
+            self._logger.error("Failed to mark execution paused in state manager", exc_info=e)
+
+    def _safe_mark_waiting(self, execution_id: str) -> None:
+        try:
+            state = self._state_manager.get_execution(execution_id)
+            if state:
+                from .execution_state import ExecutionStatus as StateStatus
+                state.status = StateStatus.WAITING
+                state._touch()
+            self._logger.info("Execution Waiting", extra={"execution_id": execution_id})
+        except Exception as e:
+            self._logger.error("Failed to mark execution waiting in state manager", exc_info=e)
+
+    def _safe_evaluate_decision(self, context: DecisionContext) -> ExecutionDecision:
+        try:
+            decision = self._decision_engine.evaluate(context)
+            self._logger.info(
+                "Decision Evaluated",
+                extra={
+                    "execution_id": context.execution_state.execution_id if context.execution_state else None,
+                    "decision_type": decision.decision_type.value,
+                    "reason": decision.reason.value,
+                }
+            )
+            return decision
+        except Exception as e:
+            self._logger.error("DecisionEngine evaluation failed, default to EXECUTE", exc_info=e)
+            return ExecutionDecision(
+                decision_type=DecisionType.EXECUTE,
+                reason=DecisionReason.UNKNOWN,
+                confidence=1.0,
+                message="Decision engine evaluation failure fallback to EXECUTE.",
+            )
 
     def _run_async(self, coro) -> Any:
         """Runs a coroutine synchronously or schedules it on a running event loop."""
@@ -256,6 +306,140 @@ class ExecutionEngine:
                 parameters=step_data["parameters"],
                 confidence=plan.confidence,
             )
+
+            # Build decision context for this step
+            exec_state = self._state_manager.get_execution(execution_id)
+            decision_context = DecisionContext(
+                execution_state=exec_state,
+                resolved_preferences=plan.parameters.get("resolved_preferences") or plan.parameters,
+                workflow_metadata={
+                    "intent": step_plan.intent.value if hasattr(step_plan.intent, "value") else str(step_plan.intent),
+                    "target": step_plan.target,
+                    "parameters": step_plan.parameters,
+                    "dangerous_operation": step_plan.parameters.get("dangerous_operation"),
+                    "missing_dependency": step_plan.parameters.get("missing_dependency"),
+                    "dependency_name": step_plan.parameters.get("dependency_name"),
+                },
+                capability_metadata={
+                    "vscode_running": step_plan.parameters.get("vscode_running"),
+                    "app_already_running": step_plan.parameters.get("app_already_running"),
+                    "app_name": step_plan.parameters.get("app_name"),
+                    "missing_executable": step_plan.parameters.get("missing_executable"),
+                    "original_executable": step_plan.parameters.get("original_executable"),
+                    "fallback_executable": step_plan.parameters.get("fallback_executable"),
+                }
+            )
+
+            # Evaluate decision safely
+            decision = self._safe_evaluate_decision(decision_context)
+
+            # Internally retain decision metadata in the execution state
+            if exec_state:
+                try:
+                    exec_state.metadata["decision_type"] = decision.decision_type.value
+                    exec_state.metadata["decision_reason"] = decision.reason.value
+                    exec_state.metadata["decision_confidence"] = decision.confidence
+                    exec_state.metadata["decision_metadata"] = decision.metadata
+                except Exception:
+                    pass
+
+            # Handle decisions
+            if decision.decision_type == DecisionType.CANCEL:
+                self._logger.info("Decision Applied", extra={"execution_id": execution_id, "decision": "CANCEL"})
+                self._logger.info("Execution Cancelled", extra={"execution_id": execution_id})
+                self._safe_mark_cancelled(execution_id)
+                overall_success = False
+                summary_error = f"Execution cancelled: {decision.message}"
+                break
+
+            elif decision.decision_type == DecisionType.WAIT:
+                self._logger.info("Decision Applied", extra={"execution_id": execution_id, "decision": "WAIT"})
+                self._safe_mark_waiting(execution_id)
+                overall_success = False
+                summary_error = f"Execution waiting: {decision.message}"
+                break
+
+            elif decision.decision_type == DecisionType.ASK_USER:
+                self._logger.info("Decision Applied", extra={"execution_id": execution_id, "decision": "ASK_USER"})
+                self._logger.info("Confirmation Required", extra={"execution_id": execution_id})
+                self._safe_mark_paused(execution_id)
+                overall_success = False
+                summary_error = f"User confirmation required: {decision.message}"
+                break
+
+            elif decision.decision_type == DecisionType.SKIP:
+                self._logger.info("Decision Applied", extra={"execution_id": execution_id, "decision": "SKIP"})
+                # Skip executing capability dispatch, treat step as successful
+                duration = 0.0
+                step_status = ExecutionStatus.SUCCESS
+                step_response = f"Step skipped: {decision.message}"
+                step_error = None
+                
+                record = ExecutionRecord(
+                    step_id=step_id,
+                    intent=step_plan.intent,
+                    capability=route.capability_name,
+                    status=step_status,
+                    duration=duration,
+                    response=step_response,
+                    error=step_error,
+                )
+                self._history.record_step(record)
+                records.append(record)
+
+                # Update progress after completed step
+                percentage = (((i + 1) / total_steps) * 100.0) if total_steps > 0 else 100.0
+                self._safe_update_progress(
+                    execution_id=execution_id,
+                    percentage=percentage,
+                    current_step=i + 1,
+                    total_steps=total_steps,
+                    current_operation=step_id,
+                )
+                continue
+
+            elif decision.decision_type == DecisionType.REUSE_RESOURCE:
+                self._logger.info("Decision Applied", extra={"execution_id": execution_id, "decision": "REUSE_RESOURCE"})
+                self._logger.info("Resource Reused", extra={"execution_id": execution_id})
+                # Skip executing capability dispatch, treat step as successful
+                duration = 0.0
+                step_status = ExecutionStatus.SUCCESS
+                step_response = f"Resource reused: {decision.message}"
+                step_error = None
+
+                record = ExecutionRecord(
+                    step_id=step_id,
+                    intent=step_plan.intent,
+                    capability=route.capability_name,
+                    status=step_status,
+                    duration=duration,
+                    response=step_response,
+                    error=step_error,
+                )
+                self._history.record_step(record)
+                records.append(record)
+
+                # Update progress after completed step
+                percentage = (((i + 1) / total_steps) * 100.0) if total_steps > 0 else 100.0
+                self._safe_update_progress(
+                    execution_id=execution_id,
+                    percentage=percentage,
+                    current_step=i + 1,
+                    total_steps=total_steps,
+                    current_operation=step_id,
+                )
+                continue
+
+            elif decision.decision_type == DecisionType.USE_FALLBACK:
+                self._logger.info("Decision Applied", extra={"execution_id": execution_id, "decision": "USE_FALLBACK"})
+                self._logger.info("Fallback Selected", extra={"execution_id": execution_id})
+                if decision.recommended_action:
+                    # Swapping executable target
+                    step_plan.target = decision.metadata.get("fallback") or decision.recommended_action.split()[-1]
+
+            elif decision.decision_type == DecisionType.RETRY:
+                self._logger.info("Decision Applied", extra={"execution_id": execution_id, "decision": "RETRY"})
+                self._safe_mark_retrying(execution_id)
 
             self._logger.debug(
                 "Dispatching step execution plan",
