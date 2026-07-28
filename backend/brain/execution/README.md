@@ -1,22 +1,30 @@
-# Multi-Step Execution Engine
+# Execution Engine & Task Management Subsystem
 
-This package implements the **Multi-Step Execution Engine** subsystem for Auralis. It coordinates the step-by-step execution of routed plans through the active system dispatcher.
+This package implements the **Execution Engine**, **Long-Running Task Subsystem**, and **Background Job Scheduler Subsystem** for Auralis. It coordinates the step-by-step dispatch of routed execution plans, observable long-running tasks, and scheduled recurring background jobs.
 
-## Responsibilities
+## Subsystem Responsibilities
 
-1. **Validate Integrity**: Verify plan constraints and ensure dispatcher registry has the required routed capability handlers.
-2. **Sequential Scheduling**: Coordinate execution sequences, ensuring previous actions complete before proceeding to subsequent tasks.
-3. **Audit Trails & History**: Track session records, status checks, and execution durations to support debugging and compliance metrics.
-4. **Context Tracking**: Maintain active run IDs, current step pointer addresses, completed task queues, and result payloads.
+1. **Sequential & Async Execution**: Coordinate execution sequences, ensuring step-by-step capability dispatch through the active system dispatcher.
+2. **Long-Running Task Management**: Detect, register, queue, execute, track progress, pause, resume, cancel, recover, and persist long-running background tasks (`LongRunningTaskManager`).
+3. **Task Progress & Event Notification**: Dispatch observable task progress events (`TASK_CREATED`, `TASK_STARTED`, `TASK_PROGRESS`, `TASK_COMPLETED`, `TASK_FAILED`, etc.) via `TaskEventDispatcher`.
+4. **Background Job Scheduler**: Schedule one-time and recurring jobs (`ONCE`, `INTERVAL`, `DAILY`, `WEEKLY`, `MONTHLY`, `MANUAL`) with deterministic schedule calculations (`RecurringScheduleCalculator`), parameter validations (`RecurringTriggerValidator`), recovery, expiration rules, and retention cleanup policies (`BackgroundJobScheduler`).
+5. **Runtime Monitoring & History**: Track operational execution histories, metrics (`ExecutionMetrics`), aggregated statistics (`ExecutionStatistics`), and background job metrics via `ExecutionMonitor`.
+6. **Decision & Failure Recovery**: Evaluate execution decisions (`DecisionEngine`), formulate recovery plans (`FailureRecoveryEngine`), and manage interactive clarification sessions (`ClarificationEngine`).
 
 > [!IMPORTANT]
-> The Execution Engine does not attempt self-correction, execution retries, rollback routines, or semantic intent reasoning. It functions as a sequential executor for plans output by the Capability Selector.
+> The Execution Engine and Scheduler operate thread-safely in-memory with non-blocking persistence hooks (`TaskPersistenceHook`, `BackgroundJobPersistenceHook`). They do not require external message queues (Celery, Redis, RabbitMQ) or cron libraries (APScheduler).
 
 ## Directory Structure
 
-- [models.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/models.py): Defines execution tracking schemas (`ExecutionStatus`, `ExecutionRecord`, `ExecutionContext`, `ExecutionSummary`).
-- [execution_context.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/execution_context.py): Implements live session context trackers.
-- [execution_history.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/execution_history.py): Saves step operational histories.
+- [execution_engine.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/execution_engine.py): Step-by-step capability plan execution and scheduled job processing pipeline.
+- [execution_state.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/execution_state.py): Live execution session state tracking and progress snapshots.
+- [execution_monitor.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/execution_monitor.py): Metrics computation, event listener, and background scheduler statistics aggregation.
 - [execution_validator.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/execution_validator.py): Confirms capability requirements and plan structures.
-- [execution_scheduler.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/execution_scheduler.py): Orders step Operational queues sequentially.
-- [execution_engine.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/execution_engine.py): Manages the step-by-step dispatch pipeline.
+- [execution_scheduler.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/execution_scheduler.py): Orders plan execution steps sequentially.
+- [long_running_task_manager.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/long_running_task_manager.py): Long-running task detection, queueing, registration, progress tracking, persistence hooks, and recovery.
+- [task_events.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/task_events.py): Observable event notification models and thread-safe listener dispatcher (`TaskEventDispatcher`).
+- [background_job_scheduler.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/background_job_scheduler.py): Background job scheduler (`BackgroundJobScheduler`), trigger validator (`RecurringTriggerValidator`), schedule calculator (`RecurringScheduleCalculator`), and persistence hook protocol (`BackgroundJobPersistenceHook`).
+- [decision_engine.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/decision_engine.py): Interactive decision evaluation and intent approval checks.
+- [failure_recovery_engine.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/failure_recovery_engine.py): Diagnostic failure categorization and recovery plan formulation.
+- [clarification_engine.py](file:///c:/Users/Vishal%20S%20Naik/MyProjects/Auralis-voice-file-manager/backend/brain/execution/clarification_engine.py): Ambiguity clarification sessions and choice resolution.
+

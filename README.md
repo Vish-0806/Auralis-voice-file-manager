@@ -120,9 +120,20 @@ Auralis Version 1.5.0 implements the complete **Autonomous Routine Engine**, **P
 
 ---
 
+## Long-Running Task & Background Job Scheduler Engine (v1.6.0)
+
+Auralis Version 1.6.0 implements the complete **Long-Running Task Subsystem** and **Background Job Scheduler Subsystem**.
+
+### Key Additions:
+1. **Long-Running Task Subsystem (Phase 8.5)**: Manages observable, asynchronous operations (`LongRunningTaskManager`) with progress tracking, event notification framework (`TaskEventDispatcher`), recovery hooks (`TaskPersistenceHook`), timeout cleanup policies, and execution monitor observation without external message queues.
+2. **Background Job Scheduler Subsystem (Phase 8.6)**: Schedules one-time and recurring jobs (`ONCE`, `INTERVAL`, `DAILY`, `WEEKLY`, `MONTHLY`, `MANUAL`) via `BackgroundJobScheduler`, deterministic schedule calculations (`RecurringScheduleCalculator`), parameter validations (`RecurringTriggerValidator`), persistence hooks (`BackgroundJobPersistenceHook`), expiration rules, retention cleanup, and seamless `ExecutionEngine` integration without cron or APScheduler dependencies.
+
+---
+
 ## Architecture
 
-Auralis uses a modular architecture that separates voice capture, natural language understanding, memory context building, conversational intelligence and state tracking, execution planning, and OS operations:
+Auralis uses a modular architecture that separates voice capture, natural language understanding, memory context building, conversational intelligence and state tracking, execution planning, long-running tasks, background job scheduling, and OS operations:
+
 
 ```mermaid
 graph TD
@@ -197,7 +208,7 @@ Auralis/
 │   ├── core/                  # Assistant boundary, intent schemas, planner, and dispatcher
 │   ├── memory/                # Tiered Memory System (PostgresProvider, ContextBuilder, Routines, Proactive, Recommendations)
 │   ├── voice/                 # Modular Voice Engine subsystems
-│   ├── tests/                 # 644 unit & integration tests
+│   ├── tests/                 # 906 unit & integration tests
 │   ├── main.py                # Backend entry point
 │   └── requirements.txt       # Python package dependencies
 ├── frontend/                  # Vite + React Client App
@@ -223,6 +234,7 @@ Track the development stages of Auralis:
 * [x] **Autonomous Routine Engine (Phase 7.4):** Pattern detection, validation, optimization, routine library, matching, background scheduling, monitoring, and database persistence.
 * [x] **Proactive Assistant Engine (Phase 7.5):** Activity prediction, suggestion recommendation, deterministic scoring, prioritization, history tracking, user feedback learning, and coordinator integration.
 * [x] **Conversational Intelligence Engine:** Multi-turn context tracking, entity linking, ambiguity resolution, follow-up clarification, and session state management.
+* [x] **Long-Running Task & Background Job Scheduler Engine (Phase 8.5 & 8.6):** Observable long-running tasks, event notification framework, recurring job scheduling, parameters validation, schedule calculation, persistence hooks, recovery, expiration, and retention cleanup policies.
 * [ ] **Future Objectives:**
   * [ ] Document intelligence parser using local PyMuPDF extraction.
   * [ ] Plugin Marketplace for community extensions.
@@ -240,7 +252,7 @@ python -m venv venv
 # Install dependencies
 pip install -r backend/requirements.txt
 
-# Run complete test suite (644 tests)
+# Run complete test suite (906 tests)
 pytest backend/tests
 
 # Launch backend server
