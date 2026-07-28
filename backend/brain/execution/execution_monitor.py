@@ -105,6 +105,9 @@ class ExecutionMonitor:
         self._event_completion_count: int = 0
         self._event_failure_count: int = 0
         self._event_timeout_count: int = 0
+        self._event_recovered_count: int = 0
+        self._event_archived_count: int = 0
+        self._event_cleaned_count: int = 0
         self._task_latest_progress: Dict[str, float] = {}
 
         if self._task_manager and hasattr(self._task_manager, "event_dispatcher"):
@@ -135,6 +138,12 @@ class ExecutionMonitor:
                 self._event_failure_count += 1
             elif "TIMED_OUT" in type_str:
                 self._event_timeout_count += 1
+            elif "RECOVERED" in type_str:
+                self._event_recovered_count += 1
+            elif "ARCHIVED" in type_str:
+                self._event_archived_count += 1
+            elif "CLEANED" in type_str:
+                self._event_cleaned_count += 1
 
             progress = float(getattr(event, "progress", 0.0))
             task_id = str(getattr(event, "task_id", ""))
@@ -152,6 +161,9 @@ class ExecutionMonitor:
             comp = self._event_completion_count
             fail = self._event_failure_count
             tout = self._event_timeout_count
+            rec = self._event_recovered_count
+            arch = self._event_archived_count
+            cln = self._event_cleaned_count
             rate = (comp / total) if total > 0 else 0.0
             avg_prog = (sum(self._task_latest_progress.values()) / len(self._task_latest_progress)) if self._task_latest_progress else 0.0
 
@@ -160,10 +172,14 @@ class ExecutionMonitor:
                 "completion_events": comp,
                 "failure_events": fail,
                 "timeout_events": tout,
+                "recovered_tasks": rec,
+                "archived_tasks": arch,
+                "cleaned_tasks": cln,
                 "event_completion_rate": rate,
                 "average_task_progress": avg_prog,
                 "event_counts_by_type": dict(self._event_counts),
             }
+
 
 
 

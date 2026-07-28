@@ -57,6 +57,8 @@ from .long_running_task_manager import (
     LongRunningTask,
     LongRunningTaskConfig,
     LongRunningTaskManager,
+    TaskPersistenceHook,
+    NullTaskPersistenceHook,
 )
 from .task_events import (
     TaskEventType,
@@ -109,11 +111,14 @@ __all__ = [
     "LongRunningTask",
     "LongRunningTaskConfig",
     "LongRunningTaskManager",
+    "TaskPersistenceHook",
+    "NullTaskPersistenceHook",
     "TaskEventType",
     "TaskEvent",
     "TaskEventListener",
     "TaskEventDispatcher",
 ]
+
 
 
 

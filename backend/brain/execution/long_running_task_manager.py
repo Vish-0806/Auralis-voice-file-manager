@@ -8,14 +8,52 @@ from enum import Enum
 import logging
 import threading
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 
 from .task_events import TaskEvent, TaskEventType, TaskEventDispatcher
 
 
+@runtime_checkable
+class TaskPersistenceHook(Protocol):
+    """Abstract interface for persistent storage integration of long-running tasks."""
+
+    def save_task(self, task: LongRunningTask) -> None:
+        """Saves a newly created task record to persistent storage."""
+        ...
+
+    def update_task(self, task: LongRunningTask) -> None:
+        """Updates an existing task record in persistent storage."""
+        ...
+
+    def delete_task(self, task_id: str) -> None:
+        """Deletes a task record from persistent storage."""
+        ...
+
+    def load_tasks(self) -> List[LongRunningTask]:
+        """Loads all persisted task records from persistent storage."""
+        ...
+
+
+class NullTaskPersistenceHook:
+    """Default no-op implementation of TaskPersistenceHook."""
+
+    def save_task(self, task: LongRunningTask) -> None:
+        pass
+
+    def update_task(self, task: LongRunningTask) -> None:
+        pass
+
+    def delete_task(self, task_id: str) -> None:
+        pass
+
+    def load_tasks(self) -> List[LongRunningTask]:
+        return []
+
+
 class LongRunningTaskStatus(str, Enum):
+
 
     """Lifecycle status states for a long-running task."""
 
@@ -150,6 +188,7 @@ class LongRunningTaskManager:
         config: Optional[LongRunningTaskConfig] = None,
         logger: Optional[logging.Logger] = None,
         event_dispatcher: Optional[TaskEventDispatcher] = None,
+        persistence_hook: Optional[TaskPersistenceHook] = None,
     ) -> None:
         """Initializes the manager with configuration options and internal storage.
 
@@ -157,6 +196,7 @@ class LongRunningTaskManager:
             config: Optional LongRunningTaskConfig settings.
             logger: Optional custom logger.
             event_dispatcher: Optional injected TaskEventDispatcher.
+            persistence_hook: Optional injected TaskPersistenceHook.
         """
         self._config = config or LongRunningTaskConfig()
         self._logger = logger or logging.getLogger(__name__)
@@ -166,11 +206,17 @@ class LongRunningTaskManager:
             maxlen=self._config.maximum_history
         )
         self._event_dispatcher = event_dispatcher or TaskEventDispatcher(logger=self._logger)
+        self._persistence_hook = persistence_hook or NullTaskPersistenceHook()
 
     @property
     def event_dispatcher(self) -> TaskEventDispatcher:
         """Returns the internal TaskEventDispatcher instance."""
         return self._event_dispatcher
+
+    @property
+    def persistence_hook(self) -> TaskPersistenceHook:
+        """Returns the internal TaskPersistenceHook instance."""
+        return self._persistence_hook
 
     def _emit_event(
         self,
@@ -193,6 +239,41 @@ class LongRunningTaskManager:
             self._event_dispatcher.dispatch(event)
         except Exception as e:
             self._logger.warning("Failed to emit task event", exc_info=e)
+
+    def _safe_save_task(self, task: LongRunningTask) -> None:
+        """Safely saves a task using the persistence hook without raising exceptions."""
+        try:
+            self._persistence_hook.save_task(task)
+            self._logger.info("Persistence Hook Invoked", extra={"action": "save_task", "task_id": task.task_id})
+        except Exception as e:
+            self._logger.warning("Persistence Hook Failed", extra={"action": "save_task", "task_id": task.task_id}, exc_info=e)
+
+    def _safe_update_task(self, task: LongRunningTask) -> None:
+        """Safely updates a task using the persistence hook without raising exceptions."""
+        try:
+            self._persistence_hook.update_task(task)
+            self._logger.info("Persistence Hook Invoked", extra={"action": "update_task", "task_id": task.task_id})
+        except Exception as e:
+            self._logger.warning("Persistence Hook Failed", extra={"action": "update_task", "task_id": task.task_id}, exc_info=e)
+
+    def _safe_delete_task(self, task_id: str) -> None:
+        """Safely deletes a task using the persistence hook without raising exceptions."""
+        try:
+            self._persistence_hook.delete_task(task_id)
+            self._logger.info("Persistence Hook Invoked", extra={"action": "delete_task", "task_id": task_id})
+        except Exception as e:
+            self._logger.warning("Persistence Hook Failed", extra={"action": "delete_task", "task_id": task_id}, exc_info=e)
+
+    def _safe_load_tasks(self) -> List[LongRunningTask]:
+        """Safely loads tasks using the persistence hook without raising exceptions."""
+        try:
+            tasks = self._persistence_hook.load_tasks() or []
+            self._logger.info("Persistence Hook Invoked", extra={"action": "load_tasks", "count": len(tasks)})
+            return tasks
+        except Exception as e:
+            self._logger.warning("Persistence Hook Failed", extra={"action": "load_tasks"}, exc_info=e)
+            return []
+
 
 
     def create_task(
@@ -252,6 +333,7 @@ class LongRunningTaskManager:
 
             self._active_tasks[tid] = task
             self._logger.info("Task Created", extra={"task_id": tid, "task_name": name})
+            self._safe_save_task(task)
             self._emit_event(task, TaskEventType.TASK_CREATED)
             return task
 
@@ -276,6 +358,7 @@ class LongRunningTaskManager:
             task.status = LongRunningTaskStatus.QUEUED
             task.updated_at = datetime.now(timezone.utc)
             self._logger.info("Task Queued", extra={"task_id": task_id})
+            self._safe_update_task(task)
             self._emit_event(task, TaskEventType.TASK_QUEUED)
             return True
 
@@ -307,6 +390,7 @@ class LongRunningTaskManager:
                 task.started_at = now
 
             self._logger.info("Task Started", extra={"task_id": task_id})
+            self._safe_update_task(task)
             self._emit_event(task, TaskEventType.TASK_STARTED)
             return True
 
@@ -330,6 +414,7 @@ class LongRunningTaskManager:
             task.status = LongRunningTaskStatus.PAUSED
             task.updated_at = datetime.now(timezone.utc)
             self._logger.info("Task Paused", extra={"task_id": task_id})
+            self._safe_update_task(task)
             self._emit_event(task, TaskEventType.TASK_PAUSED)
             return True
 
@@ -353,6 +438,7 @@ class LongRunningTaskManager:
             task.status = LongRunningTaskStatus.RUNNING
             task.updated_at = datetime.now(timezone.utc)
             self._logger.info("Task Resumed", extra={"task_id": task_id})
+            self._safe_update_task(task)
             self._emit_event(task, TaskEventType.TASK_RESUMED)
             return True
 
@@ -383,6 +469,7 @@ class LongRunningTaskManager:
                 self._archive_task_locked(task)
 
             self._logger.info("Task Cancelled", extra={"task_id": task_id})
+            self._safe_update_task(task)
             self._emit_event(task, TaskEventType.TASK_CANCELLED)
             return True
 
@@ -421,6 +508,7 @@ class LongRunningTaskManager:
                 self._archive_task_locked(task)
 
             self._logger.info("Task Completed", extra={"task_id": task_id})
+            self._safe_update_task(task)
             self._emit_event(task, TaskEventType.TASK_COMPLETED)
             return True
 
@@ -455,6 +543,7 @@ class LongRunningTaskManager:
                 "Task Failed",
                 extra={"task_id": task_id, "error": error_message},
             )
+            self._safe_update_task(task)
             self._emit_event(task, TaskEventType.TASK_FAILED, message=error_message)
             return True
 
@@ -485,8 +574,10 @@ class LongRunningTaskManager:
                 self._archive_task_locked(task)
 
             self._logger.info("Task Timed Out", extra={"task_id": task_id})
+            self._safe_update_task(task)
             self._emit_event(task, TaskEventType.TASK_TIMED_OUT, message="Task execution timed out")
             return True
+
 
     def update_progress(
         self,
@@ -533,8 +624,10 @@ class LongRunningTaskManager:
                 "Progress Updated",
                 extra={"task_id": task_id, "progress": task.progress},
             )
+            self._safe_update_task(task)
             self._emit_event(task, TaskEventType.TASK_PROGRESS)
             return True
+
 
 
     def get_task(self, task_id: str) -> Optional[LongRunningTask]:
@@ -623,9 +716,100 @@ class LongRunningTaskManager:
             self._active_tasks.clear()
             self._completed_tasks.clear()
 
+    def recover_tasks(self) -> int:
+        """Restores persisted task records into active and completed in-memory stores.
+
+        Returns:
+            Count of active tasks successfully recovered into memory.
+        """
+        loaded_tasks = self._safe_load_tasks()
+        if not loaded_tasks:
+            return 0
+
+        recovered_active = 0
+        with self._lock:
+            for task in loaded_tasks:
+                if not isinstance(task, LongRunningTask) or not getattr(task, "task_id", None) or not getattr(task, "status", None):
+                    self._logger.warning("Corrupted task skipped during recovery", extra={"task": str(task)})
+                    continue
+
+                status_val = task.status.value if hasattr(task.status, "value") else str(task.status)
+                if task.is_finished():
+                    if task not in self._completed_tasks:
+                        self._completed_tasks.append(task)
+                else:
+                    self._active_tasks[task.task_id] = task
+                    recovered_active += 1
+                    self._logger.info("Task Recovered", extra={"task_id": task.task_id, "status": status_val})
+                    self._emit_event(task, TaskEventType.TASK_RECOVERED, message="Task state recovered from persistence")
+
+        return recovered_active
+
+    def cleanup_expired_tasks(self, retention_seconds: Optional[int] = None) -> int:
+        """Removes expired completed, timed-out, or cancelled tasks from history and storage.
+
+        Args:
+            retention_seconds: Optional custom retention limit in seconds (defaults to config limit).
+
+        Returns:
+            Total count of tasks cleaned.
+        """
+        retention = retention_seconds if retention_seconds is not None else 86400
+        now = datetime.now(timezone.utc)
+        cleaned_count = 0
+
+        with self._lock:
+            # First move any terminal active tasks to completed history
+            self.cleanup()
+
+            # Evict history beyond maximum_history
+            while len(self._completed_tasks) > self._config.maximum_history:
+                oldest = self._completed_tasks.popleft()
+                self._safe_delete_task(oldest.task_id)
+                self._emit_event(oldest, TaskEventType.TASK_CLEANED, message="Maximum history capacity exceeded")
+                cleaned_count += 1
+
+            # Evict tasks exceeding retention period
+            fresh_history: deque[LongRunningTask] = deque(maxlen=self._config.maximum_history)
+            for task in list(self._completed_tasks):
+                comp_at = task.completed_at or task.updated_at or task.created_at
+                if comp_at and (now - comp_at).total_seconds() > retention:
+                    self._safe_delete_task(task.task_id)
+                    self._emit_event(task, TaskEventType.TASK_CLEANED, message="Retention period expired")
+                    cleaned_count += 1
+                else:
+                    fresh_history.append(task)
+
+            self._completed_tasks = fresh_history
+            self._logger.info("Task Cleanup", extra={"cleaned_count": cleaned_count})
+
+        return cleaned_count
+
+    def check_timeouts(self) -> int:
+        """Checks active tasks against timeout limits and marks expired tasks TIMED_OUT.
+
+        Returns:
+            Count of tasks timed out.
+        """
+        now = datetime.now(timezone.utc)
+        timed_out_count = 0
+
+        with self._lock:
+            for task in list(self._active_tasks.values()):
+                if task.is_active():
+                    timeout_val = task.metadata.get("timeout") or self._config.default_timeout
+                    if (now - task.created_at).total_seconds() > timeout_val:
+                        self.timeout_task(task.task_id)
+                        self._logger.info("Timeout Cleanup", extra={"task_id": task.task_id})
+                        timed_out_count += 1
+
+        return timed_out_count
+
     def _archive_task_locked(self, task: LongRunningTask) -> None:
         """Internal helper to move a task from active map to completed deque under lock."""
         self._active_tasks.pop(task.task_id, None)
-        # Avoid duplicate entries in history deque
         if task not in self._completed_tasks:
             self._completed_tasks.append(task)
+            self._logger.info("Task Archived", extra={"task_id": task.task_id})
+            self._emit_event(task, TaskEventType.TASK_ARCHIVED, message="Task archived to completion history")
+
