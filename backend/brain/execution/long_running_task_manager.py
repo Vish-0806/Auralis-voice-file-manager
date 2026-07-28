@@ -12,8 +12,11 @@ from typing import Any, Dict, List, Optional
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 
+from .task_events import TaskEvent, TaskEventType, TaskEventDispatcher
+
 
 class LongRunningTaskStatus(str, Enum):
+
     """Lifecycle status states for a long-running task."""
 
     PENDING = "PENDING"
@@ -146,12 +149,14 @@ class LongRunningTaskManager:
         self,
         config: Optional[LongRunningTaskConfig] = None,
         logger: Optional[logging.Logger] = None,
+        event_dispatcher: Optional[TaskEventDispatcher] = None,
     ) -> None:
         """Initializes the manager with configuration options and internal storage.
 
         Args:
             config: Optional LongRunningTaskConfig settings.
             logger: Optional custom logger.
+            event_dispatcher: Optional injected TaskEventDispatcher.
         """
         self._config = config or LongRunningTaskConfig()
         self._logger = logger or logging.getLogger(__name__)
@@ -160,6 +165,35 @@ class LongRunningTaskManager:
         self._completed_tasks: deque[LongRunningTask] = deque(
             maxlen=self._config.maximum_history
         )
+        self._event_dispatcher = event_dispatcher or TaskEventDispatcher(logger=self._logger)
+
+    @property
+    def event_dispatcher(self) -> TaskEventDispatcher:
+        """Returns the internal TaskEventDispatcher instance."""
+        return self._event_dispatcher
+
+    def _emit_event(
+        self,
+        task: LongRunningTask,
+        event_type: TaskEventType,
+        message: Optional[str] = None,
+    ) -> None:
+        """Safely dispatches a TaskEvent for the task."""
+        try:
+            event = TaskEvent(
+                task_id=task.task_id,
+                event_type=event_type,
+                timestamp=datetime.now(timezone.utc),
+                progress=task.progress,
+                current_step=task.current_step,
+                total_steps=task.total_steps,
+                message=message or task.error or f"Task {event_type.value}",
+                metadata=dict(task.metadata),
+            )
+            self._event_dispatcher.dispatch(event)
+        except Exception as e:
+            self._logger.warning("Failed to emit task event", exc_info=e)
+
 
     def create_task(
         self,
@@ -218,6 +252,7 @@ class LongRunningTaskManager:
 
             self._active_tasks[tid] = task
             self._logger.info("Task Created", extra={"task_id": tid, "task_name": name})
+            self._emit_event(task, TaskEventType.TASK_CREATED)
             return task
 
 
@@ -241,6 +276,7 @@ class LongRunningTaskManager:
             task.status = LongRunningTaskStatus.QUEUED
             task.updated_at = datetime.now(timezone.utc)
             self._logger.info("Task Queued", extra={"task_id": task_id})
+            self._emit_event(task, TaskEventType.TASK_QUEUED)
             return True
 
     def start_task(self, task_id: str) -> bool:
@@ -271,6 +307,7 @@ class LongRunningTaskManager:
                 task.started_at = now
 
             self._logger.info("Task Started", extra={"task_id": task_id})
+            self._emit_event(task, TaskEventType.TASK_STARTED)
             return True
 
     def pause_task(self, task_id: str) -> bool:
@@ -293,6 +330,7 @@ class LongRunningTaskManager:
             task.status = LongRunningTaskStatus.PAUSED
             task.updated_at = datetime.now(timezone.utc)
             self._logger.info("Task Paused", extra={"task_id": task_id})
+            self._emit_event(task, TaskEventType.TASK_PAUSED)
             return True
 
     def resume_task(self, task_id: str) -> bool:
@@ -315,7 +353,9 @@ class LongRunningTaskManager:
             task.status = LongRunningTaskStatus.RUNNING
             task.updated_at = datetime.now(timezone.utc)
             self._logger.info("Task Resumed", extra={"task_id": task_id})
+            self._emit_event(task, TaskEventType.TASK_RESUMED)
             return True
+
 
     def cancel_task(self, task_id: str) -> bool:
         """Cancels an active task.
@@ -343,6 +383,7 @@ class LongRunningTaskManager:
                 self._archive_task_locked(task)
 
             self._logger.info("Task Cancelled", extra={"task_id": task_id})
+            self._emit_event(task, TaskEventType.TASK_CANCELLED)
             return True
 
     def complete_task(
@@ -380,6 +421,7 @@ class LongRunningTaskManager:
                 self._archive_task_locked(task)
 
             self._logger.info("Task Completed", extra={"task_id": task_id})
+            self._emit_event(task, TaskEventType.TASK_COMPLETED)
             return True
 
     def fail_task(self, task_id: str, error_message: str) -> bool:
@@ -413,6 +455,7 @@ class LongRunningTaskManager:
                 "Task Failed",
                 extra={"task_id": task_id, "error": error_message},
             )
+            self._emit_event(task, TaskEventType.TASK_FAILED, message=error_message)
             return True
 
     def timeout_task(self, task_id: str) -> bool:
@@ -442,6 +485,7 @@ class LongRunningTaskManager:
                 self._archive_task_locked(task)
 
             self._logger.info("Task Timed Out", extra={"task_id": task_id})
+            self._emit_event(task, TaskEventType.TASK_TIMED_OUT, message="Task execution timed out")
             return True
 
     def update_progress(
@@ -489,7 +533,9 @@ class LongRunningTaskManager:
                 "Progress Updated",
                 extra={"task_id": task_id, "progress": task.progress},
             )
+            self._emit_event(task, TaskEventType.TASK_PROGRESS)
             return True
+
 
     def get_task(self, task_id: str) -> Optional[LongRunningTask]:
         """Retrieves a task by ID from active or completed stores.

@@ -58,6 +58,12 @@ from .long_running_task_manager import (
     LongRunningTaskConfig,
     LongRunningTaskManager,
 )
+from .task_events import (
+    TaskEventType,
+    TaskEvent,
+    TaskEventListener,
+    TaskEventDispatcher,
+)
 
 __all__ = [
     "ExecutionStatus",
@@ -103,7 +109,12 @@ __all__ = [
     "LongRunningTask",
     "LongRunningTaskConfig",
     "LongRunningTaskManager",
+    "TaskEventType",
+    "TaskEvent",
+    "TaskEventListener",
+    "TaskEventDispatcher",
 ]
+
 
 
 

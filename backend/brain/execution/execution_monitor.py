@@ -100,6 +100,71 @@ class ExecutionMonitor:
         self._task_manager = task_manager
         self._lock = threading.RLock()
         self._completed_history: List[ExecutionSummary] = []
+        self._event_counts: Dict[str, int] = {}
+        self._total_events_received: int = 0
+        self._event_completion_count: int = 0
+        self._event_failure_count: int = 0
+        self._event_timeout_count: int = 0
+        self._task_latest_progress: Dict[str, float] = {}
+
+        if self._task_manager and hasattr(self._task_manager, "event_dispatcher"):
+            try:
+                self._task_manager.event_dispatcher.register_listener(self)
+            except Exception:
+                pass
+
+    def on_event(self, event: Any) -> None:
+        """TaskEventListener callback receiving dispatched TaskEvent instances.
+
+        Args:
+            event: Dispatched TaskEvent payload.
+        """
+        if not event:
+            return
+
+        with self._lock:
+            type_val = getattr(event, "event_type", "")
+            type_str = type_val.value if hasattr(type_val, "value") else str(type_val)
+
+            self._event_counts[type_str] = self._event_counts.get(type_str, 0) + 1
+            self._total_events_received += 1
+
+            if "COMPLETED" in type_str:
+                self._event_completion_count += 1
+            elif "FAILED" in type_str:
+                self._event_failure_count += 1
+            elif "TIMED_OUT" in type_str:
+                self._event_timeout_count += 1
+
+            progress = float(getattr(event, "progress", 0.0))
+            task_id = str(getattr(event, "task_id", ""))
+            if task_id:
+                self._task_latest_progress[task_id] = progress
+
+    def get_event_statistics(self) -> Dict[str, Any]:
+        """Returns aggregated event statistics collected by ExecutionMonitor listener.
+
+        Returns:
+            Dictionary containing event counts, rates, and progress metrics.
+        """
+        with self._lock:
+            total = self._total_events_received
+            comp = self._event_completion_count
+            fail = self._event_failure_count
+            tout = self._event_timeout_count
+            rate = (comp / total) if total > 0 else 0.0
+            avg_prog = (sum(self._task_latest_progress.values()) / len(self._task_latest_progress)) if self._task_latest_progress else 0.0
+
+            return {
+                "total_events": total,
+                "completion_events": comp,
+                "failure_events": fail,
+                "timeout_events": tout,
+                "event_completion_rate": rate,
+                "average_task_progress": avg_prog,
+                "event_counts_by_type": dict(self._event_counts),
+            }
+
 
 
     def calculate_metrics(self, state: ExecutionState) -> ExecutionMetrics:
