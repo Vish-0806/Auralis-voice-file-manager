@@ -26,9 +26,11 @@ from .decision_engine import DecisionEngine, DecisionContext, DecisionType, Deci
 from .failure_recovery import FailureRecoveryEngine, RecoveryContext, RecoveryStrategy
 from .clarification_engine import ClarificationEngine, ClarificationContext, ClarificationRequest
 from .long_running_task_manager import LongRunningTaskManager, LongRunningTaskPriority
+from .background_job_scheduler import BackgroundJobScheduler, convert_to_execution_request
 
 
 def is_long_running_task(plan: Any) -> bool:
+
     """Determines whether an execution plan qualifies as a long-running task.
 
     Args:
@@ -81,6 +83,7 @@ class ExecutionEngine:
         failure_recovery_engine: FailureRecoveryEngine | None = None,
         clarification_engine: ClarificationEngine | None = None,
         task_manager: LongRunningTaskManager | None = None,
+        job_scheduler: BackgroundJobScheduler | None = None,
     ) -> None:
         """Initializes the ExecutionEngine.
 
@@ -97,6 +100,7 @@ class ExecutionEngine:
             failure_recovery_engine: Optional injected FailureRecoveryEngine.
             clarification_engine: Optional injected ClarificationEngine.
             task_manager: Optional injected LongRunningTaskManager.
+            job_scheduler: Optional injected BackgroundJobScheduler.
         """
         self._logger = logger or logging.getLogger(__name__)
         self._validator = validator or ExecutionValidator(logger=self._logger)
@@ -110,6 +114,106 @@ class ExecutionEngine:
         self._failure_recovery_engine = failure_recovery_engine or FailureRecoveryEngine()
         self._clarification_engine = clarification_engine or ClarificationEngine()
         self._task_manager = task_manager or LongRunningTaskManager()
+        self._job_scheduler = job_scheduler or BackgroundJobScheduler()
+
+        # Inject or dynamically build default WorkflowObserver
+        self._workflow_observer = workflow_observer
+        if self._workflow_observer is None:
+            try:
+                from memory import MemoryService
+                from memory.workflows import WorkflowObserver, SequenceBuilder, ObservationRepository
+                mem_service = MemoryService()
+                provider = getattr(mem_service._manager._repository, "_provider", None)
+                if provider:
+                    self._workflow_observer = WorkflowObserver(SequenceBuilder(), ObservationRepository(provider))
+            except Exception as e:
+                pass
+
+    @property
+    def task_manager(self) -> LongRunningTaskManager:
+        """Returns the injected or default LongRunningTaskManager."""
+        return self._task_manager
+
+    @property
+    def job_scheduler(self) -> BackgroundJobScheduler:
+        """Returns the injected or default BackgroundJobScheduler."""
+        return self._job_scheduler
+
+
+
+    def _safe_list_ready_scheduled_jobs(self, current_time: Any = None) -> list:
+        try:
+            return self._job_scheduler.list_ready_jobs(current_time=current_time) or []
+        except Exception as e:
+            self._logger.warning("Failed to list ready scheduled jobs", exc_info=e)
+            return []
+
+    def _safe_start_scheduled_job(self, job_id: str) -> bool:
+        try:
+            return self._job_scheduler.start_job_execution(job_id)
+        except Exception as e:
+            self._logger.warning("Failed to start scheduled job execution", extra={"job_id": job_id}, exc_info=e)
+            return False
+
+    def _safe_complete_scheduled_job(self, job_id: str, result_metadata: Any = None) -> bool:
+        try:
+            return self._job_scheduler.complete_job_execution(job_id, result_metadata=result_metadata)
+        except Exception as e:
+            self._logger.warning("Failed to complete scheduled job execution", extra={"job_id": job_id}, exc_info=e)
+            return False
+
+    def _safe_fail_scheduled_job(self, job_id: str, error_message: str) -> bool:
+        try:
+            return self._job_scheduler.fail_job_execution(job_id, error_message=error_message)
+        except Exception as e:
+            self._logger.warning("Failed to fail scheduled job execution", extra={"job_id": job_id}, exc_info=e)
+            return False
+
+    def execute_ready_scheduled_jobs(
+        self,
+        dispatcher: Any = None,
+        current_time: Any = None,
+    ) -> list:
+        """Finds all ready background jobs, converts them to execution requests, and executes them.
+
+        Args:
+            dispatcher: Injected capability dispatcher.
+            current_time: Optional reference datetime timestamp.
+
+        Returns:
+            List of execution response outputs.
+        """
+        ready_jobs = self._safe_list_ready_scheduled_jobs(current_time=current_time)
+        results = []
+
+        for job in ready_jobs:
+            job_id = getattr(job, "job_id", None)
+            if not job_id:
+                continue
+
+            request_payload = convert_to_execution_request(job)
+            if not request_payload:
+                continue
+
+            self._safe_start_scheduled_job(job_id)
+            self._logger.info("Scheduled Job Ready", extra={"job_id": job_id, "job_name": getattr(job, "name", "")})
+
+            try:
+                response = self.execute_plan(request_payload, dispatcher=dispatcher)
+                results.append(response)
+
+                is_success = getattr(response, "success", True) if response else True
+                if is_success:
+                    self._safe_complete_scheduled_job(job_id)
+                else:
+                    err_msg = getattr(response, "message", "Execution returned failure response")
+                    self._safe_fail_scheduled_job(job_id, err_msg)
+            except Exception as e:
+                self._logger.warning("Error executing scheduled job", extra={"job_id": job_id}, exc_info=e)
+                self._safe_fail_scheduled_job(job_id, str(e))
+
+        return results
+
 
 
         # Inject or dynamically build default WorkflowObserver
@@ -505,34 +609,41 @@ class ExecutionEngine:
         Returns:
             An ExecutionSummary detailing the run results.
         """
-        # Determine execution_id
+        # Determine execution_id and plan parameters
+        plan_params = getattr(plan, "parameters", plan.get("parameters") if isinstance(plan, dict) else {}) or {}
+        plan_intent = getattr(plan, "intent", plan.get("intent") if isinstance(plan, dict) else Intent.UNKNOWN)
+        plan_target = getattr(plan, "target", plan.get("target") if isinstance(plan, dict) else None)
+
         execution_id = None
-        if isinstance(plan.parameters, dict):
-            execution_id = plan.parameters.get("execution_id")
+        if isinstance(plan_params, dict):
+            execution_id = plan_params.get("execution_id")
             if not execution_id:
-                metadata = plan.parameters.get("metadata")
+                metadata = plan_params.get("metadata")
                 if isinstance(metadata, dict):
                     execution_id = metadata.get("execution_id")
             if not execution_id:
-                req_metadata = plan.parameters.get("request_metadata")
+                req_metadata = plan_params.get("request_metadata")
                 if isinstance(req_metadata, dict):
                     execution_id = req_metadata.get("execution_id")
 
         if not execution_id:
             try:
-                execution_id = str(uuid.UUID(plan.execution_id))
+                raw_exec_id = getattr(plan, "execution_id", plan.get("execution_id") if isinstance(plan, dict) else None)
+                execution_id = str(uuid.UUID(raw_exec_id))
             except Exception:
                 execution_id = str(uuid.uuid4())
 
-        self._logger.info("Starting execution session", extra={"execution_id": execution_id, "intent": plan.intent.value})
+        intent_str = plan_intent.value if hasattr(plan_intent, "value") else str(plan_intent)
+        self._logger.info("Starting execution session", extra={"execution_id": execution_id, "intent": intent_str})
 
         # Register execution and start running
-        workflow_id = plan.target if plan.intent == Intent.RUN_WORKFLOW else None
+        workflow_id = plan_target if plan_intent == Intent.RUN_WORKFLOW else None
         self._safe_create_execution(
             execution_id=execution_id,
             user_id=user_id,
             workflow_id=workflow_id,
-            metadata=plan.parameters,
+            metadata=plan_params,
+
         )
         self._safe_mark_running(execution_id)
 

@@ -73,6 +73,7 @@ from .background_job_scheduler import (
     BackgroundJob,
     BackgroundSchedulerConfig,
     BackgroundJobScheduler,
+    convert_to_execution_request,
 )
 
 __all__ = [
@@ -131,7 +132,9 @@ __all__ = [
     "BackgroundJob",
     "BackgroundSchedulerConfig",
     "BackgroundJobScheduler",
+    "convert_to_execution_request",
 ]
+
 
 
 

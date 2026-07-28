@@ -216,8 +216,81 @@ def calculate_next_run(
     return None
 
 
+def convert_to_execution_request(job: BackgroundJob) -> Any:
+    """Converts a BackgroundJob instance into an execution plan request.
+
+    Args:
+        job: Source BackgroundJob instance.
+
+    Returns:
+        RoutedExecutionPlan or dictionary payload suitable for ExecutionEngine plan execution.
+    """
+    if not job or not isinstance(job, BackgroundJob):
+        return {}
+
+    plan_payload = dict(job.execution_plan) if job.execution_plan else {}
+    intent_val = plan_payload.get("intent") or job.name
+    target_val = plan_payload.get("target") or job.name
+
+    params = dict(job.parameters)
+    params.update(plan_payload.get("parameters", {}))
+    params["job_id"] = job.job_id
+    params["job_priority"] = job.priority.value if hasattr(job.priority, "value") else str(job.priority)
+    params.setdefault("auto_approved", True)
+    params.setdefault("dangerous_operation", False)
+
+
+    metadata = dict(job.metadata)
+    metadata.update(plan_payload.get("metadata", {}))
+    metadata["job_id"] = job.job_id
+    metadata["trigger_type"] = job.trigger_type.value if hasattr(job.trigger_type, "value") else str(job.trigger_type)
+    params["metadata"] = metadata
+
+    tags = list(set(job.tags + plan_payload.get("tags", [])))
+
+    try:
+        from brain.capability.models import CapabilityRoute, RoutedExecutionPlan
+        from core.intents import Intent
+
+        intent_enum = Intent.SEARCH_FILE
+        if isinstance(intent_val, Intent):
+            intent_enum = intent_val
+        elif isinstance(intent_val, str):
+            for member in Intent:
+                if member.value.lower() == intent_val.lower() or member.name.lower() == intent_val.lower():
+                    intent_enum = member
+                    break
+
+
+        cap_name = str(plan_payload.get("capability_name") or "mock_file")
+        route = CapabilityRoute(step_id="step_1", intent=intent_enum, capability_name=cap_name)
+
+        return RoutedExecutionPlan(
+            intent=intent_enum,
+            target=str(target_val),
+            parameters=params,
+            confidence=float(plan_payload.get("confidence", 1.0)),
+            routes=[route],
+        )
+    except Exception as err:
+        logging.getLogger(__name__).warning("convert_to_execution_request failed to create RoutedExecutionPlan", exc_info=err)
+
+
+
+
+    plan_payload["execution_id"] = job.job_id
+    plan_payload["intent"] = intent_val
+    plan_payload["target"] = target_val
+    plan_payload["parameters"] = params
+    plan_payload["metadata"] = metadata
+    plan_payload["tags"] = tags
+    return plan_payload
+
+
+
 class BackgroundJobScheduler:
     """Manages scheduled background jobs thread-safely."""
+
 
     def __init__(
         self,
@@ -572,9 +645,111 @@ class BackgroundJobScheduler:
                         job.status = BackgroundJobStatus.READY
                         job.updated_at = ref_time
                         ready_jobs.append(job)
-                        self._logger.info("Job Ready", extra={"job_id": job.job_id})
+                        self._logger.info("Scheduled Job Ready", extra={"job_id": job.job_id})
+
+
 
         return ready_jobs
+
+    def start_job_execution(self, job_id: str) -> bool:
+        """Transitions a READY/SCHEDULED job to RUNNING and sets last_run timestamp.
+
+        Args:
+            job_id: Target job ID.
+
+        Returns:
+            True if status transitioned, False otherwise.
+        """
+        if not job_id or not isinstance(job_id, str):
+            return False
+
+        with self._lock:
+            job = self._active_jobs.get(job_id)
+            if not job or job.is_finished() or job.status == BackgroundJobStatus.PAUSED or not job.enabled:
+                return False
+
+            now = datetime.now(timezone.utc)
+            job.status = BackgroundJobStatus.RUNNING
+            job.last_run = now
+            job.updated_at = now
+
+            self._logger.info("Scheduled Job Started", extra={"job_id": job_id})
+            return True
+
+    def complete_job_execution(
+        self,
+        job_id: str,
+        result_metadata: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Marks execution completed and reschedules recurring jobs or archives one-time jobs.
+
+        Args:
+            job_id: Target job ID.
+            result_metadata: Optional final metadata to merge into job.
+
+        Returns:
+            True if state updated, False if unknown job.
+        """
+        if not job_id or not isinstance(job_id, str):
+            return False
+
+        with self._lock:
+            job = self._active_jobs.get(job_id)
+            if not job:
+                return False
+
+            now = datetime.now(timezone.utc)
+            job.updated_at = now
+            if result_metadata:
+                job.metadata.update(result_metadata)
+
+            self._logger.info("Scheduled Job Completed", extra={"job_id": job_id})
+
+            if job.trigger_type in (BackgroundJobTriggerType.ONCE, BackgroundJobTriggerType.MANUAL):
+                job.status = BackgroundJobStatus.COMPLETED
+                if self._config.cleanup_history:
+                    self._archive_job_locked(job)
+                    self._logger.info("One-Time Job Archived", extra={"job_id": job_id})
+            else:
+                job.next_run = calculate_next_run(job.trigger_type, job.parameters, now)
+                job.status = BackgroundJobStatus.SCHEDULED
+                self._logger.info("Recurring Job Rescheduled", extra={"job_id": job_id})
+
+            return True
+
+    def fail_job_execution(self, job_id: str, error_message: str) -> bool:
+        """Marks execution as failed and updates state and error tracing.
+
+        Args:
+            job_id: Target job ID.
+            error_message: Failure error trace message.
+
+        Returns:
+            True if updated, False if unknown job.
+        """
+        if not job_id or not isinstance(job_id, str):
+            return False
+
+        with self._lock:
+            job = self._active_jobs.get(job_id)
+            if not job:
+                return False
+
+            now = datetime.now(timezone.utc)
+            job.metadata["last_error"] = error_message
+            job.updated_at = now
+
+            self._logger.info("Scheduled Job Failed", extra={"job_id": job_id, "error": error_message})
+
+            if job.trigger_type in (BackgroundJobTriggerType.ONCE, BackgroundJobTriggerType.MANUAL):
+                job.status = BackgroundJobStatus.FAILED
+                if self._config.cleanup_history:
+                    self._archive_job_locked(job)
+            else:
+                job.next_run = calculate_next_run(job.trigger_type, job.parameters, now)
+                job.status = BackgroundJobStatus.SCHEDULED
+
+            return True
 
     def archive_job(self, job_id: str) -> bool:
         """Moves an active job to completion history deque.
@@ -624,3 +799,5 @@ class BackgroundJobScheduler:
         if job not in self._completed_jobs:
             self._completed_jobs.append(job)
             self._logger.info("Job Archived", extra={"job_id": job.job_id})
+
+

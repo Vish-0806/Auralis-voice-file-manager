@@ -83,22 +83,37 @@ class ExecutionStatistics(BaseModel):
     long_running_cancelled_count: int = Field(default=0, description="Count of cancelled long-running tasks")
     long_running_completion_percentage: float = Field(default=0.0, description="Average completion percentage of long-running tasks")
 
+    # Background scheduler additions
+    scheduled_jobs_executed: int = Field(default=0, description="Total count of scheduled jobs executed")
+    scheduled_job_failures: int = Field(default=0, description="Total count of scheduled job failures")
+    average_scheduled_execution_duration: float = Field(default=0.0, description="Average duration of scheduled job executions")
+    ready_job_count: int = Field(default=0, description="Count of currently ready scheduled jobs")
+
 
 class ExecutionMonitor:
     """Monitors execution lifecycles, aggregates metrics, and tracks historical summaries."""
 
-    def __init__(self, max_history_size: int = 1000, state_manager: Optional[Any] = None, task_manager: Optional[Any] = None) -> None:
+    def __init__(
+        self,
+        max_history_size: int = 1000,
+        state_manager: Optional[Any] = None,
+        task_manager: Optional[Any] = None,
+        job_scheduler: Optional[Any] = None,
+    ) -> None:
         """Initializes the ExecutionMonitor.
 
         Args:
             max_history_size: Maximum size of the history list (FIFO eviction).
             state_manager: Optional ExecutionStateManager instance.
             task_manager: Optional LongRunningTaskManager instance.
+            job_scheduler: Optional BackgroundJobScheduler instance.
         """
         self._max_history_size = max_history_size
         self._state_manager = state_manager
         self._task_manager = task_manager
+        self._job_scheduler = job_scheduler
         self._lock = threading.RLock()
+
         self._completed_history: List[ExecutionSummary] = []
         self._event_counts: Dict[str, int] = {}
         self._total_events_received: int = 0
@@ -364,6 +379,28 @@ class ExecutionMonitor:
             if total_terminal > 0:
                 retry_rate = sum(1 for s in self._completed_history if s.retry_count > 0) / total_terminal
 
+            scheduled_executed = 0
+            scheduled_failed = 0
+            scheduled_avg_dur = 0.0
+            ready_jobs = 0
+
+            js = self._job_scheduler
+            if js is not None:
+                try:
+                    jobs = js.list_jobs()
+                    ready_list = js.list_ready_jobs()
+                    ready_jobs = len(ready_list)
+                    scheduled_executed = sum(1 for j in jobs if j.last_run is not None)
+                    scheduled_failed = sum(1 for j in jobs if str(j.status) == "FAILED" or getattr(j.status, "value", None) == "FAILED")
+                    durations = []
+                    for j in jobs:
+                        if j.last_run and j.updated_at and j.is_finished():
+                            durations.append((j.updated_at - j.last_run).total_seconds())
+                    if durations:
+                        scheduled_avg_dur = sum(durations) / len(durations)
+                except Exception:
+                    pass
+
             logger.info("Execution Statistics Generated")
 
             return ExecutionStatistics(
@@ -386,7 +423,12 @@ class ExecutionMonitor:
                 long_running_failed_count=long_running_failed,
                 long_running_cancelled_count=long_running_cancelled,
                 long_running_completion_percentage=long_running_comp_pct,
+                scheduled_jobs_executed=scheduled_executed,
+                scheduled_job_failures=scheduled_failed,
+                average_scheduled_execution_duration=scheduled_avg_dur,
+                ready_job_count=ready_jobs,
             )
+
 
 
     def clear_history(self) -> None:
