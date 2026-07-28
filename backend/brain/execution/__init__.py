@@ -51,6 +51,13 @@ from .clarification_session import (
     ClarificationSessionConfig,
     ClarificationSessionManager,
 )
+from .long_running_task_manager import (
+    LongRunningTaskStatus,
+    LongRunningTaskPriority,
+    LongRunningTask,
+    LongRunningTaskConfig,
+    LongRunningTaskManager,
+)
 
 __all__ = [
     "ExecutionStatus",
@@ -90,5 +97,11 @@ __all__ = [
     "ClarificationSession",
     "ClarificationSessionConfig",
     "ClarificationSessionManager",
+    "LongRunningTaskStatus",
+    "LongRunningTaskPriority",
+    "LongRunningTask",
+    "LongRunningTaskConfig",
+    "LongRunningTaskManager",
 ]
+
 
