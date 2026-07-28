@@ -217,8 +217,9 @@ class LongRunningTaskManager:
             )
 
             self._active_tasks[tid] = task
-            self._logger.info("Task Created", extra={"task_id": tid, "name": name})
+            self._logger.info("Task Created", extra={"task_id": tid, "task_name": name})
             return task
+
 
     def queue_task(self, task_id: str) -> bool:
         """Transitions a PENDING task to QUEUED status.

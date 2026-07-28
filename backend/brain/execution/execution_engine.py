@@ -25,6 +25,43 @@ from .execution_state_manager import ExecutionStateManager
 from .decision_engine import DecisionEngine, DecisionContext, DecisionType, DecisionReason, ExecutionDecision
 from .failure_recovery import FailureRecoveryEngine, RecoveryContext, RecoveryStrategy
 from .clarification_engine import ClarificationEngine, ClarificationContext, ClarificationRequest
+from .long_running_task_manager import LongRunningTaskManager, LongRunningTaskPriority
+
+
+def is_long_running_task(plan: Any) -> bool:
+    """Determines whether an execution plan qualifies as a long-running task.
+
+    Args:
+        plan: The execution plan object.
+
+    Returns:
+        True if the plan matches long-running criteria, False otherwise.
+    """
+    if not plan:
+        return False
+
+    intent_val = getattr(plan, "intent", None)
+    intent_str = str(intent_val).upper() if intent_val is not None else ""
+
+    known_keywords = ("INDEX", "SCAN", "SUMMARIZE", "BATCH", "SYNC", "TRAVERSE", "IMPORT", "EXPORT")
+    for kw in known_keywords:
+        if kw in intent_str:
+            return True
+
+    params = getattr(plan, "parameters", None) or {}
+    if isinstance(params, dict):
+        if params.get("is_long_running") or params.get("long_running") or params.get("batch") or params.get("async_task") or params.get("background"):
+            return True
+        if params.get("job_type") in ("indexing", "scanning", "summarization", "batch", "sync"):
+            return True
+
+    target = getattr(plan, "target", None)
+    if isinstance(target, str):
+        target_lower = target.lower()
+        if any(term in target_lower for term in ("workspace_index", "repo_scan", "batch_workflow", "large_document", "background_sync")):
+            return True
+
+    return False
 
 
 class ExecutionEngine:
@@ -43,6 +80,7 @@ class ExecutionEngine:
         decision_engine: DecisionEngine | None = None,
         failure_recovery_engine: FailureRecoveryEngine | None = None,
         clarification_engine: ClarificationEngine | None = None,
+        task_manager: LongRunningTaskManager | None = None,
     ) -> None:
         """Initializes the ExecutionEngine.
 
@@ -58,6 +96,7 @@ class ExecutionEngine:
             decision_engine: Optional injected DecisionEngine.
             failure_recovery_engine: Optional injected FailureRecoveryEngine.
             clarification_engine: Optional injected ClarificationEngine.
+            task_manager: Optional injected LongRunningTaskManager.
         """
         self._logger = logger or logging.getLogger(__name__)
         self._validator = validator or ExecutionValidator(logger=self._logger)
@@ -70,6 +109,8 @@ class ExecutionEngine:
         self._decision_engine = decision_engine or DecisionEngine(clarification_engine=clarification_engine)
         self._failure_recovery_engine = failure_recovery_engine or FailureRecoveryEngine()
         self._clarification_engine = clarification_engine or ClarificationEngine()
+        self._task_manager = task_manager or LongRunningTaskManager()
+
 
         # Inject or dynamically build default WorkflowObserver
         self._workflow_observer = workflow_observer
@@ -165,6 +206,83 @@ class ExecutionEngine:
             self._logger.info("Execution Waiting", extra={"execution_id": execution_id})
         except Exception as e:
             self._logger.error("Failed to mark execution waiting in state manager", exc_info=e)
+
+    def _safe_create_long_running_task(
+        self,
+        name: str,
+        execution_id: str | None = None,
+        total_steps: int = 0,
+        metadata: dict | None = None,
+    ) -> Any:
+        try:
+            task = self._task_manager.create_task(
+                name=name,
+                execution_id=execution_id,
+                total_steps=total_steps,
+                metadata=metadata or {},
+            )
+            self._logger.info("Long Running Task Detected", extra={"execution_id": execution_id, "task_name": name})
+            if task:
+                self._logger.info("Task Registered", extra={"execution_id": execution_id, "task_id": task.task_id})
+            return task
+
+        except Exception as e:
+            self._logger.warning("Failed to create long-running task in task manager", exc_info=e)
+            return None
+
+    def _safe_queue_long_running_task(self, task_id: str) -> None:
+        try:
+            self._task_manager.queue_task(task_id)
+            self._logger.info("Task Queued", extra={"task_id": task_id})
+        except Exception as e:
+            self._logger.warning("Failed to queue long-running task", exc_info=e)
+
+    def _safe_start_long_running_task(self, task_id: str) -> None:
+        try:
+            self._task_manager.start_task(task_id)
+            self._logger.info("Task Started", extra={"task_id": task_id})
+        except Exception as e:
+            self._logger.warning("Failed to start long-running task", exc_info=e)
+
+    def _safe_update_long_running_task_progress(
+        self,
+        task_id: str,
+        progress: float,
+        current_step: int,
+        total_steps: int,
+    ) -> None:
+        try:
+            self._task_manager.update_progress(
+                task_id=task_id,
+                progress=progress,
+                current_step=current_step,
+                total_steps=total_steps,
+            )
+            self._logger.info("Task Progress Updated", extra={"task_id": task_id, "progress": progress})
+        except Exception as e:
+            self._logger.warning("Failed to update long-running task progress", exc_info=e)
+
+    def _safe_complete_long_running_task(self, task_id: str, result_metadata: dict | None = None) -> None:
+        try:
+            self._task_manager.complete_task(task_id, result_metadata=result_metadata)
+            self._logger.info("Task Completed", extra={"task_id": task_id})
+        except Exception as e:
+            self._logger.warning("Failed to complete long-running task", exc_info=e)
+
+    def _safe_fail_long_running_task(self, task_id: str, error_message: str) -> None:
+        try:
+            self._task_manager.fail_task(task_id, error_message=error_message)
+            self._logger.info("Task Failed", extra={"task_id": task_id, "error": error_message})
+        except Exception as e:
+            self._logger.warning("Failed to fail long-running task", exc_info=e)
+
+    def _safe_cancel_long_running_task(self, task_id: str) -> None:
+        try:
+            self._task_manager.cancel_task(task_id)
+            self._logger.info("Task Cancelled", extra={"task_id": task_id})
+        except Exception as e:
+            self._logger.warning("Failed to cancel long-running task", exc_info=e)
+
 
     def _safe_evaluate_decision(self, context: DecisionContext) -> ExecutionDecision:
         try:
@@ -418,6 +536,23 @@ class ExecutionEngine:
         )
         self._safe_mark_running(execution_id)
 
+        # Detect and register Long-Running Task if applicable
+        long_running_task = None
+        if is_long_running_task(plan):
+            intent_name = plan.intent.value if hasattr(plan.intent, "value") else str(plan.intent)
+            task_name = f"{intent_name} - {plan.target or 'Task'}"
+            total_plan_steps = len(plan.routes) if plan.routes else 0
+            long_running_task = self._safe_create_long_running_task(
+                name=task_name,
+                execution_id=execution_id,
+                total_steps=total_plan_steps,
+                metadata=plan.parameters if isinstance(plan.parameters, dict) else {},
+            )
+            if long_running_task:
+                self._safe_queue_long_running_task(long_running_task.task_id)
+                self._safe_start_long_running_task(long_running_task.task_id)
+
+
         try:
             self._validator.validate_plan(plan, dispatcher)
         except Exception as val_err:
@@ -480,6 +615,14 @@ class ExecutionEngine:
                 total_steps=total_steps,
                 current_operation=step_id,
             )
+            if long_running_task:
+                self._safe_update_long_running_task_progress(
+                    task_id=long_running_task.task_id,
+                    progress=percentage,
+                    current_step=i + 1,
+                    total_steps=total_steps,
+                )
+
 
             context.start_step(step_id, route.capability_name)
             step_start_time = time.perf_counter()
@@ -532,9 +675,12 @@ class ExecutionEngine:
                 self._logger.info("Decision Applied", extra={"execution_id": execution_id, "decision": "CANCEL"})
                 self._logger.info("Execution Cancelled", extra={"execution_id": execution_id})
                 self._safe_mark_cancelled(execution_id)
+                if long_running_task:
+                    self._safe_cancel_long_running_task(long_running_task.task_id)
                 overall_success = False
                 summary_error = f"Execution cancelled: {decision.message}"
                 break
+
 
             elif decision.decision_type == DecisionType.WAIT:
                 self._logger.info("Decision Applied", extra={"execution_id": execution_id, "decision": "WAIT"})
@@ -811,6 +957,27 @@ class ExecutionEngine:
 
         if overall_success:
             self._safe_mark_completed(execution_id)
+            if long_running_task:
+                self._safe_complete_long_running_task(
+                    long_running_task.task_id,
+                    result_metadata={"execution_id": execution_id},
+                )
+        elif long_running_task:
+            exec_state = self._state_manager.get_execution(execution_id)
+            status_str = str(getattr(exec_state, "status", ""))
+            current_task = self._task_manager.get_task(long_running_task.task_id)
+            task_status_str = str(getattr(current_task, "status", "")) if current_task else ""
+            if current_task and "CANCELLED" not in task_status_str:
+                if "CANCELLED" in status_str:
+                    self._safe_cancel_long_running_task(long_running_task.task_id)
+                else:
+                    self._safe_fail_long_running_task(
+                        long_running_task.task_id,
+                        error_message=summary_error or "Execution failed",
+                    )
+
+
+
 
         total_duration = time.perf_counter() - session_start_time
         summary = ExecutionSummary(

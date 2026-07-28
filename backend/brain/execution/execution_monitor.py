@@ -76,21 +76,31 @@ class ExecutionStatistics(BaseModel):
     skipped_steps: int = Field(default=0, description="Total skipped steps count")
     retry_counts: int = Field(default=0, description="Total count of all retries made")
 
+    # Long-running task additions
+    long_running_task_count: int = Field(default=0, description="Total count of long-running tasks recorded")
+    long_running_average_duration: float = Field(default=0.0, description="Average completion time of long-running tasks in seconds")
+    long_running_failed_count: int = Field(default=0, description="Count of failed long-running tasks")
+    long_running_cancelled_count: int = Field(default=0, description="Count of cancelled long-running tasks")
+    long_running_completion_percentage: float = Field(default=0.0, description="Average completion percentage of long-running tasks")
+
 
 class ExecutionMonitor:
     """Monitors execution lifecycles, aggregates metrics, and tracks historical summaries."""
 
-    def __init__(self, max_history_size: int = 1000, state_manager: Optional[Any] = None) -> None:
+    def __init__(self, max_history_size: int = 1000, state_manager: Optional[Any] = None, task_manager: Optional[Any] = None) -> None:
         """Initializes the ExecutionMonitor.
 
         Args:
             max_history_size: Maximum size of the history list (FIFO eviction).
             state_manager: Optional ExecutionStateManager instance.
+            task_manager: Optional LongRunningTaskManager instance.
         """
         self._max_history_size = max_history_size
         self._state_manager = state_manager
+        self._task_manager = task_manager
         self._lock = threading.RLock()
         self._completed_history: List[ExecutionSummary] = []
+
 
     def calculate_metrics(self, state: ExecutionState) -> ExecutionMetrics:
         """Computes runtime performance metrics for an ExecutionState.
@@ -185,17 +195,23 @@ class ExecutionMonitor:
                 return self._completed_history[-limit:]
             return list(self._completed_history)
 
-    def get_statistics(self, state_manager: Optional[Any] = None) -> ExecutionStatistics:
+    def get_statistics(
+        self,
+        state_manager: Optional[Any] = None,
+        task_manager: Optional[Any] = None,
+    ) -> ExecutionStatistics:
         """Calculates runtime statistics across active and finished executions.
 
         Args:
             state_manager: Optional state manager instance to fetch active/running count.
+            task_manager: Optional task manager instance to fetch long-running task metrics.
 
         Returns:
             The compiled ExecutionStatistics.
         """
         with self._lock:
             mgr = state_manager or self._state_manager
+            tm = task_manager or self._task_manager
             running_count = 0
             total_recovery_attempts = sum(s.recovery_attempts for s in self._completed_history)
             total_successful_recoveries = sum(s.successful_recoveries for s in self._completed_history)
@@ -203,6 +219,37 @@ class ExecutionMonitor:
             total_fallback_usage = sum(s.fallback_usage for s in self._completed_history)
             total_skipped_steps = sum(s.skipped_steps for s in self._completed_history)
             total_retry_counts = sum(s.retry_count for s in self._completed_history)
+
+            long_running_count = 0
+            long_running_avg_dur = 0.0
+            long_running_failed = 0
+            long_running_cancelled = 0
+            long_running_comp_pct = 0.0
+
+            if tm is not None:
+                try:
+                    tasks = tm.list_tasks()
+                    long_running_count = len(tasks)
+                    long_running_failed = sum(
+                        1 for t in tasks
+                        if str(t.status) == "FAILED" or getattr(t.status, "value", None) == "FAILED"
+                    )
+                    long_running_cancelled = sum(
+                        1 for t in tasks
+                        if str(t.status) == "CANCELLED" or getattr(t.status, "value", None) == "CANCELLED"
+                    )
+
+                    durations = []
+                    for t in tasks:
+                        if t.started_at and t.completed_at:
+                            durations.append((t.completed_at - t.started_at).total_seconds())
+                    if durations:
+                        long_running_avg_dur = sum(durations) / len(durations)
+
+                    if tasks:
+                        long_running_comp_pct = sum(t.progress for t in tasks) / len(tasks)
+                except Exception:
+                    pass
 
             if mgr is not None:
                 try:
@@ -253,7 +300,13 @@ class ExecutionMonitor:
                 fallback_usage=total_fallback_usage,
                 skipped_steps=total_skipped_steps,
                 retry_counts=total_retry_counts,
+                long_running_task_count=long_running_count,
+                long_running_average_duration=long_running_avg_dur,
+                long_running_failed_count=long_running_failed,
+                long_running_cancelled_count=long_running_cancelled,
+                long_running_completion_percentage=long_running_comp_pct,
             )
+
 
     def clear_history(self) -> None:
         """Clears all historical summaries from memory."""

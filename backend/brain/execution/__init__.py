@@ -7,7 +7,7 @@ from .execution_context import ExecutionContext
 from .execution_history import ExecutionHistory
 from .execution_validator import ExecutionValidator
 from .execution_scheduler import ExecutionScheduler
-from .execution_engine import ExecutionEngine
+from .execution_engine import ExecutionEngine, is_long_running_task
 from .execution_state import (
     ExecutionStatus,
     ExecutionProgress,
@@ -67,6 +67,7 @@ __all__ = [
     "ExecutionValidator",
     "ExecutionScheduler",
     "ExecutionEngine",
+    "is_long_running_task",
     "ExecutionProgress",
     "ExecutionState",
     "ExecutionSnapshot",
@@ -103,5 +104,6 @@ __all__ = [
     "LongRunningTaskConfig",
     "LongRunningTaskManager",
 ]
+
 
 
