@@ -66,6 +66,14 @@ from .task_events import (
     TaskEventListener,
     TaskEventDispatcher,
 )
+from .background_job_scheduler import (
+    BackgroundJobStatus,
+    BackgroundJobPriority,
+    BackgroundJobTriggerType,
+    BackgroundJob,
+    BackgroundSchedulerConfig,
+    BackgroundJobScheduler,
+)
 
 __all__ = [
     "ExecutionStatus",
@@ -117,7 +125,14 @@ __all__ = [
     "TaskEvent",
     "TaskEventListener",
     "TaskEventDispatcher",
+    "BackgroundJobStatus",
+    "BackgroundJobPriority",
+    "BackgroundJobTriggerType",
+    "BackgroundJob",
+    "BackgroundSchedulerConfig",
+    "BackgroundJobScheduler",
 ]
+
 
 
 
