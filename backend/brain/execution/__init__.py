@@ -45,6 +45,12 @@ from .clarification_engine import (
     ClarificationContext,
     ClarificationEngine,
 )
+from .clarification_session import (
+    ClarificationSessionStatus,
+    ClarificationSession,
+    ClarificationSessionConfig,
+    ClarificationSessionManager,
+)
 
 __all__ = [
     "ExecutionStatus",
@@ -80,4 +86,9 @@ __all__ = [
     "ClarificationResponse",
     "ClarificationContext",
     "ClarificationEngine",
+    "ClarificationSessionStatus",
+    "ClarificationSession",
+    "ClarificationSessionConfig",
+    "ClarificationSessionManager",
 ]
+
