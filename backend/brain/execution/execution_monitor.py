@@ -88,6 +88,12 @@ class ExecutionStatistics(BaseModel):
     scheduled_job_failures: int = Field(default=0, description="Total count of scheduled job failures")
     average_scheduled_execution_duration: float = Field(default=0.0, description="Average duration of scheduled job executions")
     ready_job_count: int = Field(default=0, description="Count of currently ready scheduled jobs")
+    recovered_scheduled_jobs: int = Field(default=0, description="Total count of recovered scheduled jobs")
+    expired_scheduled_jobs: int = Field(default=0, description="Total count of expired scheduled jobs")
+    archived_scheduled_jobs: int = Field(default=0, description="Total count of archived scheduled jobs")
+    scheduled_cleanup_operations: int = Field(default=0, description="Total count of scheduled cleanup operations executed")
+    scheduled_persistence_failures: int = Field(default=0, description="Total count of scheduled job persistence failures")
+
 
 
 class ExecutionMonitor:
@@ -431,10 +437,56 @@ class ExecutionMonitor:
 
 
 
+    def get_scheduler_statistics(self, scheduler: Optional[Any] = None) -> Dict[str, Any]:
+        """Returns background job scheduler metrics and statistics.
+
+        Args:
+            scheduler: Optional BackgroundJobScheduler instance override.
+
+        Returns:
+            Dictionary containing active job counts, ready jobs, status breakdown, and metrics.
+        """
+        js = scheduler or self._job_scheduler
+        if js is None:
+            return {
+                "active_jobs": 0,
+                "completed_jobs": 0,
+                "ready_jobs": 0,
+                "total_jobs": 0,
+                "status_counts": {},
+            }
+
+        try:
+            active_jobs = js.list_jobs()
+            completed_jobs = list(getattr(js, "_completed_jobs", []))
+            ready_jobs = js.list_ready_jobs()
+
+            status_counts: Dict[str, int] = {}
+            for j in active_jobs + completed_jobs:
+                st = j.status.value if hasattr(j.status, "value") else str(j.status)
+                status_counts[st] = status_counts.get(st, 0) + 1
+
+            return {
+                "active_jobs": len(active_jobs),
+                "completed_jobs": len(completed_jobs),
+                "ready_jobs": len(ready_jobs),
+                "total_jobs": len(active_jobs) + len(completed_jobs),
+                "status_counts": status_counts,
+            }
+        except Exception:
+            return {
+                "active_jobs": 0,
+                "completed_jobs": 0,
+                "ready_jobs": 0,
+                "total_jobs": 0,
+                "status_counts": {},
+            }
+
     def clear_history(self) -> None:
         """Clears all historical summaries from memory."""
         with self._lock:
             self._completed_history.clear()
+
 
     def _add_to_history(self, state: ExecutionState) -> None:
         """Helper to build and append an ExecutionSummary to history thread-safely."""

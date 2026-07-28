@@ -5,9 +5,76 @@ from enum import Enum
 import logging
 import threading
 import uuid
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Protocol, Tuple, Union, runtime_checkable
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
+
+
+@runtime_checkable
+class BackgroundJobPersistenceHook(Protocol):
+    """Abstract protocol for background job persistence storage."""
+
+    def save_job(self, job: Any) -> bool:
+        """Saves a scheduled background job record.
+
+        Args:
+            job: BackgroundJob instance to persist.
+
+        Returns:
+            True if saved successfully, False otherwise.
+        """
+        ...
+
+    def update_job(self, job: Any) -> bool:
+        """Updates a scheduled background job record.
+
+        Args:
+            job: BackgroundJob instance to update.
+
+        Returns:
+            True if updated successfully, False otherwise.
+        """
+        ...
+
+    def delete_job(self, job_id: str) -> bool:
+        """Deletes a scheduled background job record by ID.
+
+        Args:
+            job_id: ID of the job to delete.
+
+        Returns:
+            True if deleted successfully, False otherwise.
+        """
+        ...
+
+    def load_jobs(self) -> List[Any]:
+        """Loads all persisted background job records.
+
+        Returns:
+            List of loaded BackgroundJob instances.
+        """
+        ...
+
+
+class NullBackgroundJobPersistenceHook:
+    """Default no-op implementation of BackgroundJobPersistenceHook."""
+
+    def save_job(self, job: Any) -> bool:
+        """No-op save operation. Always succeeds."""
+        return True
+
+    def update_job(self, job: Any) -> bool:
+        """No-op update operation. Always succeeds."""
+        return True
+
+    def delete_job(self, job_id: str) -> bool:
+        """No-op delete operation. Always succeeds."""
+        return True
+
+    def load_jobs(self) -> List[Any]:
+        """No-op load operation. Always returns empty list."""
+        return []
+
 
 
 class BackgroundJobStatus(str, Enum):
@@ -130,6 +197,12 @@ class BackgroundSchedulerConfig(BaseModel):
         ge=1,
         description="Default check interval in seconds for interval triggers",
     )
+    retention_seconds: int = Field(
+        default=86400,
+        ge=1,
+        description="Retention period in seconds for completed job history (default 24 hours)",
+    )
+
 
 
 
@@ -605,12 +678,14 @@ class BackgroundJobScheduler:
         self,
         config: Optional[BackgroundSchedulerConfig] = None,
         logger: Optional[logging.Logger] = None,
+        persistence_hook: Optional[BackgroundJobPersistenceHook] = None,
     ) -> None:
-        """Initializes the scheduler with configuration options and internal storage.
+        """Initializes the scheduler with configuration options, internal storage, and persistence hook.
 
         Args:
             config: Optional BackgroundSchedulerConfig settings.
             logger: Optional custom logger.
+            persistence_hook: Optional BackgroundJobPersistenceHook implementation.
         """
         self._config = config or BackgroundSchedulerConfig()
         self._logger = logger or logging.getLogger(__name__)
@@ -621,6 +696,169 @@ class BackgroundJobScheduler:
         )
         self._validator = RecurringTriggerValidator(logger=self._logger)
         self._calculator = RecurringScheduleCalculator(logger=self._logger)
+        self._persistence_hook = persistence_hook or NullBackgroundJobPersistenceHook()
+
+    @property
+    def persistence_hook(self) -> BackgroundJobPersistenceHook:
+        """Returns the configured persistence hook."""
+        return self._persistence_hook
+
+    def _safe_save_job(self, job: BackgroundJob) -> bool:
+        """Safely invokes save_job on persistence hook without throwing exceptions."""
+        self._logger.info("Persistence Hook Invoked", extra={"operation": "save_job", "job_id": job.job_id})
+        try:
+            return bool(self._persistence_hook.save_job(job))
+        except Exception as err:
+            self._logger.warning(
+                "Persistence Failure",
+                extra={"operation": "save_job", "job_id": job.job_id, "error": str(err)},
+            )
+            return False
+
+    def _safe_update_job(self, job: BackgroundJob) -> bool:
+        """Safely invokes update_job on persistence hook without throwing exceptions."""
+        self._logger.info("Persistence Hook Invoked", extra={"operation": "update_job", "job_id": job.job_id})
+        try:
+            return bool(self._persistence_hook.update_job(job))
+        except Exception as err:
+            self._logger.warning(
+                "Persistence Failure",
+                extra={"operation": "update_job", "job_id": job.job_id, "error": str(err)},
+            )
+            return False
+
+    def _safe_delete_job(self, job_id: str) -> bool:
+        """Safely invokes delete_job on persistence hook without throwing exceptions."""
+        self._logger.info("Persistence Hook Invoked", extra={"operation": "delete_job", "job_id": job_id})
+        try:
+            return bool(self._persistence_hook.delete_job(job_id))
+        except Exception as err:
+            self._logger.warning(
+                "Persistence Failure",
+                extra={"operation": "delete_job", "job_id": job_id, "error": str(err)},
+            )
+            return False
+
+    def _safe_load_jobs(self) -> List[BackgroundJob]:
+        """Safely invokes load_jobs on persistence hook without throwing exceptions."""
+        self._logger.info("Persistence Hook Invoked", extra={"operation": "load_jobs"})
+        try:
+            jobs = self._persistence_hook.load_jobs()
+            return list(jobs) if jobs is not None else []
+        except Exception as err:
+            self._logger.warning(
+                "Persistence Failure",
+                extra={"operation": "load_jobs", "error": str(err)},
+            )
+            return []
+
+    def recover_jobs(self) -> int:
+        """Loads persisted jobs from the persistence hook, validates them, and restores state.
+
+        Returns:
+            Number of successfully recovered jobs.
+        """
+        with self._lock:
+            jobs = self._safe_load_jobs()
+            recovered_count = 0
+            for job in jobs:
+                if not isinstance(job, BackgroundJob) or not getattr(job, "job_id", None) or not getattr(job, "name", None):
+                    self._logger.warning("Corrupted Job Skipped", extra={"job_id": getattr(job, "job_id", "unknown")})
+                    continue
+
+                val = self._validator.validate_trigger(job.trigger_type, job.parameters)
+                if not val.is_valid:
+                    self._logger.warning("Corrupted Job Skipped", extra={"job_id": job.job_id, "error": val.error})
+                    continue
+
+                if job.is_finished():
+                    if job not in self._completed_jobs:
+                        self._completed_jobs.append(job)
+                else:
+                    self._active_jobs[job.job_id] = job
+
+                recovered_count += 1
+                self._logger.info("Job Recovered", extra={"job_id": job.job_id, "status": job.status.value if hasattr(job.status, "value") else str(job.status)})
+
+            return recovered_count
+
+    def expire_jobs(self, current_time: Optional[datetime] = None) -> int:
+        """Identifies ONCE jobs whose scheduled execution time has permanently passed and archives them.
+
+        Args:
+            current_time: Optional reference timestamp (defaults to UTC now).
+
+        Returns:
+            Number of expired jobs.
+        """
+        now = current_time or datetime.now(timezone.utc)
+        if not now.tzinfo:
+            now = now.replace(tzinfo=timezone.utc)
+
+        expired_count = 0
+        with self._lock:
+            for jid, job in list(self._active_jobs.items()):
+                if job.trigger_type != BackgroundJobTriggerType.ONCE:
+                    continue
+
+                if job.status in (BackgroundJobStatus.SCHEDULED, BackgroundJobStatus.READY):
+                    if job.next_run and job.next_run < now:
+                        job.status = BackgroundJobStatus.EXPIRED
+                        job.updated_at = now
+                        expired_count += 1
+                        self._logger.info("Job Expired", extra={"job_id": jid})
+                        self._archive_job_locked(job)
+                        self._logger.info("Job Archived", extra={"job_id": jid, "reason": "expired"})
+
+        return expired_count
+
+    def cleanup_expired_jobs(self, current_time: Optional[datetime] = None) -> Dict[str, int]:
+        """Removes completed, cancelled, and expired terminal jobs older than retention_seconds.
+
+        Args:
+            current_time: Optional reference timestamp (defaults to UTC now).
+
+        Returns:
+            Dictionary summarizing cleanup counts by status.
+        """
+        now = current_time or datetime.now(timezone.utc)
+        if not now.tzinfo:
+            now = now.replace(tzinfo=timezone.utc)
+
+        retention_delta = timedelta(seconds=self._config.retention_seconds)
+        stats = {
+            "cleaned_completed": 0,
+            "cleaned_cancelled": 0,
+            "cleaned_expired": 0,
+            "total_cleaned": 0,
+        }
+
+        with self._lock:
+            remaining_history: deque[BackgroundJob] = deque(maxlen=self._config.maximum_history)
+            for job in list(self._completed_jobs):
+                is_past_retention = (now - job.updated_at) >= retention_delta
+                if is_past_retention:
+                    st_str = job.status.value if hasattr(job.status, "value") else str(job.status)
+                    if st_str == "COMPLETED":
+                        stats["cleaned_completed"] += 1
+                    elif st_str == "CANCELLED":
+                        stats["cleaned_cancelled"] += 1
+                    elif st_str == "EXPIRED":
+                        stats["cleaned_expired"] += 1
+                    else:
+                        stats["cleaned_completed"] += 1
+
+                    stats["total_cleaned"] += 1
+                    self._safe_delete_job(job.job_id)
+                else:
+                    remaining_history.append(job)
+
+            self._completed_jobs = remaining_history
+            if stats["total_cleaned"] > 0:
+                self._logger.info("Scheduler Cleanup", extra=stats)
+
+        return stats
+
 
     def create_job(
         self,
@@ -693,6 +931,7 @@ class BackgroundJobScheduler:
             )
 
             self._active_jobs[jid] = job
+            self._safe_save_job(job)
             self._logger.info("Job Created", extra={"job_id": jid, "job_name": name})
             return job
 
@@ -759,9 +998,9 @@ class BackgroundJobScheduler:
                 job.tags = tags
 
             job.updated_at = now
+            self._safe_update_job(job)
             self._logger.info("Job Updated", extra={"job_id": job_id})
             return True
-
 
     def pause_job(self, job_id: str) -> bool:
         """Transitions a job to PAUSED status.
@@ -782,6 +1021,7 @@ class BackgroundJobScheduler:
 
             job.status = BackgroundJobStatus.PAUSED
             job.updated_at = datetime.now(timezone.utc)
+            self._safe_update_job(job)
             self._logger.info("Job Paused", extra={"job_id": job_id})
             return True
 
@@ -804,6 +1044,7 @@ class BackgroundJobScheduler:
 
             job.status = BackgroundJobStatus.SCHEDULED
             job.updated_at = datetime.now(timezone.utc)
+            self._safe_update_job(job)
             self._logger.info("Job Resumed", extra={"job_id": job_id})
             return True
 
@@ -830,6 +1071,8 @@ class BackgroundJobScheduler:
 
             if self._config.cleanup_history:
                 self._archive_job_locked(job)
+            else:
+                self._safe_update_job(job)
 
             self._logger.info("Job Cancelled", extra={"job_id": job_id})
             return True
@@ -853,7 +1096,12 @@ class BackgroundJobScheduler:
             if removed_history:
                 self._completed_jobs = deque(filtered_history, maxlen=self._config.maximum_history)
 
-            return (removed_active is not None) or removed_history
+            if removed_active is not None or removed_history:
+                self._safe_delete_job(job_id)
+                self._logger.info("Job Removed", extra={"job_id": job_id})
+                return True
+
+            return False
 
     def enable_job(self, job_id: str) -> bool:
         """Enables job scheduling execution.
@@ -874,6 +1122,7 @@ class BackgroundJobScheduler:
 
             job.enabled = True
             job.updated_at = datetime.now(timezone.utc)
+            self._safe_update_job(job)
             self._logger.info("Job Enabled", extra={"job_id": job_id})
             return True
 
@@ -896,8 +1145,10 @@ class BackgroundJobScheduler:
 
             job.enabled = False
             job.updated_at = datetime.now(timezone.utc)
+            self._safe_update_job(job)
             self._logger.info("Job Disabled", extra={"job_id": job_id})
             return True
+
 
     def get_job(self, job_id: str) -> Optional[BackgroundJob]:
         """Retrieves a job by ID from active or completed stores.
@@ -1001,6 +1252,7 @@ class BackgroundJobScheduler:
             job.status = BackgroundJobStatus.RUNNING
             job.last_run = now
             job.updated_at = now
+            self._safe_update_job(job)
 
             self._logger.info("Scheduled Job Started", extra={"job_id": job_id})
             return True
@@ -1039,9 +1291,12 @@ class BackgroundJobScheduler:
                 if self._config.cleanup_history:
                     self._archive_job_locked(job)
                     self._logger.info("One-Time Job Archived", extra={"job_id": job_id})
+                else:
+                    self._safe_update_job(job)
             else:
                 job.next_run = self._calculator.calculate_next_run(job.trigger_type, job.parameters, from_time=now, last_run=now)
                 job.status = BackgroundJobStatus.SCHEDULED
+                self._safe_update_job(job)
                 self._logger.info("Recurring Job Rescheduled", extra={"job_id": job_id})
 
             return True
@@ -1074,9 +1329,12 @@ class BackgroundJobScheduler:
                 job.status = BackgroundJobStatus.FAILED
                 if self._config.cleanup_history:
                     self._archive_job_locked(job)
+                else:
+                    self._safe_update_job(job)
             else:
                 job.next_run = self._calculator.calculate_next_run(job.trigger_type, job.parameters, from_time=now, last_run=now)
                 job.status = BackgroundJobStatus.SCHEDULED
+                self._safe_update_job(job)
 
             return True
 
@@ -1129,5 +1387,7 @@ class BackgroundJobScheduler:
         if job not in self._completed_jobs:
             self._completed_jobs.append(job)
             self._logger.info("Job Archived", extra={"job_id": job.job_id})
+        self._safe_update_job(job)
+
 
 

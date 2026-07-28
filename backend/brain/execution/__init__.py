@@ -77,6 +77,8 @@ from .background_job_scheduler import (
     TriggerValidationResult,
     RecurringTriggerValidator,
     RecurringScheduleCalculator,
+    BackgroundJobPersistenceHook,
+    NullBackgroundJobPersistenceHook,
 )
 
 __all__ = [
@@ -139,7 +141,10 @@ __all__ = [
     "TriggerValidationResult",
     "RecurringTriggerValidator",
     "RecurringScheduleCalculator",
+    "BackgroundJobPersistenceHook",
+    "NullBackgroundJobPersistenceHook",
 ]
+
 
 
 
