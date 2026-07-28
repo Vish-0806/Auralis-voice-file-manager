@@ -7,7 +7,7 @@ from .execution_context import ExecutionContext
 from .execution_history import ExecutionHistory
 from .execution_validator import ExecutionValidator
 from .execution_scheduler import ExecutionScheduler
-from .execution_engine import ExecutionEngine
+from .execution_engine import ExecutionEngine, is_long_running_task
 from .execution_state import (
     ExecutionStatus,
     ExecutionProgress,
@@ -45,6 +45,41 @@ from .clarification_engine import (
     ClarificationContext,
     ClarificationEngine,
 )
+from .clarification_session import (
+    ClarificationSessionStatus,
+    ClarificationSession,
+    ClarificationSessionConfig,
+    ClarificationSessionManager,
+)
+from .long_running_task_manager import (
+    LongRunningTaskStatus,
+    LongRunningTaskPriority,
+    LongRunningTask,
+    LongRunningTaskConfig,
+    LongRunningTaskManager,
+    TaskPersistenceHook,
+    NullTaskPersistenceHook,
+)
+from .task_events import (
+    TaskEventType,
+    TaskEvent,
+    TaskEventListener,
+    TaskEventDispatcher,
+)
+from .background_job_scheduler import (
+    BackgroundJobStatus,
+    BackgroundJobPriority,
+    BackgroundJobTriggerType,
+    BackgroundJob,
+    BackgroundSchedulerConfig,
+    BackgroundJobScheduler,
+    convert_to_execution_request,
+    TriggerValidationResult,
+    RecurringTriggerValidator,
+    RecurringScheduleCalculator,
+    BackgroundJobPersistenceHook,
+    NullBackgroundJobPersistenceHook,
+)
 
 __all__ = [
     "ExecutionStatus",
@@ -54,6 +89,7 @@ __all__ = [
     "ExecutionValidator",
     "ExecutionScheduler",
     "ExecutionEngine",
+    "is_long_running_task",
     "ExecutionProgress",
     "ExecutionState",
     "ExecutionSnapshot",
@@ -80,4 +116,40 @@ __all__ = [
     "ClarificationResponse",
     "ClarificationContext",
     "ClarificationEngine",
+    "ClarificationSessionStatus",
+    "ClarificationSession",
+    "ClarificationSessionConfig",
+    "ClarificationSessionManager",
+    "LongRunningTaskStatus",
+    "LongRunningTaskPriority",
+    "LongRunningTask",
+    "LongRunningTaskConfig",
+    "LongRunningTaskManager",
+    "TaskPersistenceHook",
+    "NullTaskPersistenceHook",
+    "TaskEventType",
+    "TaskEvent",
+    "TaskEventListener",
+    "TaskEventDispatcher",
+    "BackgroundJobStatus",
+    "BackgroundJobPriority",
+    "BackgroundJobTriggerType",
+    "BackgroundJob",
+    "BackgroundSchedulerConfig",
+    "BackgroundJobScheduler",
+    "convert_to_execution_request",
+    "TriggerValidationResult",
+    "RecurringTriggerValidator",
+    "RecurringScheduleCalculator",
+    "BackgroundJobPersistenceHook",
+    "NullBackgroundJobPersistenceHook",
 ]
+
+
+
+
+
+
+
+
+

@@ -94,6 +94,10 @@ backend/
 ### 2.6 Conversational Intelligence Subsystem
 * **Conversational Intelligence Engine**: Manages multi-turn conversation state, links entities across turns (e.g., resolving `"it"`, `"them"`, `"the second folder"` to previous actions), resolves command ambiguity, formulates interactive clarification requests, and handles conversational error recovery.
 
+### 2.7 Long-Running Task & Background Job Scheduler Subsystems
+* **Long-Running Task Subsystem**: Manages observable, asynchronous operations (`LongRunningTaskManager`) with progress tracking, event listener dispatching (`TaskEventDispatcher`), recovery hooks (`TaskPersistenceHook`), timeout cleanup policies, and execution monitor observation without external message queues.
+* **Background Job Scheduler Subsystem**: Manages scheduled and recurring jobs (`ONCE`, `INTERVAL`, `DAILY`, `WEEKLY`, `MONTHLY`, `MANUAL`) via `BackgroundJobScheduler`, deterministic schedule calculations (`RecurringScheduleCalculator`), parameter validations (`RecurringTriggerValidator`), persistence hooks (`BackgroundJobPersistenceHook`), expiration rules, retention cleanup, and seamless `ExecutionEngine` integration without cron or APScheduler dependencies.
+
 ---
 
 ## 3. Getting Started
@@ -127,4 +131,5 @@ Execute the entire Pytest suite:
 ```bash
 pytest
 ```
-Currently, the backend contains **644 unit and integration tests** verifying core flows, file operations, state transitions, speech, memory retrieval, brain orchestration, memory ranking, context windows, reference resolution, workspace intelligence, autonomous routines, proactive assistant, conversational intelligence, and integration pipeline steps.
+Currently, the backend contains **906 unit and integration tests** verifying core flows, file operations, state transitions, speech, memory retrieval, brain orchestration, memory ranking, context windows, reference resolution, workspace intelligence, autonomous routines, proactive assistant, conversational intelligence, long-running tasks, background job scheduler, recurring triggers, persistence hooks, and integration pipeline steps.
+

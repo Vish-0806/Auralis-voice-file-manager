@@ -76,21 +76,133 @@ class ExecutionStatistics(BaseModel):
     skipped_steps: int = Field(default=0, description="Total skipped steps count")
     retry_counts: int = Field(default=0, description="Total count of all retries made")
 
+    # Long-running task additions
+    long_running_task_count: int = Field(default=0, description="Total count of long-running tasks recorded")
+    long_running_average_duration: float = Field(default=0.0, description="Average completion time of long-running tasks in seconds")
+    long_running_failed_count: int = Field(default=0, description="Count of failed long-running tasks")
+    long_running_cancelled_count: int = Field(default=0, description="Count of cancelled long-running tasks")
+    long_running_completion_percentage: float = Field(default=0.0, description="Average completion percentage of long-running tasks")
+
+    # Background scheduler additions
+    scheduled_jobs_executed: int = Field(default=0, description="Total count of scheduled jobs executed")
+    scheduled_job_failures: int = Field(default=0, description="Total count of scheduled job failures")
+    average_scheduled_execution_duration: float = Field(default=0.0, description="Average duration of scheduled job executions")
+    ready_job_count: int = Field(default=0, description="Count of currently ready scheduled jobs")
+    recovered_scheduled_jobs: int = Field(default=0, description="Total count of recovered scheduled jobs")
+    expired_scheduled_jobs: int = Field(default=0, description="Total count of expired scheduled jobs")
+    archived_scheduled_jobs: int = Field(default=0, description="Total count of archived scheduled jobs")
+    scheduled_cleanup_operations: int = Field(default=0, description="Total count of scheduled cleanup operations executed")
+    scheduled_persistence_failures: int = Field(default=0, description="Total count of scheduled job persistence failures")
+
+
 
 class ExecutionMonitor:
     """Monitors execution lifecycles, aggregates metrics, and tracks historical summaries."""
 
-    def __init__(self, max_history_size: int = 1000, state_manager: Optional[Any] = None) -> None:
+    def __init__(
+        self,
+        max_history_size: int = 1000,
+        state_manager: Optional[Any] = None,
+        task_manager: Optional[Any] = None,
+        job_scheduler: Optional[Any] = None,
+    ) -> None:
         """Initializes the ExecutionMonitor.
 
         Args:
             max_history_size: Maximum size of the history list (FIFO eviction).
             state_manager: Optional ExecutionStateManager instance.
+            task_manager: Optional LongRunningTaskManager instance.
+            job_scheduler: Optional BackgroundJobScheduler instance.
         """
         self._max_history_size = max_history_size
         self._state_manager = state_manager
+        self._task_manager = task_manager
+        self._job_scheduler = job_scheduler
         self._lock = threading.RLock()
+
         self._completed_history: List[ExecutionSummary] = []
+        self._event_counts: Dict[str, int] = {}
+        self._total_events_received: int = 0
+        self._event_completion_count: int = 0
+        self._event_failure_count: int = 0
+        self._event_timeout_count: int = 0
+        self._event_recovered_count: int = 0
+        self._event_archived_count: int = 0
+        self._event_cleaned_count: int = 0
+        self._task_latest_progress: Dict[str, float] = {}
+
+        if self._task_manager and hasattr(self._task_manager, "event_dispatcher"):
+            try:
+                self._task_manager.event_dispatcher.register_listener(self)
+            except Exception:
+                pass
+
+    def on_event(self, event: Any) -> None:
+        """TaskEventListener callback receiving dispatched TaskEvent instances.
+
+        Args:
+            event: Dispatched TaskEvent payload.
+        """
+        if not event:
+            return
+
+        with self._lock:
+            type_val = getattr(event, "event_type", "")
+            type_str = type_val.value if hasattr(type_val, "value") else str(type_val)
+
+            self._event_counts[type_str] = self._event_counts.get(type_str, 0) + 1
+            self._total_events_received += 1
+
+            if "COMPLETED" in type_str:
+                self._event_completion_count += 1
+            elif "FAILED" in type_str:
+                self._event_failure_count += 1
+            elif "TIMED_OUT" in type_str:
+                self._event_timeout_count += 1
+            elif "RECOVERED" in type_str:
+                self._event_recovered_count += 1
+            elif "ARCHIVED" in type_str:
+                self._event_archived_count += 1
+            elif "CLEANED" in type_str:
+                self._event_cleaned_count += 1
+
+            progress = float(getattr(event, "progress", 0.0))
+            task_id = str(getattr(event, "task_id", ""))
+            if task_id:
+                self._task_latest_progress[task_id] = progress
+
+    def get_event_statistics(self) -> Dict[str, Any]:
+        """Returns aggregated event statistics collected by ExecutionMonitor listener.
+
+        Returns:
+            Dictionary containing event counts, rates, and progress metrics.
+        """
+        with self._lock:
+            total = self._total_events_received
+            comp = self._event_completion_count
+            fail = self._event_failure_count
+            tout = self._event_timeout_count
+            rec = self._event_recovered_count
+            arch = self._event_archived_count
+            cln = self._event_cleaned_count
+            rate = (comp / total) if total > 0 else 0.0
+            avg_prog = (sum(self._task_latest_progress.values()) / len(self._task_latest_progress)) if self._task_latest_progress else 0.0
+
+            return {
+                "total_events": total,
+                "completion_events": comp,
+                "failure_events": fail,
+                "timeout_events": tout,
+                "recovered_tasks": rec,
+                "archived_tasks": arch,
+                "cleaned_tasks": cln,
+                "event_completion_rate": rate,
+                "average_task_progress": avg_prog,
+                "event_counts_by_type": dict(self._event_counts),
+            }
+
+
+
 
     def calculate_metrics(self, state: ExecutionState) -> ExecutionMetrics:
         """Computes runtime performance metrics for an ExecutionState.
@@ -185,17 +297,23 @@ class ExecutionMonitor:
                 return self._completed_history[-limit:]
             return list(self._completed_history)
 
-    def get_statistics(self, state_manager: Optional[Any] = None) -> ExecutionStatistics:
+    def get_statistics(
+        self,
+        state_manager: Optional[Any] = None,
+        task_manager: Optional[Any] = None,
+    ) -> ExecutionStatistics:
         """Calculates runtime statistics across active and finished executions.
 
         Args:
             state_manager: Optional state manager instance to fetch active/running count.
+            task_manager: Optional task manager instance to fetch long-running task metrics.
 
         Returns:
             The compiled ExecutionStatistics.
         """
         with self._lock:
             mgr = state_manager or self._state_manager
+            tm = task_manager or self._task_manager
             running_count = 0
             total_recovery_attempts = sum(s.recovery_attempts for s in self._completed_history)
             total_successful_recoveries = sum(s.successful_recoveries for s in self._completed_history)
@@ -203,6 +321,37 @@ class ExecutionMonitor:
             total_fallback_usage = sum(s.fallback_usage for s in self._completed_history)
             total_skipped_steps = sum(s.skipped_steps for s in self._completed_history)
             total_retry_counts = sum(s.retry_count for s in self._completed_history)
+
+            long_running_count = 0
+            long_running_avg_dur = 0.0
+            long_running_failed = 0
+            long_running_cancelled = 0
+            long_running_comp_pct = 0.0
+
+            if tm is not None:
+                try:
+                    tasks = tm.list_tasks()
+                    long_running_count = len(tasks)
+                    long_running_failed = sum(
+                        1 for t in tasks
+                        if str(t.status) == "FAILED" or getattr(t.status, "value", None) == "FAILED"
+                    )
+                    long_running_cancelled = sum(
+                        1 for t in tasks
+                        if str(t.status) == "CANCELLED" or getattr(t.status, "value", None) == "CANCELLED"
+                    )
+
+                    durations = []
+                    for t in tasks:
+                        if t.started_at and t.completed_at:
+                            durations.append((t.completed_at - t.started_at).total_seconds())
+                    if durations:
+                        long_running_avg_dur = sum(durations) / len(durations)
+
+                    if tasks:
+                        long_running_comp_pct = sum(t.progress for t in tasks) / len(tasks)
+                except Exception:
+                    pass
 
             if mgr is not None:
                 try:
@@ -236,6 +385,28 @@ class ExecutionMonitor:
             if total_terminal > 0:
                 retry_rate = sum(1 for s in self._completed_history if s.retry_count > 0) / total_terminal
 
+            scheduled_executed = 0
+            scheduled_failed = 0
+            scheduled_avg_dur = 0.0
+            ready_jobs = 0
+
+            js = self._job_scheduler
+            if js is not None:
+                try:
+                    jobs = js.list_jobs()
+                    ready_list = js.list_ready_jobs()
+                    ready_jobs = len(ready_list)
+                    scheduled_executed = sum(1 for j in jobs if j.last_run is not None)
+                    scheduled_failed = sum(1 for j in jobs if str(j.status) == "FAILED" or getattr(j.status, "value", None) == "FAILED")
+                    durations = []
+                    for j in jobs:
+                        if j.last_run and j.updated_at and j.is_finished():
+                            durations.append((j.updated_at - j.last_run).total_seconds())
+                    if durations:
+                        scheduled_avg_dur = sum(durations) / len(durations)
+                except Exception:
+                    pass
+
             logger.info("Execution Statistics Generated")
 
             return ExecutionStatistics(
@@ -253,12 +424,69 @@ class ExecutionMonitor:
                 fallback_usage=total_fallback_usage,
                 skipped_steps=total_skipped_steps,
                 retry_counts=total_retry_counts,
+                long_running_task_count=long_running_count,
+                long_running_average_duration=long_running_avg_dur,
+                long_running_failed_count=long_running_failed,
+                long_running_cancelled_count=long_running_cancelled,
+                long_running_completion_percentage=long_running_comp_pct,
+                scheduled_jobs_executed=scheduled_executed,
+                scheduled_job_failures=scheduled_failed,
+                average_scheduled_execution_duration=scheduled_avg_dur,
+                ready_job_count=ready_jobs,
             )
+
+
+
+    def get_scheduler_statistics(self, scheduler: Optional[Any] = None) -> Dict[str, Any]:
+        """Returns background job scheduler metrics and statistics.
+
+        Args:
+            scheduler: Optional BackgroundJobScheduler instance override.
+
+        Returns:
+            Dictionary containing active job counts, ready jobs, status breakdown, and metrics.
+        """
+        js = scheduler or self._job_scheduler
+        if js is None:
+            return {
+                "active_jobs": 0,
+                "completed_jobs": 0,
+                "ready_jobs": 0,
+                "total_jobs": 0,
+                "status_counts": {},
+            }
+
+        try:
+            active_jobs = js.list_jobs()
+            completed_jobs = list(getattr(js, "_completed_jobs", []))
+            ready_jobs = js.list_ready_jobs()
+
+            status_counts: Dict[str, int] = {}
+            for j in active_jobs + completed_jobs:
+                st = j.status.value if hasattr(j.status, "value") else str(j.status)
+                status_counts[st] = status_counts.get(st, 0) + 1
+
+            return {
+                "active_jobs": len(active_jobs),
+                "completed_jobs": len(completed_jobs),
+                "ready_jobs": len(ready_jobs),
+                "total_jobs": len(active_jobs) + len(completed_jobs),
+                "status_counts": status_counts,
+            }
+        except Exception:
+            return {
+                "active_jobs": 0,
+                "completed_jobs": 0,
+                "ready_jobs": 0,
+                "total_jobs": 0,
+                "status_counts": {},
+            }
 
     def clear_history(self) -> None:
         """Clears all historical summaries from memory."""
         with self._lock:
             self._completed_history.clear()
+
 
     def _add_to_history(self, state: ExecutionState) -> None:
         """Helper to build and append an ExecutionSummary to history thread-safely."""
