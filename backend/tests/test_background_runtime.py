@@ -238,8 +238,9 @@ def test_structured_logging(caplog: Any) -> None:
     job = scheduler.create_job(
         name="Log Test Job",
         trigger_type=BackgroundJobTriggerType.INTERVAL,
-        parameters={"interval_seconds": -10},
+        parameters={"interval_seconds": 5},
     )
+
     assert job is not None
 
     dispatcher = MockDispatcher()

@@ -1,14 +1,11 @@
-"""Background Job Scheduler for managing scheduled job lifecycles and readiness."""
-
-from __future__ import annotations
-
+import calendar
 from collections import deque
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 import logging
 import threading
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, Union
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, Field
 
@@ -135,9 +132,383 @@ class BackgroundSchedulerConfig(BaseModel):
     )
 
 
+
+class TriggerValidationResult(BaseModel):
+    """Outcome of background job trigger parameter validation."""
+
+    is_valid: bool = Field(description="True if trigger configuration is valid")
+    error: Optional[str] = Field(default=None, description="Descriptive error message if invalid")
+    details: Dict[str, Any] = Field(default_factory=dict, description="Detailed validation breakdown")
+
+
+class RecurringTriggerValidator:
+    """Validates recurring background job trigger parameters and schedules."""
+
+    def __init__(self, logger: Optional[logging.Logger] = None) -> None:
+        """Initializes the RecurringTriggerValidator.
+
+        Args:
+            logger: Optional custom logger for diagnostics.
+        """
+        self._logger = logger or logging.getLogger(__name__)
+
+    def validate_trigger(
+        self,
+        trigger_type: Union[BackgroundJobTriggerType, str],
+        parameters: Optional[Dict[str, Any]] = None,
+    ) -> TriggerValidationResult:
+        """Validates trigger mechanism and parameter settings.
+
+        Args:
+            trigger_type: Trigger type Enum or string representation.
+            parameters: Dictionary of trigger parameters.
+
+        Returns:
+            TriggerValidationResult indicating validation outcome and details.
+        """
+        params = parameters or {}
+        t_str = trigger_type.value if hasattr(trigger_type, "value") else str(trigger_type).upper()
+
+        try:
+            tt = BackgroundJobTriggerType(t_str)
+        except Exception:
+            err = f"Unknown trigger type: '{trigger_type}'"
+            self._logger.warning("Trigger Validation Failed", extra={"trigger_type": str(trigger_type), "error": err})
+            self._logger.warning("Invalid Schedule", extra={"trigger_type": str(trigger_type), "error": err})
+            return TriggerValidationResult(is_valid=False, error=err, details={"trigger_type": str(trigger_type)})
+
+        if tt == BackgroundJobTriggerType.MANUAL:
+            self._logger.info("Trigger Validated", extra={"trigger_type": tt.value})
+            return TriggerValidationResult(is_valid=True, details={"trigger_type": tt.value})
+
+        if tt == BackgroundJobTriggerType.ONCE:
+            res = self._validate_once(params)
+        elif tt == BackgroundJobTriggerType.INTERVAL:
+            res = self._validate_interval(params)
+        elif tt == BackgroundJobTriggerType.DAILY:
+            res = self._validate_daily(params)
+        elif tt == BackgroundJobTriggerType.WEEKLY:
+            res = self._validate_weekly(params)
+        elif tt == BackgroundJobTriggerType.MONTHLY:
+            res = self._validate_monthly(params)
+        else:
+            res = TriggerValidationResult(is_valid=False, error=f"Unsupported trigger type '{tt.value}'")
+
+        if res.is_valid:
+            self._logger.info("Trigger Validated", extra={"trigger_type": tt.value})
+        else:
+            self._logger.warning("Trigger Validation Failed", extra={"trigger_type": tt.value, "error": res.error})
+            self._logger.warning("Invalid Schedule", extra={"trigger_type": tt.value, "error": res.error})
+
+        return res
+
+    def _validate_once(self, params: Dict[str, Any]) -> TriggerValidationResult:
+        if "delay_seconds" in params:
+            try:
+                float(params["delay_seconds"])
+            except (ValueError, TypeError):
+                return TriggerValidationResult(is_valid=False, error="delay_seconds must be a numeric value")
+
+
+        if "run_at" in params:
+            run_at = params["run_at"]
+            if not isinstance(run_at, datetime):
+                if isinstance(run_at, str):
+                    try:
+                        datetime.fromisoformat(run_at)
+                    except Exception:
+                        return TriggerValidationResult(is_valid=False, error="run_at string must be ISO format")
+                else:
+                    return TriggerValidationResult(is_valid=False, error="run_at must be datetime or ISO string")
+
+        return TriggerValidationResult(is_valid=True, details={"trigger": "ONCE"})
+
+    def _validate_interval(self, params: Dict[str, Any]) -> TriggerValidationResult:
+        if "interval_seconds" not in params:
+            return TriggerValidationResult(is_valid=False, error="Missing required parameter 'interval_seconds'")
+
+        try:
+            val = float(params["interval_seconds"])
+            if val <= 0:
+                return TriggerValidationResult(is_valid=False, error="interval_seconds must be greater than zero")
+        except (ValueError, TypeError):
+            return TriggerValidationResult(is_valid=False, error="interval_seconds must be a numeric value")
+
+        for conflict_key in ("day_of_week", "day_of_month"):
+            if conflict_key in params:
+                return TriggerValidationResult(is_valid=False, error=f"Conflicting parameter '{conflict_key}' for INTERVAL trigger")
+
+        return TriggerValidationResult(is_valid=True, details={"trigger": "INTERVAL", "interval_seconds": val})
+
+
+
+    def _validate_daily(self, params: Dict[str, Any]) -> TriggerValidationResult:
+        time_str = params.get("time_of_day", "00:00")
+        time_err = self._validate_time_of_day(time_str)
+        if time_err:
+            return TriggerValidationResult(is_valid=False, error=time_err)
+
+        for conflict_key in ("interval_seconds", "day_of_week", "day_of_month"):
+            if conflict_key in params:
+                return TriggerValidationResult(is_valid=False, error=f"Conflicting parameter '{conflict_key}' for DAILY trigger")
+
+        return TriggerValidationResult(is_valid=True, details={"trigger": "DAILY", "time_of_day": str(time_str)})
+
+    def _validate_weekly(self, params: Dict[str, Any]) -> TriggerValidationResult:
+        if "day_of_week" not in params:
+            return TriggerValidationResult(is_valid=False, error="Missing required parameter 'day_of_week'")
+
+        dow = params["day_of_week"]
+        if isinstance(dow, str):
+            day_map = {
+                "monday": 0, "mon": 0,
+                "tuesday": 1, "tue": 1,
+                "wednesday": 2, "wed": 2,
+                "thursday": 3, "thu": 3,
+                "friday": 4, "fri": 4,
+                "saturday": 5, "sat": 5,
+                "sunday": 6, "sun": 6,
+            }
+            if dow.lower() not in day_map:
+                return TriggerValidationResult(is_valid=False, error=f"Invalid day_of_week string '{dow}'")
+        else:
+            try:
+                val = int(dow)
+                if val < 0 or val > 6:
+                    return TriggerValidationResult(is_valid=False, error="day_of_week must be between 0 and 6")
+            except (ValueError, TypeError):
+                return TriggerValidationResult(is_valid=False, error="day_of_week must be an integer (0-6) or weekday name")
+
+        time_str = params.get("time_of_day", "00:00")
+        time_err = self._validate_time_of_day(time_str)
+        if time_err:
+            return TriggerValidationResult(is_valid=False, error=time_err)
+
+        for conflict_key in ("interval_seconds", "day_of_month"):
+            if conflict_key in params:
+                return TriggerValidationResult(is_valid=False, error=f"Conflicting parameter '{conflict_key}' for WEEKLY trigger")
+
+        return TriggerValidationResult(is_valid=True, details={"trigger": "WEEKLY", "day_of_week": dow})
+
+    def _validate_monthly(self, params: Dict[str, Any]) -> TriggerValidationResult:
+        if "day_of_month" not in params:
+            return TriggerValidationResult(is_valid=False, error="Missing required parameter 'day_of_month'")
+
+        dom = params["day_of_month"]
+        try:
+            val = int(dom)
+            if val < 1 or val > 31:
+                return TriggerValidationResult(is_valid=False, error="day_of_month must be between 1 and 31")
+        except (ValueError, TypeError):
+            return TriggerValidationResult(is_valid=False, error="day_of_month must be an integer between 1 and 31")
+
+        time_str = params.get("time_of_day", "00:00")
+        time_err = self._validate_time_of_day(time_str)
+        if time_err:
+            return TriggerValidationResult(is_valid=False, error=time_err)
+
+        for conflict_key in ("interval_seconds", "day_of_week"):
+            if conflict_key in params:
+                return TriggerValidationResult(is_valid=False, error=f"Conflicting parameter '{conflict_key}' for MONTHLY trigger")
+
+        return TriggerValidationResult(is_valid=True, details={"trigger": "MONTHLY", "day_of_month": dom})
+
+    def _validate_time_of_day(self, time_str: Any) -> Optional[str]:
+        if not isinstance(time_str, str):
+            return "time_of_day must be a string formatted as HH:MM"
+        parts = time_str.split(":")
+        if len(parts) != 2:
+            return f"Invalid time_of_day format '{time_str}', expected HH:MM"
+        try:
+            h, m = int(parts[0]), int(parts[1])
+            if h < 0 or h > 23:
+                return f"Hour out of range (0-23): {h}"
+            if m < 0 or m > 59:
+                return f"Minute out of range (0-59): {m}"
+        except ValueError:
+            return f"Non-numeric time_of_day values in '{time_str}'"
+        return None
+
+
+class RecurringScheduleCalculator:
+    """Calculates deterministic next_run timestamps for background job schedules."""
+
+    def __init__(self, logger: Optional[logging.Logger] = None) -> None:
+        """Initializes the RecurringScheduleCalculator.
+
+        Args:
+            logger: Optional custom logger for diagnostics.
+        """
+        self._logger = logger or logging.getLogger(__name__)
+
+    def calculate_next_run(
+        self,
+        trigger_type: Union[BackgroundJobTriggerType, str],
+        parameters: Optional[Dict[str, Any]] = None,
+        from_time: Optional[datetime] = None,
+        last_run: Optional[datetime] = None,
+    ) -> Optional[datetime]:
+        """Calculates the deterministic next run datetime in UTC.
+
+        Args:
+            trigger_type: Trigger type Enum or string.
+            parameters: Trigger parameters dictionary.
+            from_time: Reference start timestamp (defaults to UTC now).
+            last_run: Optional last execution timestamp.
+
+        Returns:
+            Calculated next run datetime in UTC, or None if MANUAL or finished.
+        """
+        params = parameters or {}
+        ref_time = from_time or datetime.now(timezone.utc)
+        if not ref_time.tzinfo:
+            ref_time = ref_time.replace(tzinfo=timezone.utc)
+
+        t_str = trigger_type.value if hasattr(trigger_type, "value") else str(trigger_type).upper()
+        try:
+            tt = BackgroundJobTriggerType(t_str)
+        except Exception:
+            return None
+
+        if tt == BackgroundJobTriggerType.MANUAL:
+            return None
+
+        next_run: Optional[datetime] = None
+
+        if tt == BackgroundJobTriggerType.ONCE:
+            next_run = self._calculate_once(params, ref_time, last_run)
+        elif tt == BackgroundJobTriggerType.INTERVAL:
+            next_run = self._calculate_interval(params, ref_time, last_run)
+        elif tt == BackgroundJobTriggerType.DAILY:
+            next_run = self._calculate_daily(params, ref_time)
+        elif tt == BackgroundJobTriggerType.WEEKLY:
+            next_run = self._calculate_weekly(params, ref_time)
+        elif tt == BackgroundJobTriggerType.MONTHLY:
+            next_run = self._calculate_monthly(params, ref_time)
+
+        if next_run:
+            self._logger.info("Recurring Job Calculated", extra={"trigger_type": tt.value})
+            self._logger.info("Next Run Calculated", extra={"trigger_type": tt.value, "next_run": next_run.isoformat()})
+
+        return next_run
+
+    def _calculate_once(
+        self,
+        params: Dict[str, Any],
+        ref_time: datetime,
+        last_run: Optional[datetime] = None,
+    ) -> Optional[datetime]:
+        if last_run is not None:
+            return None
+
+        run_at = params.get("run_at")
+        if isinstance(run_at, datetime):
+            return run_at if run_at.tzinfo else run_at.replace(tzinfo=timezone.utc)
+        if isinstance(run_at, str):
+            try:
+                dt = datetime.fromisoformat(run_at)
+                return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+            except Exception:
+                pass
+
+        delay_seconds = float(params.get("delay_seconds", 0))
+        return ref_time + timedelta(seconds=max(0.0, delay_seconds))
+
+    def _calculate_interval(
+        self,
+        params: Dict[str, Any],
+        ref_time: datetime,
+        last_run: Optional[datetime] = None,
+    ) -> Optional[datetime]:
+        try:
+            interval = float(params.get("interval_seconds", 60))
+            if interval <= 0:
+                interval = 60.0
+        except (ValueError, TypeError):
+            interval = 60.0
+
+        base_time = last_run or ref_time
+        if not base_time.tzinfo:
+            base_time = base_time.replace(tzinfo=timezone.utc)
+
+        target = base_time + timedelta(seconds=interval)
+        while target <= ref_time:
+            target += timedelta(seconds=interval)
+        return target
+
+    def _calculate_daily(self, params: Dict[str, Any], ref_time: datetime) -> Optional[datetime]:
+        h, m = self._parse_time_of_day(params.get("time_of_day", "00:00"))
+        target = ref_time.replace(hour=h, minute=m, second=0, microsecond=0)
+        if target <= ref_time:
+            target += timedelta(days=1)
+        return target
+
+    def _calculate_weekly(self, params: Dict[str, Any], ref_time: datetime) -> Optional[datetime]:
+        dow = self._parse_day_of_week(params.get("day_of_week", 0))
+        h, m = self._parse_time_of_day(params.get("time_of_day", "00:00"))
+
+        days_ahead = (dow - ref_time.weekday()) % 7
+        target = ref_time.replace(hour=h, minute=m, second=0, microsecond=0) + timedelta(days=days_ahead)
+        if target <= ref_time:
+            target += timedelta(days=7)
+        return target
+
+    def _calculate_monthly(self, params: Dict[str, Any], ref_time: datetime) -> Optional[datetime]:
+        dom = self._parse_day_of_month(params.get("day_of_month", 1))
+        h, m = self._parse_time_of_day(params.get("time_of_day", "00:00"))
+
+        _, max_days_curr = calendar.monthrange(ref_time.year, ref_time.month)
+        target_day_curr = min(dom, max_days_curr)
+        target = ref_time.replace(day=target_day_curr, hour=h, minute=m, second=0, microsecond=0)
+
+        if target <= ref_time:
+            next_month = ref_time.month + 1
+            next_year = ref_time.year
+            if next_month > 12:
+                next_month = 1
+                next_year += 1
+            _, max_days_next = calendar.monthrange(next_year, next_month)
+            target_day_next = min(dom, max_days_next)
+            target = datetime(next_year, next_month, target_day_next, h, m, 0, 0, tzinfo=timezone.utc)
+
+        return target
+
+    def _parse_time_of_day(self, val: Any) -> Tuple[int, int]:
+        if isinstance(val, str) and ":" in val:
+            try:
+                parts = val.split(":")
+                return int(parts[0]) % 24, int(parts[1]) % 60
+            except Exception:
+                pass
+        return 0, 0
+
+    def _parse_day_of_week(self, val: Any) -> int:
+        if isinstance(val, str):
+            day_map = {
+                "monday": 0, "mon": 0,
+                "tuesday": 1, "tue": 1,
+                "wednesday": 2, "wed": 2,
+                "thursday": 3, "thu": 3,
+                "friday": 4, "fri": 4,
+                "saturday": 5, "sat": 5,
+                "sunday": 6, "sun": 6,
+            }
+            return day_map.get(val.lower(), 0)
+        try:
+            return int(val) % 7
+        except Exception:
+            return 0
+
+    def _parse_day_of_month(self, val: Any) -> int:
+        try:
+            return max(1, min(31, int(val)))
+        except Exception:
+            return 1
+
+
 def calculate_next_run(
-    trigger_type: BackgroundJobTriggerType,
-    parameters: Dict[str, Any],
+    trigger_type: Union[BackgroundJobTriggerType, str],
+    parameters: Optional[Dict[str, Any]] = None,
     from_time: Optional[datetime] = None,
 ) -> Optional[datetime]:
     """Calculates next run timestamp based on trigger type and parameters.
@@ -150,70 +521,9 @@ def calculate_next_run(
     Returns:
         Calculated next run datetime in UTC, or None if trigger is MANUAL.
     """
-    ref_time = from_time or datetime.now(timezone.utc)
-    if not ref_time.tzinfo:
-        ref_time = ref_time.replace(tzinfo=timezone.utc)
+    calculator = RecurringScheduleCalculator()
+    return calculator.calculate_next_run(trigger_type, parameters, from_time=from_time)
 
-    if trigger_type == BackgroundJobTriggerType.MANUAL:
-        return None
-
-    if trigger_type == BackgroundJobTriggerType.ONCE:
-        run_at = parameters.get("run_at")
-        if isinstance(run_at, datetime):
-            return run_at if run_at.tzinfo else run_at.replace(tzinfo=timezone.utc)
-        if isinstance(run_at, str):
-            try:
-                dt = datetime.fromisoformat(run_at)
-                return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-            except Exception:
-                pass
-        delay_seconds = float(parameters.get("delay_seconds", 0))
-        return ref_time + timedelta(seconds=delay_seconds)
-
-    if trigger_type == BackgroundJobTriggerType.INTERVAL:
-        interval = float(parameters.get("interval_seconds", 60))
-        return ref_time + timedelta(seconds=max(1.0, interval))
-
-    if trigger_type == BackgroundJobTriggerType.DAILY:
-        time_str = str(parameters.get("time_of_day", "00:00"))
-        try:
-            parts = time_str.split(":")
-            hour, minute = int(parts[0]), int(parts[1])
-        except Exception:
-            hour, minute = 0, 0
-        target = ref_time.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        if target <= ref_time:
-            target += timedelta(days=1)
-        return target
-
-    if trigger_type == BackgroundJobTriggerType.WEEKLY:
-        day_of_week = int(parameters.get("day_of_week", 0)) % 7
-        time_str = str(parameters.get("time_of_day", "00:00"))
-        try:
-            parts = time_str.split(":")
-            hour, minute = int(parts[0]), int(parts[1])
-        except Exception:
-            hour, minute = 0, 0
-        days_ahead = (day_of_week - ref_time.weekday()) % 7
-        target = ref_time.replace(hour=hour, minute=minute, second=0, microsecond=0) + timedelta(days=days_ahead)
-        if target <= ref_time:
-            target += timedelta(days=7)
-        return target
-
-    if trigger_type == BackgroundJobTriggerType.MONTHLY:
-        day_of_month = max(1, min(28, int(parameters.get("day_of_month", 1))))
-        time_str = str(parameters.get("time_of_day", "00:00"))
-        try:
-            parts = time_str.split(":")
-            hour, minute = int(parts[0]), int(parts[1])
-        except Exception:
-            hour, minute = 0, 0
-        target = ref_time.replace(day=day_of_month, hour=hour, minute=minute, second=0, microsecond=0)
-        if target <= ref_time:
-            target = target + timedelta(days=30)
-        return target
-
-    return None
 
 
 def convert_to_execution_request(job: BackgroundJob) -> Any:
@@ -291,7 +601,6 @@ def convert_to_execution_request(job: BackgroundJob) -> Any:
 class BackgroundJobScheduler:
     """Manages scheduled background jobs thread-safely."""
 
-
     def __init__(
         self,
         config: Optional[BackgroundSchedulerConfig] = None,
@@ -310,6 +619,8 @@ class BackgroundJobScheduler:
         self._completed_jobs: deque[BackgroundJob] = deque(
             maxlen=self._config.maximum_history
         )
+        self._validator = RecurringTriggerValidator(logger=self._logger)
+        self._calculator = RecurringScheduleCalculator(logger=self._logger)
 
     def create_job(
         self,
@@ -344,6 +655,16 @@ class BackgroundJobScheduler:
         if not name:
             return None
 
+        params = dict(parameters or {})
+        t_str = trigger_type.value if hasattr(trigger_type, "value") else str(trigger_type).upper()
+        if t_str == "INTERVAL":
+            params.setdefault("interval_seconds", self._config.default_check_interval)
+
+        val_result = self._validator.validate_trigger(trigger_type, params)
+        if not val_result.is_valid:
+            return None
+
+
         with self._lock:
             if len(self._active_jobs) >= self._config.maximum_jobs:
                 self.cleanup()
@@ -352,8 +673,7 @@ class BackgroundJobScheduler:
 
             jid = job_id or f"job_{uuid.uuid4().hex[:12]}"
             now = datetime.now(timezone.utc)
-            params = parameters or {}
-            next_run = calculate_next_run(trigger_type, params, now)
+            next_run = self._calculator.calculate_next_run(trigger_type, params, from_time=now)
 
             job = BackgroundJob(
                 job_id=jid,
@@ -410,6 +730,14 @@ class BackgroundJobScheduler:
             if not job or job.is_finished():
                 return False
 
+            new_tt = trigger_type if trigger_type is not None else job.trigger_type
+            new_params = parameters if parameters is not None else job.parameters
+
+            if trigger_type is not None or parameters is not None:
+                val_result = self._validator.validate_trigger(new_tt, new_params)
+                if not val_result.is_valid:
+                    return False
+
             now = datetime.now(timezone.utc)
             if name is not None:
                 job.name = name
@@ -423,7 +751,7 @@ class BackgroundJobScheduler:
                 job.trigger_type = trigger_type
 
             if trigger_type is not None or parameters is not None:
-                job.next_run = calculate_next_run(job.trigger_type, job.parameters, now)
+                job.next_run = self._calculator.calculate_next_run(job.trigger_type, job.parameters, from_time=now)
 
             if metadata:
                 job.metadata.update(metadata)
@@ -433,6 +761,7 @@ class BackgroundJobScheduler:
             job.updated_at = now
             self._logger.info("Job Updated", extra={"job_id": job_id})
             return True
+
 
     def pause_job(self, job_id: str) -> bool:
         """Transitions a job to PAUSED status.
@@ -711,7 +1040,7 @@ class BackgroundJobScheduler:
                     self._archive_job_locked(job)
                     self._logger.info("One-Time Job Archived", extra={"job_id": job_id})
             else:
-                job.next_run = calculate_next_run(job.trigger_type, job.parameters, now)
+                job.next_run = self._calculator.calculate_next_run(job.trigger_type, job.parameters, from_time=now, last_run=now)
                 job.status = BackgroundJobStatus.SCHEDULED
                 self._logger.info("Recurring Job Rescheduled", extra={"job_id": job_id})
 
@@ -746,10 +1075,11 @@ class BackgroundJobScheduler:
                 if self._config.cleanup_history:
                     self._archive_job_locked(job)
             else:
-                job.next_run = calculate_next_run(job.trigger_type, job.parameters, now)
+                job.next_run = self._calculator.calculate_next_run(job.trigger_type, job.parameters, from_time=now, last_run=now)
                 job.status = BackgroundJobStatus.SCHEDULED
 
             return True
+
 
     def archive_job(self, job_id: str) -> bool:
         """Moves an active job to completion history deque.
