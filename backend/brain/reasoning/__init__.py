@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 from .constraint_analyzer import ConstraintAnalyzer
+from .intent_analyzer import (
+    IntentAnalysisResult,
+    IntentAnalyzer,
+    IntentAnalyzerConfig,
+    IntentCategory,
+    IntentConfidence,
+)
 from .models import Constraint, Objective, Priority, ReasoningResult
 from .objective_builder import ObjectiveBuilder
 from .priority_manager import PriorityManager
@@ -17,4 +24,9 @@ __all__ = [
     "ConstraintAnalyzer",
     "PriorityManager",
     "ReasoningEngine",
+    "IntentCategory",
+    "IntentConfidence",
+    "IntentAnalysisResult",
+    "IntentAnalyzerConfig",
+    "IntentAnalyzer",
 ]
