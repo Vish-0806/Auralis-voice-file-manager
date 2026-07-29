@@ -34,6 +34,14 @@ from .plan_validator import (
     ValidationIssue,
     ValidationSeverity,
 )
+from .risk_analyzer import (
+    RiskAnalysisResult,
+    RiskAnalyzer,
+    RiskAnalyzerConfig,
+    RiskCategory,
+    RiskItem,
+    RiskLevel,
+)
 from .subtask_generator import SubtaskGenerator
 from .task_planner import TaskPlanner
 from .workflow_compiler import WorkflowCompiler
@@ -89,4 +97,10 @@ __all__ = [
     "ActionDependency",
     "DependencyResolutionResult",
     "DependencyResolverConfig",
+    "RiskLevel",
+    "RiskCategory",
+    "RiskItem",
+    "RiskAnalysisResult",
+    "RiskAnalyzerConfig",
+    "RiskAnalyzer",
 ]
