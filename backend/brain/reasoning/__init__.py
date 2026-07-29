@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 from .constraint_analyzer import ConstraintAnalyzer
+from .goal_extractor import (
+    GoalExtractionResult,
+    GoalExtractor,
+    GoalExtractorConfig,
+    GoalPriority,
+    GoalType,
+)
 from .intent_analyzer import (
     IntentAnalysisResult,
     IntentAnalyzer,
@@ -41,4 +48,9 @@ __all__ = [
     "StrategySelectionResult",
     "StrategySelectorConfig",
     "ReasoningStrategySelector",
+    "GoalType",
+    "GoalPriority",
+    "GoalExtractionResult",
+    "GoalExtractorConfig",
+    "GoalExtractor",
 ]
