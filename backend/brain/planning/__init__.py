@@ -13,7 +13,14 @@ from .action_planner import (
 from .decomposition_rules import DecompositionRules
 from .decomposition_validator import DecompositionValidator
 from .dependency_builder import DependencyBuilder
-from .dependency_resolver import DependencyResolver
+from .dependency_resolver import (
+    ActionDependency,
+    DependencyResolutionResult,
+    DependencyResolver,
+    DependencyResolverConfig,
+    DependencyStatus,
+    DependencyType,
+)
 from .goal_decomposer import GoalDecomposer
 from .models import ExecutionDependency, ExecutionSequence, ExecutionStep
 from .objective_analyzer import ObjectiveAnalyzer
@@ -77,4 +84,9 @@ __all__ = [
     "PlanValidationResult",
     "PlanValidatorConfig",
     "PlanValidator",
+    "DependencyType",
+    "DependencyStatus",
+    "ActionDependency",
+    "DependencyResolutionResult",
+    "DependencyResolverConfig",
 ]
