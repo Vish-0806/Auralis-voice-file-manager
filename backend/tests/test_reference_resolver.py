@@ -1,7 +1,9 @@
 """Unit tests for ConversationReferenceResolver (Phase 9.1.3)."""
 
 from concurrent.futures import ThreadPoolExecutor
+# pyrefly: ignore [missing-import]
 import pytest
+# pyrefly: ignore [missing-import]
 from pydantic import ValidationError
 
 from brain.conversation.reference_resolver import (
