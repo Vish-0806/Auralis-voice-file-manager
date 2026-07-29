@@ -47,9 +47,9 @@ class ExecutionPlan(BaseModel):
 
     request: str = ""
     action_plan: ActionPlan = Field(default_factory=ActionPlan)
-    validation_result: PlanValidationResult = Field(default_factory=PlanValidationResult)
-    dependency_result: DependencyResolutionResult = Field(default_factory=DependencyResolutionResult)
-    risk_result: RiskAnalysisResult = Field(default_factory=RiskAnalysisResult)
+    validation_result: PlanValidationResult = Field(default_factory=lambda: PlanValidationResult(valid=True))
+    dependency_result: DependencyResolutionResult = Field(default_factory=lambda: DependencyResolutionResult(resolved=True, status=DependencyStatus.RESOLVED))
+    risk_result: RiskAnalysisResult = Field(default_factory=lambda: RiskAnalysisResult(overall_risk=RiskLevel.NONE, acceptable=True))
     execution_order: List[int] = Field(default_factory=list)
     readiness: ExecutionReadiness = ExecutionReadiness.READY
     current_stage: ExecutionStage = ExecutionStage.READY_FOR_EXECUTION
