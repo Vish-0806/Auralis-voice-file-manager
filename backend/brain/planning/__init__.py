@@ -20,6 +20,13 @@ from .objective_analyzer import ObjectiveAnalyzer
 from .objective_graph import ObjectiveGraph, ObjectiveNode
 from .plan_builder import PlanBuilder
 from .plan_optimizer import OptimizationReport, OptimizationResult, OptimizationRule, PlanOptimizer
+from .plan_validator import (
+    PlanValidationResult,
+    PlanValidator,
+    PlanValidatorConfig,
+    ValidationIssue,
+    ValidationSeverity,
+)
 from .subtask_generator import SubtaskGenerator
 from .task_planner import TaskPlanner
 from .workflow_compiler import WorkflowCompiler
@@ -65,4 +72,9 @@ __all__ = [
     "ActionPlan",
     "ActionPlannerConfig",
     "ActionPlanner",
+    "ValidationSeverity",
+    "ValidationIssue",
+    "PlanValidationResult",
+    "PlanValidatorConfig",
+    "PlanValidator",
 ]
