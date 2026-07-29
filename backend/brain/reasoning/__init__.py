@@ -2,11 +2,51 @@
 
 from __future__ import annotations
 
-from .constraint_analyzer import ConstraintAnalyzer
+from .constraint_analyzer import (
+    ConstraintAnalysisResult,
+    ConstraintAnalyzer,
+    ConstraintAnalyzerConfig,
+    ConstraintSeverity,
+    ConstraintType,
+)
+from .context_builder import (
+    ReasoningContext,
+    ReasoningContextBuilder,
+    ReasoningContextBuilderConfig,
+)
+from .goal_extractor import (
+    GoalExtractionResult,
+    GoalExtractor,
+    GoalExtractorConfig,
+    GoalPriority,
+    GoalType,
+)
+from .intent_analyzer import (
+    IntentAnalysisResult,
+    IntentAnalyzer,
+    IntentAnalyzerConfig,
+    IntentCategory,
+    IntentConfidence,
+)
 from .models import Constraint, Objective, Priority, ReasoningResult
 from .objective_builder import ObjectiveBuilder
 from .priority_manager import PriorityManager
 from .reasoning_engine import ReasoningEngine
+from .runtime import (
+    ReasoningRuntimeCoordinator,
+    ReasoningRuntimeHealth,
+    ReasoningRuntimeStats,
+    ReasoningRuntimeStatus,
+    get_reasoning_runtime,
+    reset_reasoning_runtime,
+)
+from .strategy_selector import (
+    ReasoningStrategy,
+    ReasoningStrategySelector,
+    StrategyPriority,
+    StrategySelectionResult,
+    StrategySelectorConfig,
+)
 
 __all__ = [
     "Priority",
@@ -17,4 +57,32 @@ __all__ = [
     "ConstraintAnalyzer",
     "PriorityManager",
     "ReasoningEngine",
+    "IntentCategory",
+    "IntentConfidence",
+    "IntentAnalysisResult",
+    "IntentAnalyzerConfig",
+    "IntentAnalyzer",
+    "ReasoningStrategy",
+    "StrategyPriority",
+    "StrategySelectionResult",
+    "StrategySelectorConfig",
+    "ReasoningStrategySelector",
+    "GoalType",
+    "GoalPriority",
+    "GoalExtractionResult",
+    "GoalExtractorConfig",
+    "GoalExtractor",
+    "ConstraintType",
+    "ConstraintSeverity",
+    "ConstraintAnalysisResult",
+    "ConstraintAnalyzerConfig",
+    "ReasoningContext",
+    "ReasoningContextBuilderConfig",
+    "ReasoningContextBuilder",
+    "ReasoningRuntimeStatus",
+    "ReasoningRuntimeStats",
+    "ReasoningRuntimeHealth",
+    "ReasoningRuntimeCoordinator",
+    "get_reasoning_runtime",
+    "reset_reasoning_runtime",
 ]
