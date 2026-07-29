@@ -9,6 +9,7 @@ import logging
 import threading
 from typing import Any, Callable, Dict, List, Optional
 
+# pyrefly: ignore [missing-import]
 from pydantic import BaseModel, ConfigDict, Field
 
 from brain.reasoning.constraint_analyzer import ConstraintAnalysisResult
