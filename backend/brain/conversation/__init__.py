@@ -1,4 +1,4 @@
-"""Conversation package for managing session state, turns, context windows, and reference resolution."""
+"""Conversation package for managing session state, turns, context windows, reference resolution, and summaries."""
 
 from brain.conversation.context_manager import (
     ConversationContext,
@@ -19,6 +19,11 @@ from brain.conversation.reference_resolver import (
     ReferenceResolverConfig,
     ReferenceType,
 )
+from brain.conversation.summarizer import (
+    ConversationSummarizer,
+    ConversationSummary,
+    ConversationSummaryConfig,
+)
 
 __all__ = [
     "ConversationSessionStatus",
@@ -34,4 +39,7 @@ __all__ = [
     "ReferenceResolutionResult",
     "ReferenceResolverConfig",
     "ConversationReferenceResolver",
+    "ConversationSummary",
+    "ConversationSummaryConfig",
+    "ConversationSummarizer",
 ]
