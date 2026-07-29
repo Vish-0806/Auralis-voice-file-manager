@@ -1,5 +1,10 @@
-"""Conversation package for managing session state and turns."""
+"""Conversation package for managing session state, turns, and context windows."""
 
+from brain.conversation.context_manager import (
+    ConversationContext,
+    ConversationContextConfig,
+    ConversationContextManager,
+)
 from brain.conversation.conversation_session import (
     ConversationSession,
     ConversationSessionConfig,
@@ -14,4 +19,7 @@ __all__ = [
     "ConversationSession",
     "ConversationSessionConfig",
     "ConversationSessionManager",
+    "ConversationContext",
+    "ConversationContextConfig",
+    "ConversationContextManager",
 ]
