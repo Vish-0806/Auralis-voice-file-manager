@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from .constraint_analyzer import ConstraintAnalyzer
+from .constraint_analyzer import (
+    ConstraintAnalysisResult,
+    ConstraintAnalyzer,
+    ConstraintAnalyzerConfig,
+    ConstraintSeverity,
+    ConstraintType,
+)
 from .goal_extractor import (
     GoalExtractionResult,
     GoalExtractor,
@@ -53,4 +59,8 @@ __all__ = [
     "GoalExtractionResult",
     "GoalExtractorConfig",
     "GoalExtractor",
+    "ConstraintType",
+    "ConstraintSeverity",
+    "ConstraintAnalysisResult",
+    "ConstraintAnalyzerConfig",
 ]
