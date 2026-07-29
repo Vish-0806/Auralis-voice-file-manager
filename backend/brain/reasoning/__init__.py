@@ -14,6 +14,13 @@ from .models import Constraint, Objective, Priority, ReasoningResult
 from .objective_builder import ObjectiveBuilder
 from .priority_manager import PriorityManager
 from .reasoning_engine import ReasoningEngine
+from .strategy_selector import (
+    ReasoningStrategy,
+    ReasoningStrategySelector,
+    StrategyPriority,
+    StrategySelectionResult,
+    StrategySelectorConfig,
+)
 
 __all__ = [
     "Priority",
@@ -29,4 +36,9 @@ __all__ = [
     "IntentAnalysisResult",
     "IntentAnalyzerConfig",
     "IntentAnalyzer",
+    "ReasoningStrategy",
+    "StrategyPriority",
+    "StrategySelectionResult",
+    "StrategySelectorConfig",
+    "ReasoningStrategySelector",
 ]
