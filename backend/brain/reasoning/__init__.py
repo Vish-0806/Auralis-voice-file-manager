@@ -32,6 +32,14 @@ from .models import Constraint, Objective, Priority, ReasoningResult
 from .objective_builder import ObjectiveBuilder
 from .priority_manager import PriorityManager
 from .reasoning_engine import ReasoningEngine
+from .runtime import (
+    ReasoningRuntimeCoordinator,
+    ReasoningRuntimeHealth,
+    ReasoningRuntimeStats,
+    ReasoningRuntimeStatus,
+    get_reasoning_runtime,
+    reset_reasoning_runtime,
+)
 from .strategy_selector import (
     ReasoningStrategy,
     ReasoningStrategySelector,
@@ -71,4 +79,10 @@ __all__ = [
     "ReasoningContext",
     "ReasoningContextBuilderConfig",
     "ReasoningContextBuilder",
+    "ReasoningRuntimeStatus",
+    "ReasoningRuntimeStats",
+    "ReasoningRuntimeHealth",
+    "ReasoningRuntimeCoordinator",
+    "get_reasoning_runtime",
+    "reset_reasoning_runtime",
 ]
