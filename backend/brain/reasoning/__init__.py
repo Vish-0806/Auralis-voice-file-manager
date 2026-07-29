@@ -9,6 +9,11 @@ from .constraint_analyzer import (
     ConstraintSeverity,
     ConstraintType,
 )
+from .context_builder import (
+    ReasoningContext,
+    ReasoningContextBuilder,
+    ReasoningContextBuilderConfig,
+)
 from .goal_extractor import (
     GoalExtractionResult,
     GoalExtractor,
@@ -63,4 +68,7 @@ __all__ = [
     "ConstraintSeverity",
     "ConstraintAnalysisResult",
     "ConstraintAnalyzerConfig",
+    "ReasoningContext",
+    "ReasoningContextBuilderConfig",
+    "ReasoningContextBuilder",
 ]

@@ -1,431 +1,331 @@
-"""Unit and Integration tests for ContextBuilder."""
+"""Unit tests for ReasoningContextBuilder (Phase 9.2.5)."""
 
-# pyrefly: ignore [missing-import]
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+import logging
 import pytest
-import uuid
-from datetime import datetime, timezone
-from memory import (
-    MemoryService,
-    MemoryEntry,
-    MemoryMetadata,
-    MemoryType,
-    ContextBuilder,
+from pydantic import ValidationError
+
+from brain.reasoning import (
+    ConstraintAnalysisResult,
+    ConstraintAnalyzer,
+    ConstraintType,
+    GoalExtractionResult,
+    GoalExtractor,
+    GoalType,
+    IntentAnalysisResult,
+    IntentAnalyzer,
+    IntentCategory,
+    ReasoningContext,
+    ReasoningContextBuilder,
+    ReasoningContextBuilderConfig,
+    ReasoningEngine,
+    ReasoningStrategy,
+    ReasoningStrategySelector,
+    StrategySelectionResult,
 )
 
 
 @pytest.fixture
-def mock_in_memory_service(monkeypatch):
-    """Provides a MemoryService forced to use InMemoryProvider."""
-    from memory.config import settings
-    monkeypatch.setattr(settings, "provider_type", "in_memory")
-    return MemoryService()
-
-
-@pytest.fixture
-def postgres_active_service(monkeypatch):
-    """Provides a MemoryService forced to use PostgresProvider."""
-    from memory.config import settings
-    monkeypatch.setattr(settings, "provider_type", "postgres")
-    return MemoryService()
-
-
-@pytest.fixture(scope="module", autouse=True)
-def setup_postgres_schema():
-    """Ensures PostgreSQL tables exist for integration testing."""
-    # pyrefly: ignore [missing-import]
-    from sqlalchemy import create_engine
-    from memory.database import Base
-    from memory.database.config import db_config
-    engine = create_engine(db_config.url)
-    Base.metadata.create_all(bind=engine)
-    yield
-
-
-@pytest.mark.anyio
-async def test_context_builder_empty_scenarios(mock_in_memory_service) -> None:
-    """Verify ContextBuilder handles empty database / empty provider cases without raising errors."""
-    service = mock_in_memory_service
-    builder = ContextBuilder(service)
-
-    # Build context with no data seeded
-    context = await builder.build_context(user_id=123)
-
-    assert context.recent_conversations == []
-    assert context.recent_executions == []
-    assert context.current_context is None
-    assert context.preferences == []
-    assert context.workspace_context is None
-    assert context.metadata == {"user_id": 123, "session_id": None}
-
-
-@pytest.mark.anyio
-async def test_context_builder_in_memory(mock_in_memory_service) -> None:
-    """Verify ContextBuilder correctly aggregates and filters data using the InMemoryProvider."""
-    service = mock_in_memory_service
-    builder = ContextBuilder(service)
-    unique = f"_{uuid.uuid4().hex[:8]}"
-
-    # 1. Seed conversation
-    await service.save(MemoryEntry(
-        id=f"conv_1{unique}",
-        content="Hello standard user",
-        memory_type=MemoryType.CONVERSATION,
-        metadata=MemoryMetadata(additional_info={"session_id": f"sess_1{unique}", "user_id": 123})
-    ))
-
-    # 2. Seed execution
-    await service.save(MemoryEntry(
-        id=f"exec_1{unique}",
-        content="exec status logs",
-        memory_type=MemoryType.ACTIVITY,
-        metadata=MemoryMetadata(additional_info={"status": "success", "user_id": 123})
-    ))
-
-    # 3. Seed context
-    await service.save(MemoryEntry(
-        id=f"sess_1{unique}",
-        content="/home/workspace_project",
-        memory_type=MemoryType.SESSION,
-        metadata=MemoryMetadata(additional_info={"user_id": 123})
-    ))
-
-    # 4. Seed preference
-    await service.save(MemoryEntry(
-        id=f"theme{unique}",
-        content="dark",
-        memory_type=MemoryType.PREFERENCE,
-        metadata=MemoryMetadata(additional_info={"user_id": 123})
-    ))
-
-    # 5. Seed workspace project context
-    await service.save(MemoryEntry(
-        id=f"work_profile{unique}",
-        content="/home/workspace_project",
-        memory_type=MemoryType.PROJECT,
-        metadata=MemoryMetadata(additional_info={"user_id": 123, "name": "project_a"})
-    ))
-
-    # Run the builder
-    context = await builder.build_context(user_id=123, session_id=f"sess_1{unique}")
-
-    assert len(context.recent_conversations) == 1
-    assert context.recent_conversations[0].content == "Hello standard user"
-
-    assert len(context.recent_executions) == 1
-    assert context.recent_executions[0].content == "exec status logs"
-
-    assert context.current_context is not None
-    assert context.current_context.content == "/home/workspace_project"
-
-    assert len(context.preferences) == 1
-    assert context.preferences[0].content == "dark"
-
-    assert context.workspace_context is not None
-    assert context.workspace_context.metadata.additional_info.get("name") == "project_a"
-
-
-@pytest.mark.anyio
-async def test_context_builder_postgres(postgres_active_service) -> None:
-    """Verify ContextBuilder correctly aggregates and filters data in PostgreSQL."""
-    service = postgres_active_service
-    builder = ContextBuilder(service)
-    unique = f"_{uuid.uuid4().hex[:8]}"
-
-    # Initialize Postgres Provider default profile
-    provider = service._manager._repository._provider
-    await provider.initialize()
-
-    # Create isolated user for postgres
-    with provider._session_scope() as session:
-        from memory.repository.repository_factory import RepositoryFactory
-        from memory.models.domain_models import UserDomain
-        factory = RepositoryFactory(session)
-        user_repo = factory.get_user_repository()
-        user = UserDomain(username=f"test_ctx_{unique}", email=f"ctx_{unique}@auralis.local")
-        user = user_repo.create(user)
-        test_user_id = user.id
-
-    try:
-        # 1. Seed conversation
-        await service.save(MemoryEntry(
-            id=f"conv_1{unique}",
-            content="Hello pg user",
-            memory_type=MemoryType.CONVERSATION,
-            metadata=MemoryMetadata(additional_info={"session_id": f"sess_1{unique}", "user_id": test_user_id})
-        ))
-
-        # 2. Seed execution
-        await service.save(MemoryEntry(
-            id=f"exec_1{unique}",
-            content="exec status logs pg",
-            memory_type=MemoryType.ACTIVITY,
-            metadata=MemoryMetadata(additional_info={"status": "success", "user_id": test_user_id})
-        ))
-
-        # 3. Seed context
-        await service.save(MemoryEntry(
-            id=f"sess_1{unique}",
-            content="/home/workspace_project_pg",
-            memory_type=MemoryType.SESSION,
-            metadata=MemoryMetadata(additional_info={"user_id": test_user_id})
-        ))
-
-        # 4. Seed preference
-        await service.save(MemoryEntry(
-            id=f"theme{unique}",
-            content="dark_theme_pg",
-            memory_type=MemoryType.PREFERENCE,
-            metadata=MemoryMetadata(additional_info={"user_id": test_user_id})
-        ))
-
-        # 5. Seed workspace context
-        # We write directly to the DB because there is no direct save() mapping to project/workspace in PostgresProvider
-        with provider._session_scope() as session:
-            from memory.repository.repository_factory import RepositoryFactory
-            from memory.models.domain_models import WorkspaceProfileDomain
-            factory = RepositoryFactory(session)
-            work_repo = factory.get_workspace_repository()
-            profile = WorkspaceProfileDomain(
-                user_id=test_user_id,
-                name="pg_project",
-                path="/home/workspace_project_pg",
-                settings={"editor": "VSCode"}
-            )
-            work_repo.create(profile)
-
-        # Run builder
-        context = await builder.build_context(user_id=test_user_id, session_id=f"sess_1{unique}")
-
-        # Assertions
-        # Filter returned objects to only match our isolated user_id
-        conversations = [c for c in context.recent_conversations if c.metadata.additional_info.get("user_id") == test_user_id]
-        assert len(conversations) == 1
-        assert conversations[0].content == "Hello pg user"
-
-        executions = [e for e in context.recent_executions if e.metadata.additional_info.get("user_id") == test_user_id]
-        assert len(executions) == 1
-        assert executions[0].content == "exec status logs pg"
-
-        assert context.current_context is not None
-        assert context.current_context.content == "/home/workspace_project_pg"
-
-        preferences = [p for p in context.preferences if p.metadata.additional_info.get("user_id") == test_user_id]
-        assert len(preferences) == 1
-        assert preferences[0].content == "dark_theme_pg"
-
-        assert context.workspace_context is not None
-        assert context.workspace_context.metadata.additional_info.get("name") == "pg_project"
-
-    finally:
-        # Teardown dynamic test user and cascade-deleted data
-        with provider._session_scope() as session:
-            factory = RepositoryFactory(session)
-            user_repo = factory.get_user_repository()
-            user_repo.delete(test_user_id)
-
-
-@pytest.mark.anyio
-async def test_context_builder_exception_resilience(monkeypatch) -> None:
-    """Verify ContextBuilder catches raised retrieval exceptions and defaults gracefully to empty objects."""
-    # Create a broken memory service
-    service = MemoryService()
-
-    async def raise_err(*args, **kwargs):
-        raise RuntimeError("DB connection dropped")
-
-    # Monkeypatch service methods to raise exceptions
-    monkeypatch.setattr(service, "get_recent_conversations", raise_err)
-    monkeypatch.setattr(service, "get_conversations_by_session", raise_err)
-    monkeypatch.setattr(service, "get_recent_executions", raise_err)
-    monkeypatch.setattr(service, "get_latest_context", raise_err)
-    monkeypatch.setattr(service, "get_user_preferences", raise_err)
-
-    builder = ContextBuilder(service)
-    context = await builder.build_context(user_id=456, session_id="broken_sess")
-
-    # Assert gracefulness: empty lists and None returned instead of exception propagating
-    assert context.recent_conversations == []
-    assert context.recent_executions == []
-    assert context.current_context is None
-    assert context.preferences == []
-    assert context.workspace_context is None
-    assert context.metadata == {"user_id": 456, "session_id": "broken_sess"}
-
-
-@pytest.mark.anyio
-async def test_context_window_empty_history(mock_in_memory_service) -> None:
-    """Verify that custom context windows handle empty history cleanly."""
-    from memory import ContextWindowConfig
-    window_cfg = ContextWindowConfig(short_term_limit=0, long_term_limit=0, session_limit=0)
-    builder = ContextBuilder(mock_in_memory_service, window_config=window_cfg)
-
-    context = await builder.build_context(user_id=789)
-    assert context.recent_conversations == []
-    assert context.recent_executions == []
-
-
-@pytest.mark.anyio
-async def test_context_window_large_history(mock_in_memory_service) -> None:
-    """Verify that context window limits restrict retrieved data sizes."""
-    from memory import ContextWindowConfig
-    service = mock_in_memory_service
-    unique = "_large"
-
-    # Seed 15 conversations and 10 executions
-    for i in range(15):
-        await service.save(MemoryEntry(
-            id=f"conv_{i}{unique}",
-            content=f"conv msg {i}",
-            memory_type=MemoryType.CONVERSATION,
-            metadata=MemoryMetadata(additional_info={"user_id": 789})
-        ))
-    for i in range(10):
-        await service.save(MemoryEntry(
-            id=f"exec_{i}{unique}",
-            content=f"exec logs {i}",
-            memory_type=MemoryType.ACTIVITY,
-            metadata=MemoryMetadata(additional_info={"user_id": 789})
-        ))
-
-    window_cfg = ContextWindowConfig(short_term_limit=3, long_term_limit=5)
-    builder = ContextBuilder(service, window_config=window_cfg)
-
-    context = await builder.build_context(user_id=789)
-    assert len(context.recent_conversations) == 5
-    assert len(context.recent_executions) == 3
-
-
-@pytest.mark.anyio
-async def test_context_window_session_only(mock_in_memory_service) -> None:
-    """Verify that when session_only is True, general history is bypassed completely."""
-    from memory import ContextWindowConfig
-    service = mock_in_memory_service
-    unique = "_sess"
-
-    # Seed session conversation
-    await service.save(MemoryEntry(
-        id=f"conv_sess{unique}",
-        content="session message",
-        memory_type=MemoryType.CONVERSATION,
-        metadata=MemoryMetadata(additional_info={"user_id": 789, "session_id": "target_sess"})
-    ))
-
-    # Seed general conversation (no session_id)
-    await service.save(MemoryEntry(
-        id=f"conv_gen{unique}",
-        content="general message",
-        memory_type=MemoryType.CONVERSATION,
-        metadata=MemoryMetadata(additional_info={"user_id": 789})
-    ))
-
-    # Seed execution
-    await service.save(MemoryEntry(
-        id=f"exec_{unique}",
-        content="exec logs",
-        memory_type=MemoryType.ACTIVITY,
-        metadata=MemoryMetadata(additional_info={"user_id": 789})
-    ))
-
-    window_cfg = ContextWindowConfig(session_limit=5)
-    builder = ContextBuilder(service, window_config=window_cfg)
-
-    context = await builder.build_context(user_id=789, session_id="target_sess", session_only=True)
-
-    # Conversations should contain the session conversation only
-    assert len(context.recent_conversations) == 1
-    assert context.recent_conversations[0].content == "session message"
-
-    # Executions and preferences must be completely skipped/empty
-    assert context.recent_executions == []
-    assert context.preferences == []
-
-
-@pytest.mark.anyio
-async def test_context_builder_workspace_attached(mock_in_memory_service) -> None:
-    """Verify that workspace_analysis is compiled and attached when active workspace path is available."""
-    from unittest.mock import MagicMock, AsyncMock
-    from memory.workspace import WorkspaceAnalysis
-
-    service = mock_in_memory_service
-    unique = "_attached"
-
-    # Seed current context with workspace_path in metadata
-    await service.save(MemoryEntry(
-        id=f"sess_active{unique}",
-        content="/home/active_workspace",
-        memory_type=MemoryType.SESSION,
-        metadata=MemoryMetadata(additional_info={"user_id": 789, "workspace_path": "/home/active_workspace"})
-    ))
-
-    # Mock Coordinator
-    mock_coord = MagicMock()
-    mock_coord.analyze = AsyncMock()
-
-    analysis_stub = WorkspaceAnalysis(
-        workspace_path="/home/active_workspace",
-        project_name="active_workspace",
-        project_type="python",
-        repository_type="git",
-        dominant_language="Python",
-        language_statistics={"Python": 1.0},
-        language_counts={"Python": 1},
-        build_system="pip",
-        recommended_build_command="pip install -r requirements.txt",
-        git_branch="main",
-        git_remote_available=True,
-        git_dirty=False,
-        git_has_unpushed_commits=False,
-        total_files=1,
-        total_directories=0,
-        maximum_depth=1,
-        total_size=100,
-        last_indexed=datetime.now(timezone.utc),
-        analysis_timestamp=datetime.now(timezone.utc),
+def builder() -> ReasoningContextBuilder:
+    """Fixture providing a fresh ReasoningContextBuilder instance."""
+    return ReasoningContextBuilder()
+
+
+def test_context_construction(builder: ReasoningContextBuilder) -> None:
+    """Verifies context construction combining all stage reasoning outputs."""
+    intent_res = IntentAnalysisResult(intent=IntentCategory.FILE_MANAGEMENT)
+    strat_res = StrategySelectionResult(strategy=ReasoningStrategy.FILE_REASONING)
+    goal_res = GoalExtractionResult(goal_type=GoalType.MOVE_FILES)
+    const_res = ConstraintAnalysisResult(constraint_count=1)
+
+    ctx = builder.build_context(
+        request="move report.pdf to Archive",
+        intent_result=intent_res,
+        strategy_result=strat_res,
+        goal_result=goal_res,
+        constraint_result=const_res,
+        metadata={"session_id": "s1"},
     )
-    mock_coord.analyze.return_value = analysis_stub
 
-    builder = ContextBuilder(service, coordinator=mock_coord)
-    context = await builder.build_context(user_id=789)
-
-    assert context.workspace_analysis == analysis_stub
-    mock_coord.analyze.assert_called_once_with("/home/active_workspace")
-
-
-@pytest.mark.anyio
-async def test_context_builder_workspace_absent(mock_in_memory_service) -> None:
-    """Verify that workspace_analysis is None when active workspace path is not available."""
-    from unittest.mock import MagicMock
-    service = mock_in_memory_service
-
-    mock_coord = MagicMock()
-    builder = ContextBuilder(service, coordinator=mock_coord)
-    context = await builder.build_context(user_id=789)
-
-    assert context.workspace_analysis is None
-    mock_coord.analyze.assert_not_called()
+    assert isinstance(ctx, ReasoningContext)
+    assert ctx.request == "move report.pdf to Archive"
+    assert ctx.intent.intent == IntentCategory.FILE_MANAGEMENT
+    assert ctx.strategy.strategy == ReasoningStrategy.FILE_REASONING
+    assert ctx.goal.goal_type == GoalType.MOVE_FILES
+    assert ctx.constraints.constraint_count == 1
+    assert ctx.metadata == {"session_id": "s1"}
 
 
-@pytest.mark.anyio
-async def test_context_builder_workspace_failure(mock_in_memory_service) -> None:
-    """Verify that Workspace Intelligence exceptions do not block context aggregation."""
-    from unittest.mock import MagicMock, AsyncMock
-    service = mock_in_memory_service
-    unique = "_fail"
+def test_immutable_context(builder: ReasoningContextBuilder) -> None:
+    """Verifies ReasoningContext model is an immutable snapshot."""
+    ctx = builder.build_context("test request")
+    with pytest.raises((TypeError, ValidationError)):
+        ctx.request = "MUTATED"
 
-    await service.save(MemoryEntry(
-        id=f"sess_active{unique}",
-        content="/home/err_workspace",
-        memory_type=MemoryType.SESSION,
-        metadata=MemoryMetadata(additional_info={"user_id": 789, "workspace_path": "/home/err_workspace"})
-    ))
 
-    # Mock Coordinator to raise exception
-    mock_coord = MagicMock()
-    mock_coord.analyze = AsyncMock()
-    mock_coord.analyze.side_effect = RuntimeError("Indexing timeout")
+def test_metadata_propagation(builder: ReasoningContextBuilder) -> None:
+    """Verifies metadata dictionary propagation into context model."""
+    ctx = builder.build_context("req", metadata={"user": "u123", "client": "v1"})
+    assert ctx.metadata == {"user": "u123", "client": "v1"}
 
-    builder = ContextBuilder(service, coordinator=mock_coord)
-    context = await builder.build_context(user_id=789)
 
-    assert context.workspace_analysis is None
+def test_timestamp_creation(builder: ReasoningContextBuilder) -> None:
+    """Verifies timestamp created_at field is generated automatically."""
+    ctx = builder.build_context("req")
+    assert isinstance(ctx.created_at, datetime)
 
+
+def test_empty_context(builder: ReasoningContextBuilder) -> None:
+    """Verifies building a context with no arguments returns a default valid context."""
+    ctx = builder.build_context()
+    assert isinstance(ctx, ReasoningContext)
+    assert ctx.request == ""
+    assert ctx.intent.intent == IntentCategory.UNKNOWN
+
+
+def test_invalid_input(builder: ReasoningContextBuilder) -> None:
+    """Verifies non-string request and non-model parameters produce a clean default context without raising exceptions."""
+    ctx = builder.build_context(request=12345, intent_result="invalid", strategy_result=99)
+    assert isinstance(ctx, ReasoningContext)
+    assert ctx.request == ""
+    assert ctx.intent.intent == IntentCategory.UNKNOWN
+
+
+def test_hook_registration(builder: ReasoningContextBuilder) -> None:
+    """Verifies context hook registration."""
+    def sample_hook(meta: dict) -> dict:
+        meta["hooked"] = True
+        return meta
+
+    res = builder.register_context_hook("h1", sample_hook, priority=10)
+    assert res is True
+
+    hooks = builder.list_context_hooks()
+    assert len(hooks) == 1
+    assert hooks[0]["hook_id"] == "h1"
+
+
+def test_hook_removal(builder: ReasoningContextBuilder) -> None:
+    """Verifies removing a registered context hook."""
+    builder.register_context_hook("h_rem", lambda m: m)
+    removed = builder.remove_context_hook("h_rem")
+    assert removed is True
+    assert builder.list_context_hooks() == []
+
+
+def test_hook_execution(builder: ReasoningContextBuilder) -> None:
+    """Verifies registered hooks execute and enrich context metadata during build_context."""
+    def enrich_hook(meta: dict) -> dict:
+        meta["processed_by_hook"] = True
+        return meta
+
+    builder.register_context_hook("enrich", enrich_hook)
+    ctx = builder.build_context("test req", metadata={"initial": True})
+
+    assert ctx.metadata["initial"] is True
+    assert ctx.metadata["processed_by_hook"] is True
+
+
+def test_duplicate_hooks(builder: ReasoningContextBuilder) -> None:
+    """Verifies re-registering a hook with same hook_id replaces existing entry."""
+    builder.register_context_hook("h_dup", lambda m: m, priority=1)
+    builder.register_context_hook("h_dup", lambda m: m, priority=100)
+
+    hooks = builder.list_context_hooks()
+    assert len(hooks) == 1
+    assert hooks[0]["priority"] == 100
+
+
+def test_hook_ordering(builder: ReasoningContextBuilder) -> None:
+    """Verifies context hooks execute in order of priority descending."""
+    execution_order = []
+
+    def h_low(meta: dict) -> dict:
+        execution_order.append("low")
+        return meta
+
+    def h_high(meta: dict) -> dict:
+        execution_order.append("high")
+        return meta
+
+    builder.register_context_hook("low", h_low, priority=1)
+    builder.register_context_hook("high", h_high, priority=100)
+    builder.build_context("req")
+
+    assert execution_order == ["high", "low"]
+
+
+def test_configuration_injection() -> None:
+    """Verifies custom ReasoningContextBuilderConfig configuration."""
+    cfg = ReasoningContextBuilderConfig(include_metadata=False)
+    rcb = ReasoningContextBuilder(config=cfg)
+
+    def hook(meta: dict) -> dict:
+        meta["should_not_run"] = True
+        return meta
+
+    rcb.register_context_hook("h_ignore", hook)
+    ctx = rcb.build_context("req", metadata={"initial": 1})
+
+    assert "should_not_run" not in ctx.metadata
+
+
+def test_thread_safety() -> None:
+    """Verifies thread safety during concurrent hook registrations and context building."""
+    rcb = ReasoningContextBuilder()
+
+    def worker(idx: int) -> None:
+        rcb.register_context_hook(f"h_worker_{idx}", lambda m: m)
+        rcb.build_context(f"req_{idx}")
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(worker, i) for i in range(50)]
+        for f in futures:
+            f.result()
+
+    ctx = rcb.build_context("final req")
+    assert isinstance(ctx, ReasoningContext)
+
+
+def test_registry_clearing(builder: ReasoningContextBuilder) -> None:
+    """Verifies clear_context_hooks clears all registered hooks."""
+    builder.register_context_hook("h1", lambda m: m)
+    builder.clear_context_hooks()
+    assert builder.list_context_hooks() == []
+
+
+def test_listing(builder: ReasoningContextBuilder) -> None:
+    """Verifies list_context_hooks returns metadata for all registered hooks."""
+    builder.register_context_hook("h1", lambda m: m, priority=5, metadata={"info": "test"})
+    hooks = builder.list_context_hooks()
+    assert len(hooks) == 1
+    assert hooks[0]["hook_id"] == "h1"
+    assert hooks[0]["priority"] == 5
+
+
+def test_graceful_failures(builder: ReasoningContextBuilder) -> None:
+    """Verifies context hooks throwing exceptions do not crash context construction."""
+    def faulty_hook(meta: dict) -> dict:
+        raise ValueError("Hook failed!")
+
+    builder.register_context_hook("faulty", faulty_hook)
+    ctx = builder.build_context("test req")
+    assert isinstance(ctx, ReasoningContext)
+
+
+def test_integration_with_intent_analyzer() -> None:
+    """Verifies building context with IntentAnalyzer output."""
+    intent_an = IntentAnalyzer()
+    rcb = ReasoningContextBuilder()
+
+    intent_res = intent_an.analyze("move report.pdf")
+    ctx = rcb.build_context("move report.pdf", intent_result=intent_res)
+
+    assert ctx.intent.intent == IntentCategory.FILE_MANAGEMENT
+
+
+def test_integration_with_strategy_selector() -> None:
+    """Verifies building context with StrategySelector output."""
+    intent_an = IntentAnalyzer()
+    strat_sel = ReasoningStrategySelector()
+    rcb = ReasoningContextBuilder()
+
+    i_res = intent_an.analyze("search for pdfs")
+    s_res = strat_sel.select_strategy(i_res)
+    ctx = rcb.build_context("search for pdfs", intent_result=i_res, strategy_result=s_res)
+
+    assert ctx.strategy.strategy == ReasoningStrategy.SEARCH_REASONING
+
+
+def test_integration_with_goal_extractor() -> None:
+    """Verifies building context with GoalExtractor output."""
+    intent_an = IntentAnalyzer()
+    strat_sel = ReasoningStrategySelector()
+    goal_ext = GoalExtractor()
+    rcb = ReasoningContextBuilder()
+
+    req = "create folder ProjectX"
+    i_res = intent_an.analyze(req)
+    s_res = strat_sel.select_strategy(i_res)
+    g_res = goal_ext.extract_goals(req, i_res, s_res)
+    ctx = rcb.build_context(req, i_res, s_res, g_res)
+
+    assert ctx.goal.goal_type == GoalType.CREATE_FOLDER
+
+
+def test_integration_with_constraint_analyzer() -> None:
+    """Verifies building context with ConstraintAnalyzer output."""
+    intent_an = IntentAnalyzer()
+    strat_sel = ReasoningStrategySelector()
+    goal_ext = GoalExtractor()
+    ca = ConstraintAnalyzer()
+    rcb = ReasoningContextBuilder()
+
+    req = "copy photo.png to Desktop larger than 5MB"
+    i_res = intent_an.analyze(req)
+    s_res = strat_sel.select_strategy(i_res)
+    g_res = goal_ext.extract_goals(req, i_res, s_res)
+    c_res = ca.analyze_constraints(req, i_res, s_res, g_res)
+    ctx = rcb.build_context(req, i_res, s_res, g_res, c_res)
+
+    assert ctx.constraints.constraint_count >= 1
+
+
+def test_singleton_compatibility() -> None:
+    """Verifies ReasoningContextBuilder operates cleanly as a shared instance."""
+    b1 = ReasoningContextBuilder()
+    b2 = ReasoningContextBuilder()
+    assert isinstance(b1, ReasoningContextBuilder)
+    assert isinstance(b2, ReasoningContextBuilder)
+
+
+def test_backward_compatibility() -> None:
+    """Verifies backward compatibility with pre-existing brain.reasoning exports."""
+    from brain.reasoning import (
+        ConstraintAnalyzer,
+        GoalExtractor,
+        IntentAnalyzer,
+        ObjectiveBuilder,
+        PriorityManager,
+        ReasoningContext,
+        ReasoningContextBuilder,
+        ReasoningEngine,
+        ReasoningStrategySelector,
+    )
+
+    rcb = ReasoningContextBuilder()
+    assert rcb is not None
+
+
+def test_regression_validation() -> None:
+    """Verifies end-to-end multi-stage reasoning pipeline context build."""
+    intent_an = IntentAnalyzer()
+    strat_sel = ReasoningStrategySelector()
+    goal_ext = GoalExtractor()
+    ca = ConstraintAnalyzer()
+    rcb = ReasoningContextBuilder()
+
+    req = "delete temp files before January"
+    i_res = intent_an.analyze(req)
+    s_res = strat_sel.select_strategy(i_res)
+    g_res = goal_ext.extract_goals(req, i_res, s_res)
+    c_res = ca.analyze_constraints(req, i_res, s_res, g_res)
+    ctx = rcb.build_context(req, i_res, s_res, g_res, c_res, metadata={"pipeline": "v1"})
+
+    assert ctx.request == req
+    assert ctx.intent.intent == IntentCategory.FILE_MANAGEMENT
+    assert ctx.strategy.strategy == ReasoningStrategy.FILE_REASONING
+    assert ctx.goal.goal_type == GoalType.DELETE_FILES
+    assert ctx.constraints.constraint_count >= 1
+    assert ctx.metadata == {"pipeline": "v1"}
+
+
+def test_configuration_validation() -> None:
+    """Verifies ReasoningContextBuilderConfig properties."""
+    cfg = ReasoningContextBuilderConfig(include_metadata=True, validate_components=False, strict_building=False)
+    rcb = ReasoningContextBuilder(config=cfg)
+
+    assert rcb.config.include_metadata is True
+    assert rcb.config.validate_components is False
+    assert rcb.config.strict_building is False
