@@ -8,7 +8,7 @@ import logging
 import threading
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from brain.voice.voice_models import ConfirmationStatus, VoiceConfirmation
 
@@ -25,6 +25,40 @@ class ConfirmationManager:
     - Accept, reject, cancel, or time-out pending confirmations.
     - Maintain per-session history.
     """
+
+    _pending_action: Optional[str] = None
+    _pending_target: Optional[str] = None
+    _pending_destination: Optional[str] = None
+    _pending_timestamp: Optional[float] = None
+
+    @classmethod
+    def set_pending_action(cls, action: str, target: str, destination: Optional[str] = None) -> None:
+        """Sets pending state action for confirmation compatibility."""
+        import time
+        cls._pending_action = action
+        cls._pending_target = target
+        cls._pending_destination = destination
+        cls._pending_timestamp = time.time()
+
+    @classmethod
+    def get_pending_action(cls) -> Optional[Dict[str, Any]]:
+        """Retrieves pending state action."""
+        if cls._pending_action is None:
+            return None
+        return {
+            "pending_action": cls._pending_action,
+            "pending_target": cls._pending_target,
+            "pending_destination": cls._pending_destination,
+            "timestamp": cls._pending_timestamp,
+        }
+
+    @classmethod
+    def clear_pending_action(cls) -> None:
+        """Clears pending state action."""
+        cls._pending_action = None
+        cls._pending_target = None
+        cls._pending_destination = None
+        cls._pending_timestamp = None
 
     def __init__(self, default_timeout_seconds: float = _DEFAULT_TIMEOUT_SECONDS) -> None:
         """Initialises ConfirmationManager.

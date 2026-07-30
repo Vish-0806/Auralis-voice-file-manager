@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+# pyrefly: ignore [missing-import]
 import pytest
 from typing import Any
 
@@ -20,6 +21,9 @@ from brain.execution.failure_recovery import (
 )
 
 
+from tests.mocks import MockResult
+
+
 class MockDispatcher:
     """Mock dispatcher that can raise custom exceptions upon request."""
     def __init__(self, exception_to_raise: Exception | None = None, return_failure: bool = False, failure_error: str = "") -> None:
@@ -32,14 +36,12 @@ class MockDispatcher:
         self.dispatched.append(plan)
         if self.exception_to_raise is not None:
             raise self.exception_to_raise
-        
-        class MockResult:
-            success = not self.return_failure
-            execution_time = 0.05
-            response = "Dispatched" if not self.return_failure else ""
-            error = self.failure_error if self.return_failure else None
-            data = {}
-        return MockResult()
+        return MockResult(
+            success=not self.return_failure,
+            execution_time=0.05,
+            response="Dispatched" if not self.return_failure else "",
+            error=self.failure_error if self.return_failure else None,
+        )
 
 
 def test_failure_runtime_filenotfound() -> None:

@@ -47,6 +47,22 @@ def set_pending_action(action_data: dict[str, Any] | None) -> None:
 
     global _pending_action
     _pending_action = action_data
+    if action_data:
+        try:
+            from brain.voice.confirmation_manager import ConfirmationManager
+            ConfirmationManager.set_pending_action(
+                action=action_data.get("action", ""),
+                target=action_data.get("target", ""),
+                destination=action_data.get("destination"),
+            )
+        except Exception:
+            pass
+    else:
+        try:
+            from brain.voice.confirmation_manager import ConfirmationManager
+            ConfirmationManager.clear_pending_action()
+        except Exception:
+            pass
 
 
 def get_pending_action() -> dict[str, Any] | None:

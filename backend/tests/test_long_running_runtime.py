@@ -24,6 +24,9 @@ from brain.execution.long_running_task_manager import (
 from core.models import Intent
 
 
+from tests.mocks import MockResult
+
+
 class MockDispatcher:
     """Mock dispatcher recording requests."""
 
@@ -33,13 +36,12 @@ class MockDispatcher:
 
     def dispatch(self, plan: Any) -> Any:
         self.dispatched.append(plan)
-        class MockResult:
-            success = not self.should_fail
-            execution_time = 0.05
-            response = "Success" if not self.should_fail else None
-            error = "Execution Error" if self.should_fail else None
-            data = {}
-        return MockResult()
+        return MockResult(
+            success=not self.should_fail,
+            execution_time=0.05,
+            response="Success" if not self.should_fail else "",
+            error="Execution Error" if self.should_fail else None,
+        )
 
 
 class FailingTaskManager(LongRunningTaskManager):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+# pyrefly: ignore [missing-import]
 import pytest
 from typing import Any
 
@@ -38,21 +39,7 @@ class CustomFailureRecoveryEngine(FailureRecoveryEngine):
         )
 
 
-class MockDispatcher:
-    """Mock dispatcher that simulates a series of successes/failures."""
-    def __init__(self, failure_count: int = 0) -> None:
-        self.failure_count = failure_count
-        self.calls = 0
-
-    def dispatch(self, plan: Any) -> Any:
-        self.calls += 1
-        class MockResult:
-            success = self.calls > self.failure_count
-            execution_time = 0.01
-            response = "Execution succeeded" if success else ""
-            error = "Mocked execution failure" if not success else None
-            data = {}
-        return MockResult()
+from tests.mocks import MockDispatcher, MockResult
 
 
 def test_autonomous_recovery_retry_succeeds() -> None:

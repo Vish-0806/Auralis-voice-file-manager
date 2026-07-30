@@ -9,13 +9,7 @@ from pydantic import BaseModel, Field
 from core.intents import Intent
 
 
-class ExecutionStatus(str, Enum):
-    """Represents the operational status of an execution session or step."""
-
-    PENDING = "PENDING"
-    RUNNING = "RUNNING"
-    SUCCESS = "SUCCESS"
-    FAILED = "FAILED"
+from brain.execution.execution_models import ExecutionStatus
 
 
 class ExecutionRecord(BaseModel):
