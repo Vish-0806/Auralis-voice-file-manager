@@ -21,6 +21,9 @@ from brain.execution.decision_engine import (
 )
 
 
+from tests.mocks import MockResult
+
+
 class MockDispatcher:
     """Mock dispatcher tracking calls and returning mock responses."""
     def __init__(self, should_fail: bool = False) -> None:
@@ -29,13 +32,12 @@ class MockDispatcher:
 
     def dispatch(self, plan: Any) -> Any:
         self.dispatched_plans.append(plan)
-        class MockResult:
-            success = not self.should_fail
-            execution_time = 0.05
-            response = "Dispatched successfully"
-            error = None if not self.should_fail else "Dispatch execution failure"
-            data = {}
-        return MockResult()
+        return MockResult(
+            success=not self.should_fail,
+            execution_time=0.05,
+            response="Dispatched successfully",
+            error=None if not self.should_fail else "Dispatch execution failure",
+        )
 
 
 def test_runtime_execute_decision() -> None:

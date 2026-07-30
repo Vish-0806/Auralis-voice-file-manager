@@ -25,11 +25,6 @@ from memory.context import (
 )
 
 
-@compiles(JSONB, "sqlite")
-def compile_jsonb_sqlite(type_, compiler, **kw):
-    """Compiles JSONB as JSON under SQLite to support test suites."""
-    return "JSON"
-
 
 @pytest.fixture(scope="module")
 def db_engine():

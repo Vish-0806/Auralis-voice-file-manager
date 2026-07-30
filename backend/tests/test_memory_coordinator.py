@@ -3,9 +3,13 @@
 from unittest.mock import MagicMock
 # pyrefly: ignore [missing-import]
 import pytest
+# pyrefly: ignore [missing-import]
 from sqlalchemy import create_engine
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import sessionmaker, Session
+# pyrefly: ignore [missing-import]
 from sqlalchemy.ext.compiler import compiles
+# pyrefly: ignore [missing-import]
 from sqlalchemy.dialects.postgresql import JSONB
 
 from memory.database import Base
@@ -25,11 +29,6 @@ from memory.coordinator.memory_registry import MemoryRegistry
 from memory.coordinator.memory_pipeline import MemoryPipeline
 from memory.coordinator.memory_health import MemoryHealth
 
-
-@compiles(JSONB, "sqlite")
-def compile_jsonb_sqlite(type_, compiler, **kw):
-    """Compiles JSONB as JSON under SQLite to support test suites."""
-    return "JSON"
 
 
 @pytest.fixture(scope="module")

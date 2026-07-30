@@ -4,10 +4,11 @@ import time
 # pyrefly: ignore [missing-import]
 import pytest
 from datetime import datetime, timedelta
+# pyrefly: ignore [missing-import]
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.dialects.postgresql import JSONB
+# pyrefly: ignore [missing-import]
+from sqlalchemy.orm import Session, sessionmaker
+
 
 from memory.database import Base
 from memory.repository.routine_repository import RoutineRepository
@@ -23,11 +24,6 @@ from memory.learning import (
     InvalidRoutineError,
 )
 
-
-@compiles(JSONB, "sqlite")
-def compile_jsonb_sqlite(type_, compiler, **kw):
-    """Compiles JSONB as JSON under SQLite to support test suites."""
-    return "JSON"
 
 
 @pytest.fixture(scope="module")
@@ -94,19 +90,19 @@ def test_validator_detects_bad_routine_format() -> None:
         val.validate_routine("", {"steps": [{"action": "test"}]}, 0.5)
 
     # Empty action sequence
-    with pytest.raises(InvalidWorkspaceError if "Workspace" in str(InvalidRoutineError) else InvalidRoutineError):
+    with pytest.raises(InvalidRoutineError):
         val.validate_routine("trigger", {}, 0.5)
 
     # Empty steps list
-    with pytest.raises(InvalidWorkspaceError if "Workspace" in str(InvalidRoutineError) else InvalidRoutineError):
+    with pytest.raises(InvalidRoutineError):
         val.validate_routine("trigger", {"steps": []}, 0.5)
 
     # Missing action name
-    with pytest.raises(InvalidWorkspaceError if "Workspace" in str(InvalidRoutineError) else InvalidRoutineError):
+    with pytest.raises(InvalidRoutineError):
         val.validate_routine("trigger", {"steps": [{"input_parameters": {}}]}, 0.5)
 
     # Invalid confidence range
-    with pytest.raises(InvalidWorkspaceError if "Workspace" in str(InvalidRoutineError) else InvalidRoutineError):
+    with pytest.raises(InvalidRoutineError):
         val.validate_routine("trigger", {"steps": [{"action": "click"}]}, 1.5)
 
 

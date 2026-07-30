@@ -1,9 +1,14 @@
 """Unit tests for the Auralis PostgreSQL Provider implementation."""
 
+# pyrefly: ignore [missing-import]
 import pytest
+# pyrefly: ignore [missing-import]
 from sqlalchemy import create_engine
+# pyrefly: ignore [missing-import]
 from sqlalchemy.orm import sessionmaker
+# pyrefly: ignore [missing-import]
 from sqlalchemy.ext.compiler import compiles
+# pyrefly: ignore [missing-import]
 from sqlalchemy.dialects.postgresql import JSONB
 
 from memory.database import Base
@@ -11,11 +16,6 @@ from memory.models.domain_models import MemoryEntry, MemoryMetadata, MemoryQuery
 from memory.providers.postgres_provider import PostgresProvider
 from memory.exceptions import DataIntegrityError, DatabaseConnectionError, DatabaseOperationError
 
-
-@compiles(JSONB, "sqlite")
-def compile_jsonb_sqlite(type_, compiler, **kw):
-    """Compiles JSONB as JSON under SQLite to support test suites."""
-    return "JSON"
 
 
 @pytest.fixture
@@ -154,6 +154,7 @@ async def test_provider_update_and_delete(mock_db_session) -> None:
 @pytest.mark.anyio
 async def test_provider_exception_translation(mock_db_session, monkeypatch) -> None:
     """Verify SQLAlchemy exceptions are successfully mapped into domain-specific exceptions."""
+    # pyrefly: ignore [missing-import]
     from sqlalchemy.exc import IntegrityError
     provider = PostgresProvider()
     await provider.initialize()

@@ -21,6 +21,9 @@ from brain.execution.clarification_engine import (
 )
 
 
+from tests.mocks import MockResult
+
+
 class MockDispatcher:
     """Mock dispatcher that records details of dispatcher requests."""
     def __init__(self) -> None:
@@ -28,12 +31,7 @@ class MockDispatcher:
 
     def dispatch(self, plan: Any) -> Any:
         self.dispatched.append(plan)
-        class MockResult:
-            success = True
-            execution_time = 0.01
-            response = "Execution succeeded"
-            data = {}
-        return MockResult()
+        return MockResult(success=True, execution_time=0.01, response="Execution succeeded")
 
 
 def test_clarification_runtime_generated_and_suspended() -> None:
