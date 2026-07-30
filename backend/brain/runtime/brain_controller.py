@@ -28,10 +28,18 @@ class BrainController:
     - Thread-safe via RLock.
     """
 
-    def __init__(self, assistant_runtime: Optional[AssistantRuntime] = None) -> None:
+    def __init__(
+        self,
+        assistant_runtime: Optional[AssistantRuntime] = None,
+        logger: Optional[logging.Logger] = None,
+        memory_service: Optional[Any] = None,
+        **kwargs: Any,
+    ) -> None:
         self._lock = threading.RLock()
         self._assistant = assistant_runtime or AssistantRuntime()
-        logger.debug("BrainController initialized")
+        self._logger = logger or logging.getLogger(__name__)
+        self._memory_service = memory_service
+        self._logger.debug("BrainController initialized")
 
     def initialize(self) -> bool:
         """Initialize the complete Auralis backend runtime.
@@ -43,10 +51,10 @@ class BrainController:
             return self._assistant.initialize()
 
     def shutdown(self) -> bool:
-        """Shutdown the complete Auralis backend runtime.
+        """Gracefully shut down all subsystem runtimes.
 
         Returns:
-            True always (graceful shutdown).
+            True if all subsystems shut down cleanly.
         """
         with self._lock:
             return self._assistant.shutdown()
@@ -60,11 +68,16 @@ class BrainController:
         with self._lock:
             return self._assistant.restart()
 
-    def process_request(self, request: Union[BrainRequest, str]) -> BrainResponse:
+    def process_request(
+        self,
+        request: Union[BrainRequest, str],
+        dispatcher: Optional[Any] = None,
+    ) -> BrainResponse:
         """Process an incoming voice/text request through the complete brain pipeline.
 
         Args:
             request: :class:`BrainRequest` object or raw user prompt string.
+            dispatcher: Optional dispatcher implementation for legacy pipeline compatibility.
 
         Returns:
             Immutable :class:`BrainResponse`.

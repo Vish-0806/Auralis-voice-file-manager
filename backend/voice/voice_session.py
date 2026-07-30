@@ -22,17 +22,17 @@ class VoiceSessionManager(IVoiceSessionManager):
 
     def get_pending_action(self) -> Optional[Dict[str, Any]]:
         """Bridges retrieval of pending action state from the application's core manager."""
-        from capabilities.files.file_operations import get_pending_action
-        return get_pending_action()
+        from brain.voice.confirmation_manager import ConfirmationManager
+        return ConfirmationManager.get_pending_action()
 
     def set_pending_action(self, action: str, target: str, destination: Optional[str] = None) -> None:
         """Saves a pending state action."""
-        from app.confirmation_manager import ConfirmationManager
+        from brain.voice.confirmation_manager import ConfirmationManager
         ConfirmationManager.set_pending_action(action, target, destination)
         self.session.last_active_time = time.time()
 
     def clear_pending_action(self) -> None:
         """Clears out currently stored pending state actions."""
-        from app.confirmation_manager import ConfirmationManager
+        from brain.voice.confirmation_manager import ConfirmationManager
         ConfirmationManager.clear_pending_action()
         self.session.last_active_time = time.time()

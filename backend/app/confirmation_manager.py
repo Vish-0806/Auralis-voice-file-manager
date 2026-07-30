@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 class ConfirmationManager:
     """Manages application state, specifically pending actions for confirmation workflows
 
-    and future multi-step automation workflows.
+    and future multi-step automation workflows. Thin compatibility facade over Brain ConfirmationManager.
     """
 
     _pending_action: Optional[str] = None
@@ -29,6 +29,14 @@ class ConfirmationManager:
         cls._pending_target = target
         cls._pending_destination = destination
         cls._timestamp = time.time()
+        try:
+            from brain.voice.confirmation_manager import ConfirmationManager as BrainConfirmationManager
+            if action:
+                BrainConfirmationManager.set_pending_action(action, target, destination)
+            else:
+                BrainConfirmationManager.clear_pending_action()
+        except Exception:
+            pass
 
     @classmethod
     def get_pending_action(cls) -> Optional[Dict[str, Any]]:
@@ -53,6 +61,11 @@ class ConfirmationManager:
         cls._pending_destination = None
         cls._timestamp = None
         cls._workflow_steps = []
+        try:
+            from brain.voice.confirmation_manager import ConfirmationManager as BrainConfirmationManager
+            BrainConfirmationManager.clear_pending_action()
+        except Exception:
+            pass
 
     @classmethod
     def add_workflow_step(cls, step_data: Dict[str, Any]) -> None:

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from .models import BrainRequest, BrainResponse, BrainStatus, BrainExecution
+from brain.runtime.brain_models import BrainRequest, BrainResponse
+from .models import BrainStatus, BrainExecution
 from .brain_config import BrainConfig
 from .brain_registry import BrainRegistry
 from .brain_pipeline import BrainPipeline
-from .brain_controller import BrainController
+from brain.runtime.brain_controller import BrainController
 
 __all__ = [
     "BrainRequest",
