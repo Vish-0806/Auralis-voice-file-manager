@@ -1,7 +1,7 @@
-"""MemoryInjector component for assembling and injecting memory context into prompts (Phase 10.3).
+"""MemoryInjector component for assembling and injecting memory context into prompts (Phase 10.3 & Phase 10.5).
 
 Extracts and injects long-term memory, recent memory, user preferences, pinned memory,
-and execution context from AIContext. Uses dependency injection without database access.
+and execution context from AIContext using AIMemoryProvider.
 """
 
 import logging
@@ -55,7 +55,15 @@ class MemoryInjector:
         memory_provider: Optional[MemoryProviderInterface] = None,
         templates: Optional[PromptTemplates] = None,
     ) -> None:
-        self.memory_provider = memory_provider or DefaultMemoryProvider()
+        if memory_provider is not None:
+            self.memory_provider = memory_provider
+        else:
+            try:
+                from brain.ai.memory.memory_provider import AIMemoryProvider
+                self.memory_provider = AIMemoryProvider()
+            except ImportError:
+                self.memory_provider = DefaultMemoryProvider()
+
         self.templates = templates or PromptTemplates()
 
     def inject_memory(self, context: AIContext, custom_template: Optional[str] = None) -> str:

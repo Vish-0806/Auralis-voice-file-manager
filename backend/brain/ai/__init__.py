@@ -1,7 +1,8 @@
-"""Auralis AI Architecture Subsystem (Phases 10.1 - 10.4).
+"""Auralis AI Architecture Subsystem (Phases 10.1 - 10.5).
 
 Exports all interfaces, models, exceptions, managers, builders, routers, orchestrator,
-provider configurations, concrete LLM providers, prompt intelligence pipeline, and tool calling runtime.
+provider configurations, concrete LLM providers, prompt intelligence pipeline, tool calling runtime,
+and memory-aware AI integration layer.
 """
 
 from brain.ai.exceptions import (
@@ -47,6 +48,24 @@ from brain.ai.context_builder import DefaultContextBuilder
 from brain.ai.prompt_templates import PromptTemplates
 from brain.ai.token_estimator import TokenEstimator
 from brain.ai.conversation_builder import ConversationBuilder
+from brain.ai.memory import (
+    AIMemoryException,
+    AIMemoryItem,
+    AIMemoryProvider,
+    AIMemoryProviderInterface,
+    DefaultMemoryFilter,
+    DefaultMemoryRanker,
+    DefaultMemoryRetriever,
+    MemoryFilterError,
+    MemoryFilterInterface,
+    MemoryQueryResult,
+    MemoryRankerInterface,
+    MemoryRankingError,
+    MemoryRetrievalError,
+    MemoryRetrieverInterface,
+    MemoryScope,
+    SCOPE_WEIGHTS,
+)
 from brain.ai.memory_injector import (
     DefaultMemoryProvider,
     MemoryInjector,
@@ -95,7 +114,11 @@ __all__ = [
     "ToolValidationError",
     "ToolExecutionError",
     "ToolParsingError",
-    # Models & Permissions
+    "AIMemoryException",
+    "MemoryRetrievalError",
+    "MemoryRankingError",
+    "MemoryFilterError",
+    # Models & Permissions & Memory
     "ToolCategory",
     "FinishReason",
     "PromptRole",
@@ -109,6 +132,9 @@ __all__ = [
     "AIResponse",
     "ToolPermissionLevel",
     "ToolMetadata",
+    "MemoryScope",
+    "AIMemoryItem",
+    "MemoryQueryResult",
     # Interfaces
     "AIProvider",
     "ContextBuilder",
@@ -118,6 +144,10 @@ __all__ = [
     "ToolRegistryInterface",
     "ToolParserInterface",
     "ToolExecutorInterface",
+    "AIMemoryProviderInterface",
+    "MemoryRetrieverInterface",
+    "MemoryRankerInterface",
+    "MemoryFilterInterface",
     # Provider Config & Providers
     "ProviderConfig",
     "load_provider_config_from_env",
@@ -136,6 +166,12 @@ __all__ = [
     "MockWorkspaceContextProvider",
     "PromptOptimizer",
     "ROLE_PRIORITY",
+    # Memory-aware AI Services
+    "DefaultMemoryRetriever",
+    "DefaultMemoryRanker",
+    "SCOPE_WEIGHTS",
+    "DefaultMemoryFilter",
+    "AIMemoryProvider",
     # Tool Calling Runtime
     "DefaultToolRegistry",
     "DefaultToolParser",
