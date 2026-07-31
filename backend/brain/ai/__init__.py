@@ -1,6 +1,7 @@
-"""Auralis AI Architecture Subsystem (Phase 10.1).
+"""Auralis AI Architecture Subsystem (Phase 10.1 & Phase 10.2).
 
-Exports all interfaces, models, exceptions, managers, builders, routers, and orchestrator.
+Exports all interfaces, models, exceptions, managers, builders, routers, orchestrator,
+provider configurations, and concrete LLM providers.
 """
 
 from brain.ai.exceptions import (
@@ -31,6 +32,15 @@ from brain.ai.interfaces import (
     ContextBuilder,
     PromptBuilder,
     ToolRouter,
+)
+from brain.ai.provider_config import (
+    ProviderConfig,
+    get_groq_default_config,
+    load_provider_config_from_env,
+)
+from brain.ai.providers import (
+    BaseAIProvider,
+    GroqProvider,
 )
 from brain.ai.provider_manager import ProviderManager
 from brain.ai.context_builder import DefaultContextBuilder
@@ -65,6 +75,12 @@ __all__ = [
     "ContextBuilder",
     "PromptBuilder",
     "ToolRouter",
+    # Provider Config & Providers
+    "ProviderConfig",
+    "load_provider_config_from_env",
+    "get_groq_default_config",
+    "BaseAIProvider",
+    "GroqProvider",
     # Implementations & Managers
     "ProviderManager",
     "DefaultContextBuilder",
