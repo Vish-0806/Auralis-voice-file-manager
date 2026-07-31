@@ -1,8 +1,8 @@
-"""Auralis AI Architecture Subsystem (Phases 10.1 - 10.5).
+"""Auralis AI Architecture Subsystem (Phases 10.1 - 10.6).
 
 Exports all interfaces, models, exceptions, managers, builders, routers, orchestrator,
 provider configurations, concrete LLM providers, prompt intelligence pipeline, tool calling runtime,
-and memory-aware AI integration layer.
+memory-aware AI integration layer, and multi-step planning engine.
 """
 
 from brain.ai.exceptions import (
@@ -96,6 +96,33 @@ from brain.ai.tools import (
     ToolValidationError,
 )
 from brain.ai.tool_router import DefaultToolRouter
+from brain.ai.planning import (
+    AIPlanner,
+    DefaultExecutionMonitor,
+    DefaultExecutionPlanner,
+    DefaultGoalAnalyzer,
+    DefaultPlanGenerator,
+    DefaultPlanValidator,
+    ExecutionMonitorInterface,
+    ExecutionMonitoringError,
+    ExecutionPlannerInterface,
+    ExecutionPlanningError,
+    ExecutionResult,
+    GoalAnalysisError,
+    GoalAnalyzerInterface,
+    Plan,
+    PlanGenerationError,
+    PlanGeneratorInterface,
+    PlannerInterface,
+    PlanningGoal,
+    PlanningException,
+    PlanStatus,
+    PlanStep,
+    PlanValidationError,
+    PlanValidatorInterface,
+    StepDependency,
+    StepStatus,
+)
 from brain.ai.orchestrator import AIOrchestrator
 
 __all__ = [
@@ -118,7 +145,13 @@ __all__ = [
     "MemoryRetrievalError",
     "MemoryRankingError",
     "MemoryFilterError",
-    # Models & Permissions & Memory
+    "PlanningException",
+    "GoalAnalysisError",
+    "PlanGenerationError",
+    "PlanValidationError",
+    "ExecutionPlanningError",
+    "ExecutionMonitoringError",
+    # Models & Permissions & Memory & Planning
     "ToolCategory",
     "FinishReason",
     "PromptRole",
@@ -135,6 +168,13 @@ __all__ = [
     "MemoryScope",
     "AIMemoryItem",
     "MemoryQueryResult",
+    "PlanStatus",
+    "StepStatus",
+    "StepDependency",
+    "PlanningGoal",
+    "PlanStep",
+    "Plan",
+    "ExecutionResult",
     # Interfaces
     "AIProvider",
     "ContextBuilder",
@@ -148,6 +188,12 @@ __all__ = [
     "MemoryRetrieverInterface",
     "MemoryRankerInterface",
     "MemoryFilterInterface",
+    "GoalAnalyzerInterface",
+    "PlanGeneratorInterface",
+    "PlanValidatorInterface",
+    "ExecutionPlannerInterface",
+    "ExecutionMonitorInterface",
+    "PlannerInterface",
     # Provider Config & Providers
     "ProviderConfig",
     "load_provider_config_from_env",
@@ -176,6 +222,13 @@ __all__ = [
     "DefaultToolRegistry",
     "DefaultToolParser",
     "DefaultToolExecutor",
+    # Multi-Step Planning Engine
+    "DefaultGoalAnalyzer",
+    "DefaultPlanGenerator",
+    "DefaultPlanValidator",
+    "DefaultExecutionPlanner",
+    "DefaultExecutionMonitor",
+    "AIPlanner",
     # Implementations & Managers
     "ProviderManager",
     "DefaultContextBuilder",
