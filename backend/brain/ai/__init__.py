@@ -1,7 +1,7 @@
-"""Auralis AI Architecture Subsystem (Phase 10.1 & Phase 10.2).
+"""Auralis AI Architecture Subsystem (Phases 10.1 - 10.3).
 
 Exports all interfaces, models, exceptions, managers, builders, routers, orchestrator,
-provider configurations, and concrete LLM providers.
+provider configurations, concrete LLM providers, and prompt intelligence pipeline services.
 """
 
 from brain.ai.exceptions import (
@@ -44,6 +44,20 @@ from brain.ai.providers import (
 )
 from brain.ai.provider_manager import ProviderManager
 from brain.ai.context_builder import DefaultContextBuilder
+from brain.ai.prompt_templates import PromptTemplates
+from brain.ai.token_estimator import TokenEstimator
+from brain.ai.conversation_builder import ConversationBuilder
+from brain.ai.memory_injector import (
+    DefaultMemoryProvider,
+    MemoryInjector,
+    MemoryProviderInterface,
+)
+from brain.ai.workspace_context import (
+    MockWorkspaceContextProvider,
+    WorkspaceContextInjector,
+    WorkspaceContextProviderInterface,
+)
+from brain.ai.prompt_optimizer import PromptOptimizer, ROLE_PRIORITY
 from brain.ai.prompt_engine import DefaultPromptBuilder
 from brain.ai.tool_router import DefaultToolRouter
 from brain.ai.orchestrator import AIOrchestrator
@@ -81,6 +95,18 @@ __all__ = [
     "get_groq_default_config",
     "BaseAIProvider",
     "GroqProvider",
+    # Prompt Intelligence Services
+    "PromptTemplates",
+    "TokenEstimator",
+    "ConversationBuilder",
+    "MemoryInjector",
+    "MemoryProviderInterface",
+    "DefaultMemoryProvider",
+    "WorkspaceContextInjector",
+    "WorkspaceContextProviderInterface",
+    "MockWorkspaceContextProvider",
+    "PromptOptimizer",
+    "ROLE_PRIORITY",
     # Implementations & Managers
     "ProviderManager",
     "DefaultContextBuilder",

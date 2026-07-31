@@ -46,6 +46,7 @@ class PromptRole(str, Enum):
     ASSISTANT = "assistant"
     TOOL = "tool"
     MEMORY = "memory"
+    WORKSPACE = "workspace"
 
 
 # ---------------------------------------------------------------------------
@@ -133,6 +134,7 @@ class Prompt(BaseModel):
     user_prompt: str = ""
     tool_prompt: str = ""
     memory_prompt: str = ""
+    workspace_prompt: str = ""
     formatted_messages: List[PromptMessage] = Field(default_factory=list)
     token_estimate: int = 0
     metadata: Dict[str, Any] = Field(default_factory=dict)
