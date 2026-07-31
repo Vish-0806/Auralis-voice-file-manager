@@ -1,7 +1,7 @@
-"""Auralis AI Architecture Subsystem (Phases 10.1 - 10.3).
+"""Auralis AI Architecture Subsystem (Phases 10.1 - 10.4).
 
 Exports all interfaces, models, exceptions, managers, builders, routers, orchestrator,
-provider configurations, concrete LLM providers, and prompt intelligence pipeline services.
+provider configurations, concrete LLM providers, prompt intelligence pipeline, and tool calling runtime.
 """
 
 from brain.ai.exceptions import (
@@ -59,6 +59,23 @@ from brain.ai.workspace_context import (
 )
 from brain.ai.prompt_optimizer import PromptOptimizer, ROLE_PRIORITY
 from brain.ai.prompt_engine import DefaultPromptBuilder
+from brain.ai.tools import (
+    AITool,
+    DefaultToolExecutor,
+    DefaultToolParser,
+    DefaultToolRegistry,
+    ToolException,
+    ToolExecutionError,
+    ToolExecutorInterface,
+    ToolMetadata,
+    ToolNotFoundError,
+    ToolParserInterface,
+    ToolParsingError,
+    ToolPermissionLevel,
+    ToolRegistrationError,
+    ToolRegistryInterface,
+    ToolValidationError,
+)
 from brain.ai.tool_router import DefaultToolRouter
 from brain.ai.orchestrator import AIOrchestrator
 
@@ -72,7 +89,13 @@ __all__ = [
     "PromptBuildError",
     "ToolRoutingError",
     "AIOrchestrationError",
-    # Models
+    "ToolException",
+    "ToolNotFoundError",
+    "ToolRegistrationError",
+    "ToolValidationError",
+    "ToolExecutionError",
+    "ToolParsingError",
+    # Models & Permissions
     "ToolCategory",
     "FinishReason",
     "PromptRole",
@@ -84,11 +107,17 @@ __all__ = [
     "Prompt",
     "AIRequest",
     "AIResponse",
+    "ToolPermissionLevel",
+    "ToolMetadata",
     # Interfaces
     "AIProvider",
     "ContextBuilder",
     "PromptBuilder",
     "ToolRouter",
+    "AITool",
+    "ToolRegistryInterface",
+    "ToolParserInterface",
+    "ToolExecutorInterface",
     # Provider Config & Providers
     "ProviderConfig",
     "load_provider_config_from_env",
@@ -107,6 +136,10 @@ __all__ = [
     "MockWorkspaceContextProvider",
     "PromptOptimizer",
     "ROLE_PRIORITY",
+    # Tool Calling Runtime
+    "DefaultToolRegistry",
+    "DefaultToolParser",
+    "DefaultToolExecutor",
     # Implementations & Managers
     "ProviderManager",
     "DefaultContextBuilder",
