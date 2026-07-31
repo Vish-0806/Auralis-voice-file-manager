@@ -1,8 +1,8 @@
-"""Auralis AI Architecture Subsystem (Phases 10.1 - 10.6).
+"""Auralis AI Architecture Subsystem (Phases 10.1 - 10.7).
 
 Exports all interfaces, models, exceptions, managers, builders, routers, orchestrator,
 provider configurations, concrete LLM providers, prompt intelligence pipeline, tool calling runtime,
-memory-aware AI integration layer, and multi-step planning engine.
+memory-aware AI integration layer, multi-step planning engine, and runtime resilience framework.
 """
 
 from brain.ai.exceptions import (
@@ -123,6 +123,47 @@ from brain.ai.planning import (
     StepDependency,
     StepStatus,
 )
+from brain.ai.resilience import (
+    AIResilienceRuntime,
+    CancellationManagerInterface,
+    CancellationReason,
+    CancellationRequest,
+    CircuitBreakerInterface,
+    CircuitBreakerOpenError,
+    CircuitBreakerState,
+    CircuitState,
+    DefaultCancellationManager,
+    DefaultCircuitBreaker,
+    DefaultEventDispatcher,
+    DefaultFailureClassifier,
+    DefaultRecoveryManager,
+    DefaultRetryManager,
+    DefaultTimeoutManager,
+    EventDispatcherInterface,
+    EventType,
+    ExecutionCancelledError,
+    FailureClassifierInterface,
+    FailureInfo,
+    FailureType,
+    RecoveryAction,
+    RecoveryDecision,
+    RecoveryExecutionError,
+    RecoveryManagerInterface,
+    ResilienceContext,
+    ResilienceException,
+    ResilienceRuntimeInterface,
+    RetryAttempt,
+    RetryLimitExceededError,
+    RetryManagerInterface,
+    RetryPolicy,
+    RetryStrategy,
+    RuntimeEvent,
+    TimeoutExceededError,
+    TimeoutManagerInterface,
+    TimeoutPolicy,
+    TimeoutState,
+    TimeoutStatus,
+)
 from brain.ai.orchestrator import AIOrchestrator
 
 __all__ = [
@@ -151,7 +192,13 @@ __all__ = [
     "PlanValidationError",
     "ExecutionPlanningError",
     "ExecutionMonitoringError",
-    # Models & Permissions & Memory & Planning
+    "ResilienceException",
+    "RetryLimitExceededError",
+    "TimeoutExceededError",
+    "ExecutionCancelledError",
+    "CircuitBreakerOpenError",
+    "RecoveryExecutionError",
+    # Models & Enums
     "ToolCategory",
     "FinishReason",
     "PromptRole",
@@ -175,6 +222,23 @@ __all__ = [
     "PlanStep",
     "Plan",
     "ExecutionResult",
+    "FailureType",
+    "RecoveryAction",
+    "CircuitState",
+    "EventType",
+    "RetryStrategy",
+    "TimeoutStatus",
+    "CancellationReason",
+    "RetryPolicy",
+    "RetryAttempt",
+    "TimeoutPolicy",
+    "TimeoutState",
+    "CancellationRequest",
+    "FailureInfo",
+    "RecoveryDecision",
+    "CircuitBreakerState",
+    "RuntimeEvent",
+    "ResilienceContext",
     # Interfaces
     "AIProvider",
     "ContextBuilder",
@@ -194,13 +258,20 @@ __all__ = [
     "ExecutionPlannerInterface",
     "ExecutionMonitorInterface",
     "PlannerInterface",
-    # Provider Config & Providers
+    "RetryManagerInterface",
+    "TimeoutManagerInterface",
+    "CancellationManagerInterface",
+    "FailureClassifierInterface",
+    "RecoveryManagerInterface",
+    "CircuitBreakerInterface",
+    "EventDispatcherInterface",
+    "ResilienceRuntimeInterface",
+    # Implementations & Managers
     "ProviderConfig",
     "load_provider_config_from_env",
     "get_groq_default_config",
     "BaseAIProvider",
     "GroqProvider",
-    # Prompt Intelligence Services
     "PromptTemplates",
     "TokenEstimator",
     "ConversationBuilder",
@@ -212,24 +283,28 @@ __all__ = [
     "MockWorkspaceContextProvider",
     "PromptOptimizer",
     "ROLE_PRIORITY",
-    # Memory-aware AI Services
     "DefaultMemoryRetriever",
     "DefaultMemoryRanker",
     "SCOPE_WEIGHTS",
     "DefaultMemoryFilter",
     "AIMemoryProvider",
-    # Tool Calling Runtime
     "DefaultToolRegistry",
     "DefaultToolParser",
     "DefaultToolExecutor",
-    # Multi-Step Planning Engine
     "DefaultGoalAnalyzer",
     "DefaultPlanGenerator",
     "DefaultPlanValidator",
     "DefaultExecutionPlanner",
     "DefaultExecutionMonitor",
     "AIPlanner",
-    # Implementations & Managers
+    "DefaultRetryManager",
+    "DefaultTimeoutManager",
+    "DefaultCancellationManager",
+    "DefaultFailureClassifier",
+    "DefaultRecoveryManager",
+    "DefaultCircuitBreaker",
+    "DefaultEventDispatcher",
+    "AIResilienceRuntime",
     "ProviderManager",
     "DefaultContextBuilder",
     "DefaultPromptBuilder",
