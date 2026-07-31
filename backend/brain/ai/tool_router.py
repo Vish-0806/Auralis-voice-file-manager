@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from brain.ai.exceptions import ToolRoutingError
 from brain.ai.interfaces import ToolRouter
 from brain.ai.ai_models import ToolCall, ToolCategory, ToolResult
-from brain.ai.tools.exceptions import ToolException, ToolNotFoundError
+from brain.ai.tools.exceptions import ToolNotFoundError
 from brain.ai.tools.interfaces import (
     AITool,
     ToolExecutorInterface,

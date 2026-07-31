@@ -6,7 +6,7 @@ step dependencies, arguments, and expected output descriptions.
 
 import uuid
 import logging
-from typing import Any, Dict, List, Optional
+from typing import List
 
 from brain.ai.planning.exceptions import PlanGenerationError
 from brain.ai.planning.interfaces import PlanGeneratorInterface

@@ -11,7 +11,6 @@ Validates:
 import logging
 from typing import Any, Dict, List, Optional, Set
 
-from brain.ai.planning.exceptions import PlanValidationError
 from brain.ai.planning.interfaces import PlanValidatorInterface
 from brain.ai.planning.planning_models import Plan, PlanStep
 

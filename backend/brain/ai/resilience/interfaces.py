@@ -18,17 +18,13 @@ from brain.ai.resilience.resilience_models import (
     CancellationReason,
     CancellationRequest,
     CircuitBreakerState,
-    CircuitState,
     EventType,
     FailureInfo,
-    FailureType,
-    RecoveryAction,
     RecoveryDecision,
     ResilienceContext,
     RetryAttempt,
     RetryPolicy,
     RuntimeEvent,
-    TimeoutPolicy,
     TimeoutState,
 )
 

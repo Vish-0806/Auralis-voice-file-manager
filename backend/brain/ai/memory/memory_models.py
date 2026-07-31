@@ -5,7 +5,7 @@ Defines MemoryScope, AIMemoryItem, and MemoryQueryResult models.
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, ConfigDict, Field
 

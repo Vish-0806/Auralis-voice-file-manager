@@ -6,7 +6,7 @@ and returns TimeoutState snapshots without threading or asyncio background tasks
 
 import time
 import logging
-from typing import Dict, Optional
+from typing import Dict
 
 from brain.ai.resilience.interfaces import TimeoutManagerInterface
 from brain.ai.resilience.resilience_models import TimeoutState, TimeoutStatus

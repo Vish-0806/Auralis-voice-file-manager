@@ -5,7 +5,7 @@ enforces maximum history size limits, trims oldest messages first, and preserves
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from brain.ai.ai_models import PromptMessage, PromptRole
 from brain.ai.token_estimator import TokenEstimator

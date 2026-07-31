@@ -8,7 +8,7 @@ Responsibilities:
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from brain.ai.ai_models import Prompt, PromptMessage, PromptRole
 from brain.ai.token_estimator import TokenEstimator

@@ -6,7 +6,7 @@ without external embedding models or vector databases.
 
 import re
 import logging
-from typing import Any, Dict, List, Set
+from typing import Dict, List, Set
 
 from brain.ai.memory.exceptions import MemoryRankingError
 from brain.ai.memory.interfaces import MemoryRankerInterface

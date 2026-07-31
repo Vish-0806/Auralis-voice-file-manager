@@ -6,7 +6,6 @@ classified FailureInfo and policy thresholds without executing recovery actions 
 
 import uuid
 import logging
-from typing import Optional
 
 from brain.ai.resilience.interfaces import RecoveryManagerInterface
 from brain.ai.resilience.resilience_models import (

@@ -6,7 +6,7 @@ Defines ProviderConfig and configuration factory functions.
 import os
 from typing import Optional
 # pyrefly: ignore [missing-import]
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class ProviderConfig(BaseModel):

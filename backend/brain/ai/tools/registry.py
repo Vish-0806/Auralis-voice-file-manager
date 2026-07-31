@@ -4,7 +4,7 @@ Provides registration, unregistration, lookup, and category filtering of AI tool
 """
 
 import logging
-from typing import Dict, List, Union, Optional
+from typing import Dict, List, Union
 
 from brain.ai.ai_models import ToolCategory
 from brain.ai.tools.exceptions import ToolNotFoundError, ToolRegistrationError

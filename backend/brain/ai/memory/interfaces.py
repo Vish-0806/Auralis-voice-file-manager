@@ -8,7 +8,7 @@ Defines ABCs for:
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from brain.ai.ai_models import AIContext
 from brain.ai.memory.memory_models import AIMemoryItem, MemoryQueryResult, MemoryScope

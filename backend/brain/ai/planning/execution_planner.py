@@ -5,7 +5,7 @@ Does not support parallel scheduling.
 """
 
 import logging
-from typing import Dict, List, Set
+from typing import Dict, List
 
 from brain.ai.planning.exceptions import ExecutionPlanningError
 from brain.ai.planning.interfaces import ExecutionPlannerInterface

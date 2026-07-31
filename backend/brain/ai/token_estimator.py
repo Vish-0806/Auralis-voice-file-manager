@@ -5,9 +5,9 @@ and detailed breakdown by role and prompt section without external tokenizer dep
 """
 
 import logging
-from typing import Any, Dict, List, Union, Optional
+from typing import Any, Dict, List, Union
 
-from brain.ai.ai_models import Prompt, PromptMessage, PromptRole
+from brain.ai.ai_models import Prompt, PromptMessage
 
 logger = logging.getLogger(__name__)
 

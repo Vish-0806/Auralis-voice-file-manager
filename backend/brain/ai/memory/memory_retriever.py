@@ -5,7 +5,7 @@ Extracts and normalizes session, recent, long-term, and pinned memories from AIC
 
 import uuid
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from brain.ai.ai_models import AIContext
 from brain.ai.memory.exceptions import MemoryRetrievalError

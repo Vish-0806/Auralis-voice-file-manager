@@ -7,7 +7,7 @@ recording timestamps, execution duration, outputs, and failure reasons.
 import time
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 from brain.ai.planning.exceptions import ExecutionMonitoringError
 from brain.ai.planning.interfaces import ExecutionMonitorInterface

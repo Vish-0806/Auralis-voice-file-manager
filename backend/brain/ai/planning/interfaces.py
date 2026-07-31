@@ -17,7 +17,6 @@ from brain.ai.planning.planning_models import (
     Plan,
     PlanningGoal,
     PlanStep,
-    StepStatus,
 )
 
 

@@ -8,7 +8,7 @@ Uses dependency injection throughout.
 import logging
 from typing import Any, Dict, List, Optional
 
-from brain.ai.planning.exceptions import PlanValidationError, PlanningException
+from brain.ai.planning.exceptions import PlanningException
 from brain.ai.planning.interfaces import (
     ExecutionMonitorInterface,
     ExecutionPlannerInterface,
