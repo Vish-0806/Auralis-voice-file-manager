@@ -177,8 +177,14 @@ class PathService(IPathService):
         if not path:
             return True
 
-        base = base_dir or self._env_service.get_cwd()
-        abs_base = self.resolve_absolute(base)
+        if base_dir is None:
+            # Check if path itself attempts unconstrained directory traversal (e.g. escaping '..')
+            norm = self.normalize_path(path)
+            if norm.startswith("..") or norm.startswith("\\..") or norm.startswith("/.."):
+                return False
+            return True
+
+        abs_base = self.resolve_absolute(base_dir)
         abs_target = self.resolve_absolute(path, base_dir=abs_base)
 
         target_os = self._detector.detect_os()

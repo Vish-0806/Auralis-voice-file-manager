@@ -257,3 +257,41 @@ def test_filesystem_statistics_frozen() -> None:
     s = FilesystemStatistics(operations_started=10)
     with pytest.raises((TypeError, ValidationError)):
         s.operations_started = 0
+
+
+# ---------------------------------------------------------------------------
+# Phase 11.2 brain.os.filesystem Models Tests
+# ---------------------------------------------------------------------------
+
+def test_os_filesystem_entry_defaults_and_immutability() -> None:
+    from brain.os.filesystem import FilesystemEntry, FilesystemEntryType
+
+    entry = FilesystemEntry(path="/tmp/test.txt", name="test.txt", entry_type=FilesystemEntryType.FILE)
+    assert entry.path == "/tmp/test.txt"
+    assert entry.entry_type == FilesystemEntryType.FILE
+
+    with pytest.raises((TypeError, ValidationError)):
+        entry.name = "other.txt"  # type: ignore
+
+
+def test_os_filesystem_permission_info_defaults_and_immutability() -> None:
+    from brain.os.filesystem import PermissionInfo
+
+    info = PermissionInfo(path="/tmp/test.txt", can_read=True, can_write=True)
+    assert info.can_read is True
+    assert info.can_write is True
+
+    with pytest.raises((TypeError, ValidationError)):
+        info.can_read = False  # type: ignore
+
+
+def test_os_filesystem_capabilities_defaults_and_immutability() -> None:
+    from brain.os.filesystem import FilesystemCapabilities
+
+    caps = FilesystemCapabilities(supports_atomic_writes=True)
+    assert caps.supports_atomic_writes is True
+    assert caps.supports_transactions is True
+
+    with pytest.raises((TypeError, ValidationError)):
+        caps.supports_atomic_writes = False  # type: ignore
+
