@@ -1,4 +1,8 @@
-"""Execution Engine subsystem package for Auralis."""
+"""Brain Execution Engine subsystem package for Auralis (Phase 12.1).
+
+Exports canonical models, exceptions, interfaces, request analyzer, decision engine,
+execution pipeline, execution provider, execution runtime, and legacy background task schedulers.
+"""
 
 from __future__ import annotations
 
@@ -34,30 +38,47 @@ from .decision_engine import (
     DecisionContext,
     DecisionEngine,
     DecisionReason,
-    DecisionType,
-    ExecutionDecision,
+)
+from .exceptions import (
+    ExecutionCancelled,
+    ExecutionException,
+    ExecutionFailure,
+    ExecutionRoutingError,
+    ExecutionValidationError,
 )
 from .execution_context import ExecutionContext
 from .execution_coordinator import ExecutionCoordinator
 from .execution_engine import ExecutionEngine, is_long_running_task
 from .execution_history import ExecutionHistory
-from .execution_models import ExecutionResult, ExecutionStatus, ExecutionStepResult
+from .execution_models import (
+    DecisionType,
+    ExecutionContext as ExecutionContextModel,
+    ExecutionDecision,
+    ExecutionHealth,
+    ExecutionMode,
+    ExecutionRequest,
+    ExecutionResult,
+    ExecutionState,
+    ExecutionStatistics,
+    ExecutionStatus,
+    ExecutionStepResult,
+)
 from .execution_monitor import (
     ExecutionMetrics,
     ExecutionMonitor,
-    ExecutionStatistics,
     ExecutionSummary,
 )
+from .execution_pipeline import ExecutionPipeline
 from .execution_policy import ExecutionPolicy
+from .execution_provider import ExecutionProvider
+from .execution_runtime import ExecutionRuntime, ExecutionRuntimeStatus
 from .execution_scheduler import ExecutionScheduler
 from .execution_session import ExecutionSession
 from .execution_state import (
     ExecutionProgress,
     ExecutionSnapshot,
-    ExecutionState,
     ExecutionStateConfig,
 )
-
 from .execution_state_manager import ExecutionStateManager
 from .execution_step_runner import ExecutionStepRunner
 from .execution_validator import ExecutionValidator
@@ -69,6 +90,13 @@ from .failure_recovery import (
     RecoveryPlan,
     RecoveryStrategy,
 )
+from .interfaces import (
+    IDecisionEngine,
+    IExecutionCoordinator,
+    IExecutionPipeline,
+    IExecutionRuntime,
+    IRequestAnalyzer,
+)
 from .long_running_task_manager import (
     LongRunningTask,
     LongRunningTaskConfig,
@@ -79,11 +107,11 @@ from .long_running_task_manager import (
     TaskPersistenceHook,
 )
 from .models import ExecutionRecord
+from .request_analyzer import RequestAnalyzer
 from .runtime import (
     ExecutionRuntimeCoordinator,
     ExecutionRuntimeHealth,
     ExecutionRuntimeStatistics,
-    ExecutionRuntimeStatus,
     get_execution_runtime,
     reset_execution_runtime,
 )
@@ -95,20 +123,50 @@ from .task_events import (
 )
 
 __all__ = [
+    # Models & Enums
+    "ExecutionRequest",
+    "ExecutionContext",
+    "ExecutionContextModel",
+    "ExecutionDecision",
+    "ExecutionResult",
+    "ExecutionStatistics",
+    "ExecutionHealth",
     "ExecutionStatus",
     "ExecutionStepResult",
-    "ExecutionResult",
+    "ExecutionState",
+    "DecisionType",
+    "ExecutionMode",
+    # Exceptions
+    "ExecutionException",
+    "ExecutionValidationError",
+    "ExecutionRoutingError",
+    "ExecutionFailure",
+    "ExecutionCancelled",
+    # Interfaces
+    "IExecutionCoordinator",
+    "IRequestAnalyzer",
+    "IDecisionEngine",
+    "IExecutionPipeline",
+    "IExecutionRuntime",
+    # Subsystem Core Components
+    "RequestAnalyzer",
+    "DecisionEngine",
+    "DecisionReason",
+    "DecisionContext",
+    "ExecutionPipeline",
+    "ExecutionProvider",
+    "ExecutionRuntime",
+    "ExecutionRuntimeStatus",
+    "get_execution_runtime",
+    "reset_execution_runtime",
+    # Legacy Execution Engine Components
     "ExecutionPolicy",
-    "ExecutionContext",
     "ExecutionSession",
     "ExecutionStepRunner",
     "ExecutionCoordinator",
-    "ExecutionRuntimeStatus",
+    "ExecutionRuntimeCoordinator",
     "ExecutionRuntimeStatistics",
     "ExecutionRuntimeHealth",
-    "ExecutionRuntimeCoordinator",
-    "get_execution_runtime",
-    "reset_execution_runtime",
     "ExecutionRecord",
     "ExecutionHistory",
     "ExecutionValidator",
@@ -116,19 +174,12 @@ __all__ = [
     "ExecutionEngine",
     "is_long_running_task",
     "ExecutionProgress",
-    "ExecutionState",
     "ExecutionSnapshot",
     "ExecutionStateConfig",
     "ExecutionStateManager",
     "ExecutionMetrics",
     "ExecutionSummary",
-    "ExecutionStatistics",
     "ExecutionMonitor",
-    "DecisionType",
-    "DecisionReason",
-    "ExecutionDecision",
-    "DecisionContext",
-    "DecisionEngine",
     "FailureCategory",
     "RecoveryStrategy",
     "FailureAnalysis",
