@@ -2,7 +2,9 @@
 
 from concurrent.futures import ThreadPoolExecutor
 import threading
+# pyrefly: ignore [missing-import]
 import pytest
+# pyrefly: ignore [missing-import]
 from pydantic import ValidationError
 
 from brain.assistant.integration import (
