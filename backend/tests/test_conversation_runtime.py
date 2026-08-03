@@ -1,318 +1,307 @@
-"""Unit tests for ConversationRuntimeCoordinator (Phase 9.1.6)."""
+"""Unit tests for Phase 13.2 – Conversation Runtime."""
 
-from concurrent.futures import ThreadPoolExecutor
-import time
+import threading
 # pyrefly: ignore [missing-import]
 import pytest
+# pyrefly: ignore [missing-import]
+from pydantic import ValidationError
 
-from brain.conversation.context_manager import ConversationContextConfig, ConversationContextManager
-from brain.conversation.conversation_session import ConversationSessionConfig, ConversationSessionManager, ConversationTurn
-from brain.conversation.recovery import ConversationRecoveryConfig, ConversationRecoveryManager, ConversationRecoveryStatus
-from brain.conversation.reference_resolver import ConversationReferenceResolver, ReferenceResolverConfig
-from brain.conversation.runtime import (
-    ConversationRuntimeCoordinator,
+from brain.assistant.conversation import (
+    ContextManager,
+    Conversation,
+    ConversationContext,
+    ConversationException,
+    ConversationHealth,
+    ConversationHistory,
+    ConversationManager,
+    ConversationMessage,
+    ConversationMetadata,
+    ConversationNotFoundError,
+    ConversationParticipant,
+    ConversationProvider,
+    ConversationRuntime,
+    ConversationState,
+    ConversationStateError,
+    ConversationStatistics,
+    ConversationType,
+    HistoryManager,
+    IConversationProvider,
+    MessageRole,
     get_conversation_runtime,
     reset_conversation_runtime,
 )
-from brain.conversation.summarizer import ConversationSummarizer, ConversationSummaryConfig
 
 
 @pytest.fixture(autouse=True)
-def auto_reset_runtime() -> None:
-    """Fixture to ensure runtime singleton is reset before and after every test."""
+def cleanup_singleton():
+    """Ensure clean singleton state before and after each test."""
     reset_conversation_runtime()
     yield
     reset_conversation_runtime()
 
 
-def test_initialization() -> None:
-    """Verifies runtime initialization and status flags."""
-    coordinator = ConversationRuntimeCoordinator()
-    assert coordinator.is_initialized is False
-    assert coordinator.is_shutdown is False
+# ---------------------------------------------------------------------------
+# 1. Immutable Models
+# ---------------------------------------------------------------------------
 
-    res = coordinator.initialize()
-    assert res is True
-    assert coordinator.is_initialized is True
-    assert coordinator.is_shutdown is False
+def test_immutable_models() -> None:
+    """Verify all 8 Pydantic v2 models are frozen and immutable."""
+    meta = ConversationMetadata()
+    part = ConversationParticipant()
+    msg = ConversationMessage()
+    ctx = ConversationContext()
+    hist = ConversationHistory()
+    stats = ConversationStatistics()
+    health = ConversationHealth()
+    conv = Conversation()
+
+    models = [meta, part, msg, ctx, hist, stats, health, conv]
+    for m in models:
+        with pytest.raises((ValidationError, TypeError, AttributeError)):
+            m.conversation_id = "hacked"  # type: ignore[attr-defined]
 
 
-def test_singleton_registration() -> None:
-    """Verifies get_conversation_runtime returns a global singleton instance."""
+# ---------------------------------------------------------------------------
+# 2. Lifecycle & Conversation Creation
+# ---------------------------------------------------------------------------
+
+def test_conversation_creation_and_retrieval() -> None:
+    """Verify creating and retrieving conversations."""
+    runtime = get_conversation_runtime()
+    provider = runtime.get_provider()
+    assert isinstance(provider, ConversationProvider)
+
+    conv = provider.manager.create_conversation(
+        conversation_type=ConversationType.VOICE,
+        title="Voice Session",
+        user_id="usr-123",
+        workspace_id="ws-456",
+    )
+
+    assert conv.conversation_id.startswith("conv-")
+    assert conv.conversation_type == ConversationType.VOICE
+    assert conv.state == ConversationState.ACTIVE
+    assert conv.metadata.title == "Voice Session"
+
+    retrieved = provider.manager.get_conversation(conv.conversation_id)
+    assert retrieved is not None
+    assert retrieved.conversation_id == conv.conversation_id
+
+
+# ---------------------------------------------------------------------------
+# 3. State Transitions
+# ---------------------------------------------------------------------------
+
+def test_state_transitions() -> None:
+    """Verify conversation state transitions (pause, close, archive)."""
+    runtime = get_conversation_runtime()
+    provider = runtime.get_provider()
+    assert isinstance(provider, ConversationProvider)
+
+    conv = provider.manager.create_conversation(title="State Test")
+    conv_id = conv.conversation_id
+
+    # Pause
+    paused = provider.manager.update_state(conv_id, ConversationState.PAUSED)
+    assert paused.state == ConversationState.PAUSED
+
+    # Close
+    closed = provider.manager.close_conversation(conv_id)
+    assert closed.state == ConversationState.CLOSED
+    assert closed.closed_at is not None
+
+    # Archive
+    archived = provider.manager.archive_conversation(conv_id)
+    assert archived.state == ConversationState.ARCHIVED
+
+    # Invalid transition from ARCHIVED to ACTIVE
+    with pytest.raises(ConversationStateError):
+        provider.manager.update_state(conv_id, ConversationState.ACTIVE)
+
+    # Non-existent conversation
+    with pytest.raises(ConversationNotFoundError):
+        provider.manager.update_state("non-existent-id", ConversationState.CLOSED)
+
+
+# ---------------------------------------------------------------------------
+# 4. Message Append & History Retrieval
+# ---------------------------------------------------------------------------
+
+def test_message_append_and_history_retrieval() -> None:
+    """Verify message appending, history retrieval, pagination, and trimming."""
+    runtime = get_conversation_runtime()
+    provider = runtime.get_provider()
+    assert isinstance(provider, ConversationProvider)
+
+    conv = provider.manager.create_conversation(title="History Test")
+    cid = conv.conversation_id
+
+    m1 = provider.history_manager.append_message(cid, MessageRole.USER, "Hello AI")
+    m2 = provider.history_manager.append_message(cid, MessageRole.ASSISTANT, "Hello User")
+    m3 = provider.history_manager.append_message(cid, MessageRole.USER, "How are you?")
+
+    assert m1.content == "Hello AI"
+    assert m2.role == MessageRole.ASSISTANT
+
+    hist = provider.history_manager.get_history(cid)
+    assert hist.total_messages == 3
+    assert len(hist.messages) == 3
+
+    # Pagination: limit=2, offset=1
+    page = provider.history_manager.get_history(cid, limit=2, offset=1)
+    assert len(page.messages) == 2
+    assert page.messages[0].content == "Hello User"
+    assert page.messages[1].content == "How are you?"
+
+    # Trimming
+    trimmed_hist = provider.history_manager.trim_history(cid, max_messages=2)
+    assert trimmed_hist.trimmed is True
+    assert len(trimmed_hist.messages) == 2
+    assert trimmed_hist.messages[0].content == "Hello User"
+
+
+# ---------------------------------------------------------------------------
+# 5. Context Updates & Topic Management
+# ---------------------------------------------------------------------------
+
+def test_context_updates() -> None:
+    """Verify context topic updates and context dictionary merges."""
+    runtime = get_conversation_runtime()
+    provider = runtime.get_provider()
+    assert isinstance(provider, ConversationProvider)
+
+    conv = provider.manager.create_conversation(title="Context Test")
+    cid = conv.conversation_id
+
+    # Topic
+    ctx1 = provider.context_manager.set_topic(cid, "File Management")
+    assert ctx1.current_topic == "File Management"
+
+    # Execution context merge
+    ctx2 = provider.context_manager.merge_execution_context(cid, {"task_id": "t-100", "step": 2})
+    assert ctx2.execution_context["task_id"] == "t-100"
+
+    # Assistant context merge
+    ctx3 = provider.context_manager.merge_assistant_context(cid, {"model": "gemini-3.6"})
+    assert ctx3.assistant_context["model"] == "gemini-3.6"
+
+    # Variable update
+    ctx4 = provider.context_manager.update_variables(cid, {"user_pref": "dark_mode"})
+    assert ctx4.variables["user_pref"] == "dark_mode"
+
+
+# ---------------------------------------------------------------------------
+# 6. Statistics & Health Reporting
+# ---------------------------------------------------------------------------
+
+def test_statistics_and_health() -> None:
+    """Verify real-time health checks and aggregate statistics."""
+    runtime = get_conversation_runtime()
+    provider = runtime.get_provider()
+    assert isinstance(provider, ConversationProvider)
+
+    c1 = provider.manager.create_conversation(title="Stats Conv 1")
+    c2 = provider.manager.create_conversation(title="Stats Conv 2")
+    provider.history_manager.append_message(c1.conversation_id, MessageRole.USER, "Test 1")
+    provider.history_manager.append_message(c1.conversation_id, MessageRole.ASSISTANT, "Test 2")
+    provider.manager.close_conversation(c2.conversation_id)
+
+    stats = runtime.get_statistics()
+    assert stats.total_conversations_created == 2
+    assert stats.active_conversations == 1
+    assert stats.closed_conversations == 1
+    assert stats.total_messages_processed == 2
+
+    health = runtime.get_health()
+    assert health.healthy is True
+    assert health.status == "READY"
+
+
+# ---------------------------------------------------------------------------
+# 7. Singleton Identity & Reset
+# ---------------------------------------------------------------------------
+
+def test_singleton_identity() -> None:
+    """Verify get_conversation_runtime identity and reset_conversation_runtime."""
     rt1 = get_conversation_runtime()
     rt2 = get_conversation_runtime()
-
     assert rt1 is rt2
     assert rt1.is_initialized is True
 
-
-def test_duplicate_initialization() -> None:
-    """Verifies initialization is idempotent and duplicate initialization is handled cleanly."""
-    coordinator = ConversationRuntimeCoordinator()
-    coordinator.initialize()
-
-    res = coordinator.initialize()
-    assert res is True
-    assert coordinator.is_initialized is True
+    reset_conversation_runtime()
+    rt3 = get_conversation_runtime()
+    assert rt3 is not rt1
+    assert rt3.is_initialized is True
 
 
-def test_shutdown() -> None:
-    """Verifies runtime shutdown procedure."""
-    coordinator = ConversationRuntimeCoordinator()
-    coordinator.initialize()
-
-    res = coordinator.shutdown()
-    assert res is True
-    assert coordinator.is_shutdown is True
-    assert coordinator.is_initialized is False
-
-
-def test_health_checks() -> None:
-    """Verifies health check reporting structure and status."""
-    coordinator = ConversationRuntimeCoordinator()
-    coordinator.initialize()
-
-    health = coordinator.health_check()
-    assert health["overall_status"] == "HEALTHY"
-    assert len(health["registered_services"]) == 5
-    assert health["active_sessions"] == 0
-    assert health["active_contexts"] == 0
-    assert health["active_summaries"] == 0
-    assert health["pending_recoveries"] == 0
-    assert health["thread_safety_status"] == "PROTECTED"
-
-
-def test_runtime_statistics() -> None:
-    """Verifies runtime statistics diagnostics generation."""
-    coordinator = ConversationRuntimeCoordinator()
-    coordinator.initialize()
-
-    stats = coordinator.runtime_statistics()
-    assert stats["service_count"] == 5
-    assert len(stats["registered_components"]) == 5
-    assert "session_statistics" in stats
-    assert "context_statistics" in stats
-    assert "summary_statistics" in stats
-    assert "recovery_statistics" in stats
-    assert stats["uptime"] >= 0.0
-
-
-def test_dependency_injection() -> None:
-    """Verifies passing custom manager instances to constructor."""
-    custom_session_mgr = ConversationSessionManager()
-    coordinator = ConversationRuntimeCoordinator(session_manager=custom_session_mgr)
-
-    assert coordinator.session_manager is custom_session_mgr
-
-
-def test_service_lookup() -> None:
-    """Verifies access to all 5 registered conversation managers."""
-    coordinator = ConversationRuntimeCoordinator()
-
-    assert isinstance(coordinator.session_manager, ConversationSessionManager)
-    assert isinstance(coordinator.context_manager, ConversationContextManager)
-    assert isinstance(coordinator.reference_resolver, ConversationReferenceResolver)
-    assert isinstance(coordinator.summarizer, ConversationSummarizer)
-    assert isinstance(coordinator.recovery_manager, ConversationRecoveryManager)
-
-
-def test_startup_integration() -> None:
-    """Simulates application startup integration."""
-    rt = get_conversation_runtime()
-    assert rt.is_initialized is True
-    health = rt.health_check()
-    assert health["overall_status"] == "HEALTHY"
-
-
-def test_shutdown_integration() -> None:
-    """Simulates application shutdown integration."""
-    rt = get_conversation_runtime()
-    rt.shutdown()
-
-    health = rt.health_check()
-    assert health["overall_status"] == "SHUTDOWN"
-
-
-def test_diagnostics() -> None:
-    """Verifies detailed breakdown in runtime statistics."""
-    coordinator = ConversationRuntimeCoordinator()
-    coordinator.initialize()
-
-    coordinator.session_manager.create_session(user_id="u1", session_id="s1")
-    coordinator.context_manager.create_context("s1")
-
-    stats = coordinator.runtime_statistics()
-    assert stats["session_statistics"]["active_sessions"] == 1
-    assert stats["context_statistics"]["total_contexts"] == 1
-
-
-def test_active_sessions() -> None:
-    """Verifies active session count tracking in health checks."""
-    coordinator = ConversationRuntimeCoordinator()
-    coordinator.initialize()
-
-    coordinator.session_manager.create_session("u1", session_id="s1")
-    coordinator.session_manager.create_session("u2", session_id="s2")
-
-    health = coordinator.health_check()
-    assert health["active_sessions"] == 2
-
-
-def test_active_contexts() -> None:
-    """Verifies active context count tracking in health checks."""
-    coordinator = ConversationRuntimeCoordinator()
-    coordinator.initialize()
-
-    coordinator.context_manager.create_context("s1")
-
-    health = coordinator.health_check()
-    assert health["active_contexts"] == 1
-
-
-def test_summaries() -> None:
-    """Verifies active summary count tracking in health checks."""
-    coordinator = ConversationRuntimeCoordinator()
-    coordinator.initialize()
-
-    turns = [ConversationTurn(turn_id="t1", role="user", content="Hi")]
-    coordinator.summarizer.create_summary("s1", turns)
-
-    health = coordinator.health_check()
-    assert health["active_summaries"] == 1
-
-
-def test_recovery_services() -> None:
-    """Verifies pending recovery count tracking in health checks."""
-    coordinator = ConversationRuntimeCoordinator()
-    coordinator.initialize()
-
-    coordinator.recovery_manager.create_recovery_record("s1")
-
-    health = coordinator.health_check()
-    assert health["pending_recoveries"] == 1
-
+# ---------------------------------------------------------------------------
+# 8. Thread Safety
+# ---------------------------------------------------------------------------
 
 def test_thread_safety() -> None:
-    """Verifies thread safety during concurrent initialization, health checks, and statistics generation."""
-    coordinator = ConversationRuntimeCoordinator()
+    """Verify thread-safe concurrent conversation creation and message appending."""
+    runtime = get_conversation_runtime()
+    provider = runtime.get_provider()
+    assert isinstance(provider, ConversationProvider)
+
+    errors = []
 
     def worker(idx: int) -> None:
-        coordinator.initialize()
-        coordinator.health_check()
-        coordinator.runtime_statistics()
+        try:
+            conv = provider.manager.create_conversation(title=f"Thread Conv {idx}")
+            for i in range(10):
+                provider.history_manager.append_message(
+                    conv.conversation_id, MessageRole.USER, f"Msg {i} from thread {idx}"
+                )
+                provider.context_manager.update_variables(conv.conversation_id, {"idx": idx})
+        except Exception as exc:
+            errors.append(exc)
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = [executor.submit(worker, i) for i in range(50)]
-        for f in futures:
-            f.result()
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
 
-    assert coordinator.is_initialized is True
-
-
-def test_repeated_shutdown() -> None:
-    """Verifies calling shutdown multiple times is safe and returns True."""
-    coordinator = ConversationRuntimeCoordinator()
-    coordinator.initialize()
-
-    assert coordinator.shutdown() is True
-    assert coordinator.shutdown() is True
-    assert coordinator.is_shutdown is True
-
-
-def test_repeated_startup() -> None:
-    """Verifies re-initializing runtime after shutdown works cleanly."""
-    coordinator = ConversationRuntimeCoordinator()
-    coordinator.initialize()
-    coordinator.shutdown()
-
-    res = coordinator.initialize()
-    assert res is True
-    assert coordinator.is_initialized is True
-    assert coordinator.is_shutdown is False
+    assert len(errors) == 0
+    stats = runtime.get_statistics()
+    assert stats.total_conversations_created == 10
+    assert stats.total_messages_processed == 100
 
 
-def test_configuration() -> None:
-    """Verifies custom configuration objects are passed to internal managers."""
-    session_cfg = ConversationSessionConfig(maximum_sessions=10)
-    context_cfg = ConversationContextConfig(maximum_contexts=10)
+# ---------------------------------------------------------------------------
+# 9. Dependency Injection
+# ---------------------------------------------------------------------------
 
-    coordinator = ConversationRuntimeCoordinator(
-        session_config=session_cfg, context_config=context_cfg
+def test_dependency_injection() -> None:
+    """Verify constructor dependency injection for managers."""
+    custom_manager = ConversationManager()
+    custom_history = HistoryManager()
+    custom_context = ContextManager()
+
+    provider = ConversationProvider(
+        manager=custom_manager,
+        history_manager=custom_history,
+        context_manager=custom_context,
     )
+    runtime = ConversationRuntime(provider=provider)
+    runtime.initialize()
 
-    assert coordinator.session_manager.config.maximum_sessions == 10
-    assert coordinator.context_manager.config.maximum_contexts == 10
-
-
-def test_graceful_failures() -> None:
-    """Verifies operations on uninitialized runtime handle status gracefully."""
-    coordinator = ConversationRuntimeCoordinator()
-    # Uninitialized coordinator health check returns NOT_INITIALIZED
-    health = coordinator.health_check()
-    assert health["overall_status"] == "NOT_INITIALIZED"
+    assert provider.manager is custom_manager
+    assert provider.history_manager is custom_history
+    assert provider.context_manager is custom_context
 
 
-def test_runtime_reset() -> None:
-    """Verifies reset_conversation_runtime resets global singleton instance."""
-    rt1 = get_conversation_runtime()
-    reset_conversation_runtime()
-    rt2 = get_conversation_runtime()
-
-    assert rt1 is not rt2
-
-
-def test_service_availability() -> None:
-    """Verifies all 5 conversation services are available and operational."""
-    rt = get_conversation_runtime()
-
-    session = rt.session_manager.create_session("u1")
-    context = rt.context_manager.create_context(session.session_id)
-    cand = rt.reference_resolver.register_entity("e1", display_name="Doc 1")
-    summary = rt.summarizer.create_summary(session.session_id, [])
-    recovery = rt.recovery_manager.create_recovery_record(session.session_id)
-
-    assert session is not None
-    assert context is not None
-    assert cand is not None
-    assert summary is not None
-    assert recovery is not None
-
-
-def test_lifecycle() -> None:
-    """Verifies complete runtime lifecycle: startup -> usage -> health -> shutdown."""
-    coordinator = ConversationRuntimeCoordinator()
-
-    # Startup
-    coordinator.initialize()
-    assert coordinator.is_initialized is True
-
-    # Usage
-    s = coordinator.session_manager.create_session("user1")
-    coordinator.context_manager.create_context(s.session_id)
-
-    # Health & Stats
-    health = coordinator.health_check()
-    assert health["overall_status"] == "HEALTHY"
-    stats = coordinator.runtime_statistics()
-    assert stats["session_statistics"]["active_sessions"] == 1
-
-    # Shutdown
-    coordinator.shutdown()
-    assert coordinator.is_shutdown is True
-
+# ---------------------------------------------------------------------------
+# 10. Backward Compatibility
+# ---------------------------------------------------------------------------
 
 def test_backward_compatibility() -> None:
-    """Verifies no breaking changes to existing brain conversation package imports."""
-    from brain.conversation import (
-        ConversationContext,
-        ConversationRecoveryRecord,
-        ConversationReferenceResolver,
-        ConversationSession,
-        ConversationSessionStatus,
-        ConversationSummarizer,
-        ConversationTurn,
-        get_conversation_runtime,
-    )
+    """Verify Phase 9 AssistantRuntime continues operating alongside ConversationRuntime."""
+    from brain.runtime import AssistantRuntime as Phase9Runtime
 
-    rt = get_conversation_runtime()
-    assert rt is not None
+    p9 = Phase9Runtime()
+    assert p9.initialize() is True
+    res = p9.process_request("hello world")
+    assert res.success is True
+    assert p9.shutdown() is True

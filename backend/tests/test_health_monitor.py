@@ -3,7 +3,7 @@
 # pyrefly: ignore [missing-import]
 import pytest
 from brain.runtime import (
-    BrainRuntimeHealth, DependencyRegistry, HealthMonitor,
+    BrainRuntimeHealth, DependencyRegistry, HealthMonitor, LifecycleManager,
     RuntimeComponent, SubsystemHealth,
 )
 
@@ -11,8 +11,9 @@ from brain.runtime import (
 @pytest.fixture
 def registry() -> DependencyRegistry:
     reg = DependencyRegistry()
-    # Populate with auto-discovered real runtimes
+    # Populate with auto-discovered real runtimes and initialize
     reg.resolve_all()
+    LifecycleManager(reg).initialize_all()
     return reg
 
 

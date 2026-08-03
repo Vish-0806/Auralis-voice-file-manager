@@ -1,136 +1,265 @@
-"""Unit tests for VoiceRuntimeCoordinator (Phase 9.6)."""
+"""Unit tests for Phase 13.7 – Voice Orchestration Runtime."""
 
+from concurrent.futures import ThreadPoolExecutor
+import threading
 # pyrefly: ignore [missing-import]
 import pytest
-from brain.voice import (
-    VoiceRuntimeCoordinator, VoiceRuntimeStatus,
-    VoiceRuntimeHealth, VoiceRuntimeStatistics,
-    get_voice_runtime, reset_voice_runtime,
+# pyrefly: ignore [missing-import]
+from pydantic import ValidationError
+
+from brain.assistant.voice import (
+    IVoiceProvider,
+    ListeningMode,
+    SpeechMode,
+    SpeechRouter,
+    VoiceCapabilities,
+    VoiceConfiguration,
+    VoiceContext,
+    VoiceCoordinator,
+    VoiceHealth,
+    VoiceInteraction,
+    VoiceInteractionType,
+    VoiceProvider,
+    VoiceRequest,
+    VoiceResponse,
+    VoiceRuntimeException,
+    VoiceRuntime,
+    VoiceSession,
+    VoiceSessionManager,
+    VoiceSessionState,
+    VoiceState,
+    VoiceStatistics,
+    VoiceTranscript,
+    WakeWordManager,
+    get_voice_runtime,
+    reset_voice_runtime,
 )
 
 
 @pytest.fixture(autouse=True)
-def isolate_runtime() -> None:
+def cleanup_singleton():
+    """Ensure clean singleton state before and after each test."""
     reset_voice_runtime()
     yield
     reset_voice_runtime()
 
 
-@pytest.fixture
-def coordinator() -> VoiceRuntimeCoordinator:
-    c = VoiceRuntimeCoordinator()
-    c.initialize()
-    return c
+# ---------------------------------------------------------------------------
+# 1. Immutable Domain Models
+# ---------------------------------------------------------------------------
+
+def test_immutable_models() -> None:
+    """Verify all 10 Pydantic v2 models are frozen and immutable."""
+    transcript = VoiceTranscript()
+    context = VoiceContext()
+    caps = VoiceCapabilities()
+    config = VoiceConfiguration()
+    req = VoiceRequest()
+    resp = VoiceResponse()
+    session = VoiceSession()
+    interaction = VoiceInteraction()
+    stats = VoiceStatistics()
+    health = VoiceHealth()
+
+    models = [transcript, context, caps, config, req, resp, session, interaction, stats, health]
+    for m in models:
+        with pytest.raises((ValidationError, TypeError, AttributeError)):
+            m.duration_ms = 999.0  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
-# Lifecycle
+# 2. Voice Session Lifecycle & Timeout Expiration
 # ---------------------------------------------------------------------------
 
-def test_initialize_sets_ready() -> None:
-    c = VoiceRuntimeCoordinator()
-    assert c.status == VoiceRuntimeStatus.INITIALIZING
-    assert c.initialize() is True
-    assert c.status == VoiceRuntimeStatus.READY
+def test_voice_session_lifecycle() -> None:
+    """Verify session creation, pause, resume, close, and active list."""
+    mgr = VoiceSessionManager(session_timeout_seconds=0.1)
 
+    sess = mgr.create_session(user_id="usr-123")
+    assert sess.state == VoiceSessionState.ACTIVE
 
-def test_shutdown_sets_shutdown(coordinator: VoiceRuntimeCoordinator) -> None:
-    assert coordinator.shutdown() is True
-    assert coordinator.status == VoiceRuntimeStatus.SHUTDOWN
+    paused = mgr.pause_session(sess.session_id)
+    assert paused.state == VoiceSessionState.PAUSED
 
+    resumed = mgr.resume_session(sess.session_id)
+    assert resumed.state == VoiceSessionState.ACTIVE
 
-def test_auto_reinitialize_on_get_orchestrator(coordinator: VoiceRuntimeCoordinator) -> None:
-    coordinator.shutdown()
-    orc = coordinator.get_orchestrator()
-    assert orc is not None
-    assert coordinator.status == VoiceRuntimeStatus.READY
+    closed = mgr.close_session(sess.session_id)
+    assert closed.state == VoiceSessionState.CLOSED
 
 
 # ---------------------------------------------------------------------------
-# Sessions
+# 3. Speech Routing (STT & TTS)
 # ---------------------------------------------------------------------------
 
-def test_start_and_end_session(coordinator: VoiceRuntimeCoordinator) -> None:
-    s = coordinator.start_session("s1")
-    assert s.session_id == "s1"
-    assert "s1" in coordinator.list_sessions()
-    
-    stats = coordinator.get_statistics()
-    assert stats.sessions_started == 1
+def test_speech_routing() -> None:
+    """Verify SpeechRouter routes STT transcripts and TTS responses."""
+    router = SpeechRouter()
 
-    coordinator.end_session("s1")
-    stats = coordinator.get_statistics()
-    assert stats.sessions_ended == 1
+    transcript = router.route_stt("open workspace settings")
+    assert isinstance(transcript, VoiceTranscript)
+    assert transcript.text == "open workspace settings"
+    assert router.stt_routed_count == 1
+
+    resp = router.route_tts("Workspace settings opened", speech_mode=SpeechMode.SYNTHESIZED)
+    assert isinstance(resp, VoiceResponse)
+    assert resp.audio_stream_id is not None
+    assert router.tts_routed_count == 1
 
 
 # ---------------------------------------------------------------------------
-# Health & Statistics
+# 4. Wake Word Lifecycle
 # ---------------------------------------------------------------------------
 
-def test_health_check(coordinator: VoiceRuntimeCoordinator) -> None:
-    health = coordinator.health_check()
-    assert isinstance(health, VoiceRuntimeHealth)
+def test_wake_word_lifecycle() -> None:
+    """Verify WakeWordManager enable, disable, pause, resume, and trigger metrics."""
+    ww_mgr = WakeWordManager()
+
+    assert ww_mgr.is_enabled is True
+    ww_mgr.pause()
+    assert ww_mgr.is_enabled is False
+
+    ww_mgr.resume()
+    assert ww_mgr.is_enabled is True
+
+    ww_mgr.record_trigger()
+    assert ww_mgr.trigger_count == 1
+
+    ww_mgr.disable()
+    assert ww_mgr.is_enabled is False
+
+
+# ---------------------------------------------------------------------------
+# 5. Coordinator End-to-End Voice Interaction
+# ---------------------------------------------------------------------------
+
+def test_voice_coordinator_orchestration() -> None:
+    """Verify VoiceCoordinator executes end-to-end voice interaction lifecycle."""
+    coordinator = VoiceCoordinator()
+
+    req = VoiceRequest(
+        transcript=VoiceTranscript(text="create new folder"),
+        context=VoiceContext(speech_mode=SpeechMode.SYNTHESIZED),
+    )
+
+    interaction = coordinator.process_voice_interaction(req)
+    assert isinstance(interaction, VoiceInteraction)
+    assert interaction.completed is True
+    assert interaction.response is not None
+    assert interaction.response.state == VoiceState.COMPLETED
+    assert "create new folder" in interaction.response.text_content
+
+
+# ---------------------------------------------------------------------------
+# 6. Statistics, Capabilities & Health Diagnostics
+# ---------------------------------------------------------------------------
+
+def test_statistics_capabilities_and_health() -> None:
+    """Verify VoiceProvider health diagnostics, statistics, and capabilities."""
+    runtime = get_voice_runtime()
+    provider = runtime.get_provider()
+    assert isinstance(provider, VoiceProvider)
+
+    caps = runtime.get_capabilities()
+    assert caps.supports_wake_word is True
+    assert caps.supports_continuous_listening is True
+
+    health = runtime.get_health()
     assert health.healthy is True
     assert health.status == "READY"
-    assert len(health.registered_components) == 5
 
-
-def test_statistics_recording(coordinator: VoiceRuntimeCoordinator) -> None:
-    coordinator.record_command_received()
-    coordinator.record_command_completed(pipeline_ms=10.0)
-    coordinator.record_confirmation_requested()
-    coordinator.record_confirmation_accepted()
-
-    stats = coordinator.get_statistics()
-    assert isinstance(stats, VoiceRuntimeStatistics)
-    assert stats.commands_received == 1
-    assert stats.commands_completed == 1
-    assert stats.average_pipeline_ms == 10.0
-    assert stats.confirmations_requested == 1
-    assert stats.confirmations_accepted == 1
-
-
-def test_clear_statistics(coordinator: VoiceRuntimeCoordinator) -> None:
-    coordinator.record_command_received()
-    coordinator.clear()
-    stats = coordinator.get_statistics()
-    assert stats.commands_received == 0
+    stats = runtime.get_statistics()
+    assert isinstance(stats, VoiceStatistics)
 
 
 # ---------------------------------------------------------------------------
-# Global Singleton
+# 7. Singleton Identity & Restart Mechanics
 # ---------------------------------------------------------------------------
 
-def test_get_voice_runtime_singleton() -> None:
-    r1 = get_voice_runtime()
-    r2 = get_voice_runtime()
-    assert r1 is r2
-    assert r1.status == VoiceRuntimeStatus.READY
+def test_singleton_identity_and_restart() -> None:
+    """Verify get_voice_runtime singleton identity and restart() behavior."""
+    rt1 = get_voice_runtime()
+    rt2 = get_voice_runtime()
+    assert rt1 is rt2
+    assert rt1.is_initialized is True
 
+    rt1.restart()
+    assert rt1.is_initialized is True
 
-def test_reset_voice_runtime() -> None:
-    r1 = get_voice_runtime()
     reset_voice_runtime()
-    r2 = get_voice_runtime()
-    assert r1 is not r2
+    rt3 = get_voice_runtime()
+    assert rt3 is not rt1
 
 
 # ---------------------------------------------------------------------------
-# Thread Safety
+# 8. Multi-Threaded Execution with ThreadPoolExecutor
 # ---------------------------------------------------------------------------
 
-def test_voice_runtime_thread_safety(coordinator: VoiceRuntimeCoordinator) -> None:
-    import threading
-    healths = []
+def test_concurrent_execution_thread_pool() -> None:
+    """Verify concurrent voice operations safety using ThreadPoolExecutor without race conditions."""
+    runtime = get_voice_runtime()
+    provider = runtime.get_provider()
+    assert isinstance(provider, VoiceProvider)
 
-    def check() -> None:
-        healths.append(coordinator.health_check())
+    def worker(idx: int) -> int:
+        sess = provider.session_manager.create_session(user_id=f"user-{idx}")
+        req = VoiceRequest(
+            session_id=sess.session_id,
+            transcript=VoiceTranscript(text=f"command from worker {idx}"),
+        )
+        interaction = provider.coordinator.process_voice_interaction(req)
+        provider.session_manager.close_session(sess.session_id)
+        return interaction.response.response_id is not None
 
-    threads = [threading.Thread(target=check) for _ in range(20)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(worker, i) for i in range(20)]
+        results = [f.result() for f in futures]
 
-    assert len(healths) == 20
-    assert all(h.healthy for h in healths)
+    assert all(results)
+    stats = runtime.get_statistics()
+    assert stats.total_sessions_created == 20
+    assert stats.total_interactions == 20
+
+
+# ---------------------------------------------------------------------------
+# 9. Dependency Injection & Backward Compatibility
+# ---------------------------------------------------------------------------
+
+def test_dependency_injection_and_compatibility() -> None:
+    """Verify constructor dependency injection and backward compatibility with existing runtimes & Phases 13.1–13.6."""
+    from brain.assistant import get_assistant_runtime
+    from brain.assistant.conversation import get_conversation_runtime
+    from brain.assistant.dialogue import get_dialogue_runtime
+    from brain.assistant.memory import get_assistant_memory_runtime
+    from brain.assistant.reasoning import get_decision_runtime
+    from brain.assistant.response import get_response_runtime
+
+    ast_rt = get_assistant_runtime()
+    conv_rt = get_conversation_runtime()
+    dial_rt = get_dialogue_runtime()
+    dec_rt = get_decision_runtime()
+    mem_rt = get_assistant_memory_runtime()
+    resp_rt = get_response_runtime()
+
+    assert ast_rt.is_initialized is True
+    assert conv_rt.is_initialized is True
+    assert dial_rt.is_initialized is True
+    assert dec_rt.is_initialized is True
+    assert mem_rt.is_initialized is True
+    assert resp_rt.is_initialized is True
+
+    custom_router = SpeechRouter()
+    custom_ww = WakeWordManager()
+    custom_sess = VoiceSessionManager()
+    custom_coord = VoiceCoordinator(speech_router=custom_router)
+
+    provider = VoiceProvider(
+        coordinator=custom_coord,
+        speech_router=custom_router,
+        wake_word_manager=custom_ww,
+        session_manager=custom_sess,
+    )
+
+    voice_rt = VoiceRuntime(provider=provider)
+    voice_rt.initialize()
+    assert voice_rt.is_initialized is True

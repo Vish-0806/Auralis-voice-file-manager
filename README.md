@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/Vish-0806/Auralis-voice-file-manager"><img src="https://img.shields.io/badge/status-active-brightgreen?style=flat-square" alt="Status"></a>
-  <a href="https://github.com/Vish-0806/Auralis-voice-file-manager/releases"><img src="https://img.shields.io/badge/version-1.5.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/Vish-0806/Auralis-voice-file-manager/releases"><img src="https://img.shields.io/badge/version-1.7.0-blue?style=flat-square" alt="Version"></a>
   <a href="file:///d:/Auralis-voice-file-manager/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/python-3.13-blue?style=flat-square" alt="Python"></a>
   <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-0.136.1-red?style=flat-square" alt="FastAPI"></a>
@@ -37,10 +37,16 @@ Auralis offers a broad set of capabilities designed for productivity and ease of
 | Feature | Capability | Description |
 | :--- | :--- | :--- |
 | **Voice Interaction** | Wake Word & Speech-to-Text | Activate the assistant hands-free and issue spoken commands with natural voice feedback. |
+| **Assistant Architecture** | 8-Stage Integration Gateway | Provider-independent Assistant Runtime Platform coordinating Conversation, Dialogue, Decision, Memory, Response, Voice, Proactive, and System runtimes. |
 | **AI Conversation** | Contextual Intent Parsing | Recognizes natural language, resolving fuzzy commands, relative dates, and implied locations. |
+| **Dialogue Management** | State Machine & Turn Tracking | Manages dialogue sessions, turn transitions (`IDLE` → `PROCESSING` → `RESPONDING`), clarification prompts, and user confirmation loops. |
+| **Decision & Reasoning** | Deterministic Candidate Routing | Evaluates request candidates, confidence thresholds, and priority scoring without LLM overhead. |
 | **Reference Resolution** | Pre-Planning Entity Mapping | Automatically resolves pronouns (`it`, `them`) and spatial references (`same folder`, `same app`) before goal interpretation. |
-| **Context Aggregation** | ContextBuilder & ContextWindow | Assembles recent conversations, executions, latest state, preferences, and workspace context with configurable window limits. |
+| **Context Aggregation** | ContextBuilder & Working Memory | Assembles recent conversations, executions, latest state, preferences, and workspace context into working memory snapshots. |
 | **Memory Ranking** | Relevance Scoring Engine | Scores memories by exponential recency decay, session affinity, workspace path match, and keyword/verb similarity. |
+| **Response Generation** | Stream & Format Assembly | Formats assistant replies (Markdown, Plain Text, JSON) and manages ordered chunk stream partitioning. |
+| **Voice Orchestration** | Session & Wake-Word Routing | Top-level voice session coordinator managing wake-word routing, speech pipeline hooks, and audio interaction states. |
+| **Proactive Assistant** | Recommendations & Notifications | Deterministic recommendation engine scoring suggestions, enforcing cooldowns, suppressing duplicates, and managing assistant-level notifications. |
 | **File Intelligence** | Intelligent File Operations | Move, copy, create, and organize files dynamically using flexible names and targets. |
 | **Desktop Automation** | GUI & System Controls | Launch applications, control window layouts, and execute basic system settings changes. |
 | **Developer Assistant** | Terminal & Git Management | Run backends, commit changes, parse terminal errors, and run local testing scripts. |
@@ -48,9 +54,6 @@ Auralis offers a broad set of capabilities designed for productivity and ease of
 | **Semantic Search** | Vector-Based Discovery | Find files based on meaning, topic, or content rather than just matching exact filenames. |
 | **Workflow Automation** | Multi-Step Chains | Combine multiple operations (e.g., "Clean my desktop and backup active projects") into single commands. |
 | **Autonomous Routines** | Pattern Mining & Execution | Automatically discovers repeated user workflows, recommends routine creation, and schedules background execution. |
-| **Proactive Assistant** | Predictive Action Suggestions | Predicts likely next user actions using historical activity analysis and deterministic scoring without LLM overhead. |
-| **Conversational Intelligence** | Multi-Turn Dialog & Entity Linking | Resolves ambiguity across turns, links entities, and manages clarification requests and dialogue recovery. |
-| **Memory Engine** | Tiered Memory & Persistence | Manages short-term context, workspace profiles, user preferences, n-gram routine mining, and PostgreSQL ORM storage. |
 | **Privacy First** | Local Execution | Keeps your files, voice data, and operational logs securely on your local system. |
 
 ---
@@ -71,27 +74,11 @@ Auralis Version 1.0.0 implements the complete Phase 5 **AI Brain Orchestration**
 
 Auralis Version 1.2.0 implements Phase 4 **Advanced Memory Retrieval API**, **Context Builder**, **Brain Memory Integration**, **Reference Resolution**, **Memory Ranking**, and **Context Window Management**.
 
-### Key Additions:
-1. **Active PostgreSQL Provider**: Production-grade ORM repositories (`ConversationRepository`, `ExecutionRepository`, `ContextRepository`, `PreferenceRepository`, `MemoryEventRepository`) with session scopes and transaction safety.
-2. **ContextBuilder**: Assembles an `AssistantContext` domain model containing recent conversations, execution history, latest context state, user preferences, and workspace profiles.
-3. **Brain Memory Integration**: Retrieves and attaches `AssistantContext` to `BrainController.process_request` with failure-resilient fallbacks and structured logging.
-4. **Reference Resolution**: Created `ReferenceResolver` to parse and resolve conversational references (`it`, `them`, `this`, `that`, `previous`, `same folder`, `same app`) prior to goal planning.
-5. **Memory Ranking**: Created `MemoryRanker` scoring memories using exponential recency decay, session affinity, workspace path matches, entity token overlap, and command verb similarity.
-6. **Context Window Management**: Configures retrieval limits (`short_term_limit`, `long_term_limit`, `session_limit`) via `ContextWindowConfig` and enables high-performance `session_only` context loading.
-
 ---
 
 ## Workspace Intelligence & Awareness Integration (v1.3.0)
 
 Auralis Version 1.3.0 implements the complete **Workspace Intelligence Subsystem** including **Workspace Discovery**, **Workspace Indexer**, **Project Intelligence Engine**, **Workspace Analysis**, **Workspace Cache & Coordinator**, and **Brain Awareness Integration**.
-
-### Key Additions:
-1. **Workspace Discovery Engine**: Asynchronously discovers candidate workspace folders inside user search roots while skipping ignored configurations and duplicate nested project paths.
-2. **Dynamic FS Indexer**: Traverses workspace directories asynchronously to index folder stats and file trees.
-3. **Project Intelligence**: Detects dominant programming languages, build tools, recommended build commands, and Git branches/dirty status.
-4. **Thread-Safe Cache & Coordinator**: Serializes path scans and caches the compiled analysis records for 5 minutes (`300.0` seconds) to avoid duplicate file crawlers.
-5. **ContextBuilder Integration**: Aggregates the `WorkspaceAnalysis` domain model directly into `AssistantContext` using safe fallback error envelopes.
-6. **BrainController Workspace Awareness**: Resolves concise summaries (Language, Build, Project, Branch) and attaches them to `BrainResponse` objects to feed downstream reasoning pipelines.
 
 ---
 
@@ -99,25 +86,11 @@ Auralis Version 1.3.0 implements the complete **Workspace Intelligence Subsystem
 
 Auralis Version 1.4.0 implements the complete Phase 6 **Intelligent Planning & Reasoning Engine** including **Goal Decomposition**, **Workflow Library**, **Workflow Matcher**, **Workflow Composer**, and **Plan Optimizer**.
 
-### Key Additions:
-1. **Goal Decomposition Engine**: Created `GoalDecomposer`, rules-driven `DecompositionRules`, and DFS cycle-safe `DecompositionValidator` to map Reasoning results into validated, nested `ObjectiveGraph` models.
-2. **Workflow Library**: Created `WorkflowLibrary` wrapping `WorkflowRegistry` to dynamically register and index workflows with rich metadata, tags, and interface signatures.
-3. **Workflow Matcher**: Created deterministic `WorkflowMatcher` scoring matches by exact goal, name, intent, tags, and signatures, ranking results by normalized confidence values.
-4. **Workflow Composer**: Created `WorkflowComposer` merging library workflows and dynamic steps into unified, cycle-safe sequences while resolving parameters, exclusive actions, and ordering cycles.
-5. **Plan Optimizer**: Created production-grade `PlanOptimizer` executing deduplications, redundant preparation eliminations, parallel depth groupings, and time-reduction metrics.
-6. **Integrated Validation**: Added a comprehensive integration test suite verifying that all planning components participate correctly in the pipeline.
-
 ---
 
 ## Autonomous Routine & Proactive Assistant Engine (v1.5.0)
 
 Auralis Version 1.5.0 implements the complete **Autonomous Routine Engine**, **Proactive Assistant Engine**, and **Conversational Intelligence Engine**.
-
-### Key Additions:
-1. **Autonomous Routine Engine (Phase 7.4)**: Automatically discovers repeated user behavior, converts repeated execution patterns into reusable routines, safely recommends routine creation, executes approved routines, monitors their performance, optimizes them over time, and persists them in PostgreSQL.
-2. **Proactive Assistant Engine (Phase 7.5)**: Transforms Auralis from a reactive assistant into a proactive desktop assistant capable of predicting user needs before commands are issued using deterministic activity prediction, recommendation scoring, prioritization, history tracking, and user feedback learning.
-3. **Conversational Intelligence Engine (Phase 7.6)**: Manages multi-turn dialogue state, active tasks, phases, cross-turn entity linking, deterministic follow-up resolution, ambiguity detection, clarification management, and session context recovery.
-4. **Adaptive Recommendation Pipeline**: Triggers workflows based on environmental events (`WorkspaceOpened`, `ApplicationOpened`, `TimeOfDay`, `PreviousWorkflowCompleted`) evaluated through deterministic confidence and cooldown policies.
 
 ---
 
@@ -125,25 +98,22 @@ Auralis Version 1.5.0 implements the complete **Autonomous Routine Engine**, **P
 
 Auralis Version 1.6.0 implements the complete **Long-Running Task Subsystem** and **Background Job Scheduler Subsystem**.
 
-### Key Additions:
-1. **Long-Running Task Subsystem (Phase 8.5)**: Manages observable, asynchronous operations (`LongRunningTaskManager`) with progress tracking, event notification framework (`TaskEventDispatcher`), recovery hooks (`TaskPersistenceHook`), timeout cleanup policies, and execution monitor observation without external message queues.
-2. **Background Job Scheduler Subsystem (Phase 8.6)**: Schedules one-time and recurring jobs (`ONCE`, `INTERVAL`, `DAILY`, `WEEKLY`, `MONTHLY`, `MANUAL`) via `BackgroundJobScheduler`, deterministic schedule calculations (`RecurringScheduleCalculator`), parameter validations (`RecurringTriggerValidator`), persistence hooks (`BackgroundJobPersistenceHook`), expiration rules, retention cleanup, and seamless `ExecutionEngine` integration without cron or APScheduler dependencies.
-
 ---
 
-## Repository Cleanup & Architecture Certification (RC-1 to RC-5)
+## Provider-Independent Assistant Architecture Platform (v1.7.0 / Phase 13)
 
-Auralis has completed a comprehensive **Repository Cleanup Initiative (Phases RC-1 through RC-5)**, transforming the backend architecture into an enterprise-grade, certified modular platform:
+Auralis Version 1.7.0 implements the complete **Provider-Independent Assistant Architecture Platform** (`backend/brain/assistant/`), establishing a modular, decoupled, thread-safe orchestration layer across 9 core subsystems:
 
-### Completed Cleanup Phases:
-1. **RC-1 (Repository Audit)**: Identified duplicate modules, obsolete helpers, and package boundary candidates.
-2. **RC-1.5 (Candidates Verification)**: Verified static analysis import paths and cross-subsystem references.
-3. **RC-1.75 (API Compatibility Verification)**: Verified signature and behavior equivalence across legacy and Brain interfaces.
-4. **RC-2 (Compatibility Layer & Import Refactoring)**: Implemented thin facade adapters in `backend/ai/`, `backend/capabilities/files/`, and `backend/app/` while migrating all runtime modules to canonical `backend/brain/` architecture.
-5. **RC-3.1 (Safe Legacy Removal & Test Consolidation)**: Consolidated duplicate SQLite JSONB helpers in `backend/tests/conftest.py` and test mocks in `backend/tests/mocks.py`.
-6. **RC-3.2 (Legacy Package Deprecation)**: Safely removed unreferenced legacy scripts while preserving backward compatibility wrappers.
-7. **RC-4 (Architecture Validation)**: Achieved an **Architecture Score of 100 / 100** with zero circular dependencies and clean DI lifecycle registration.
-8. **RC-5 (Repository Certification)**: Achieved a **Repository Health Score of 100.0 / 100 (Grade A)** and 100% test pass rate across **1,936 test cases**.
+1. **Assistant Runtime Foundation (Phase 13.1)**: Base assistant controller, provider abstraction, capabilities specification, diagnostic health models, and `AssistantRuntime` singleton.
+2. **Conversation Runtime (Phase 13.2)**: Immutable conversation session models, message history tracking, context variable store, pagination, and `ConversationRuntime`.
+3. **Dialogue Management Runtime (Phase 13.3)**: State machine turn manager (`IDLE` → `PROCESSING` → `RESPONDING`), clarification/confirmation triggers, policy evaluator, and `DialogueRuntime`.
+4. **Decision & Reasoning Coordinator (Phase 13.4)**: Provider-independent decision engine routing request candidates, policy score calculations, and `DecisionRuntime`.
+5. **Assistant Memory & Context Integration Runtime (Phase 13.5)**: Context merging engine across AI memory, conversation history, dialogue state, and execution history with priority sorting and token budget enforcement.
+6. **Assistant Response Generation & Streaming Runtime (Phase 13.6)**: Response assembly engine, Markdown/Plain Text/JSON formatters, chunk stream partitioner, and `ResponseRuntime`.
+7. **Voice Orchestration Runtime (Phase 13.7)**: Top-level voice session manager, wake-word routing, speech pipeline coordinator, and `VoiceRuntime`.
+8. **Proactive Assistant & Notification Runtime (Phase 13.8)**: Proactive suggestion engine, recommendation ranking, duplicate suppression, cooldown period enforcement, and assistant-level notification manager.
+9. **Assistant Runtime Integration Layer (Phase 13.9)**: Single integration gateway (`backend/brain/assistant/integration/`), runtime registry, 8-stage pipeline coordinator (`Conversation` → `Dialogue` → `Decision` → `Memory` → `Execution` → `Response` → `Voice` → `Proactive`), and 12-subsystem health aggregator.
+10. **End-to-End Production Certification (Phase 13.10)**: End-to-end integration test suite (`test_assistant_end_to_end.py`), zero circular imports audit, multi-threaded safety certification, and 100% test pass rate across **2,172 backend unit tests**.
 
 ---
 
@@ -151,78 +121,45 @@ Auralis has completed a comprehensive **Repository Cleanup Initiative (Phases RC
 
 Auralis implements a complete **Provider-Independent AI Architecture & Runtime Subsystem** (`backend/brain/ai/`), unifying LLM providers, prompt intelligence, tool execution, memory retrieval, multi-step planning, and runtime resilience.
 
-### Key Additions:
-1. **AI Architecture Foundation (Phase 10.1)**: Abstract interfaces (`AIProvider`, `PromptBuilder`, `ContextBuilder`, `ToolRouter`), domain models (`AIContext`, `Prompt`, `ProviderInfo`, `AIRequest`, `AIResponse`, `ToolCall`, `ToolResult`), and `AIOrchestrator`.
-2. **Provider Framework (Phase 10.2)**: `BaseAIProvider`, `GroqProvider`, and `ProviderManager` supporting priority provider registration, default selection, and automatic failover.
-3. **Prompt Intelligence Pipeline (Phase 10.3)**: `PromptTemplates`, `TokenEstimator`, `ConversationBuilder`, `MemoryInjector`, `WorkspaceContextInjector`, and `PromptOptimizer` enforcing priority order (`System` > `Developer` > `Memory` > `Workspace` > `Conversation` > `User`).
-4. **Tool Calling Runtime (Phase 10.4)**: `DefaultToolRegistry`, `DefaultToolParser`, `DefaultToolExecutor`, permission model (`READ`, `WRITE`, `EXECUTE`, `ADMIN`), metadata models, tool schema generation, and routing.
-5. **Memory-aware AI Integration (Phase 10.5)**: `AIMemoryProvider`, `DefaultMemoryRetriever`, `DefaultMemoryRanker`, and `DefaultMemoryFilter` enforcing relevance scoring, token budgets, and deduplication.
-6. **Multi-Step Planning Engine (Phase 10.6)**: `AIPlanner`, `DefaultGoalAnalyzer`, `DefaultPlanGenerator`, `DefaultPlanValidator`, `DefaultExecutionPlanner` (topological graph cycle detection), and `DefaultExecutionMonitor`.
-7. **Runtime Validation & Resilience (Phase 10.7)**: `AIResilienceRuntime`, `DefaultRetryManager` (exponential backoff), `DefaultTimeoutManager`, `DefaultCancellationManager`, `DefaultFailureClassifier`, `DefaultRecoveryManager`, `DefaultCircuitBreaker` (CLOSED/OPEN/HALF_OPEN), and `DefaultEventDispatcher`.
-
 ---
 
 ## Provider-Independent Execution Architecture & Runtime Platform (Phase 12)
 
 Auralis implements a complete **Provider-Independent Execution Architecture & Runtime Platform** (`backend/brain/execution/`), orchestrating request analysis, intent resolution, command execution, multi-step workflow graphs, long-running background tasks, rule-based automations, distributed tracing, recovery checkpoints, and unified execution integration.
 
-### Key Subsystem Additions:
-1. **Brain Execution Engine (Phase 12.1)**: Core request analysis, execution pipeline orchestration, decision engine routing, immutable Pydantic v2 execution models, and `ExecutionRuntime` singleton lifecycle management.
-2. **Intent Resolution Engine (Phase 12.2)**: Provider-independent intent parsing (`backend/brain/execution/intent/`), filler word removal, entity extraction (paths, apps, dates, devices), scoring, and ambiguity resolution.
-3. **Command Execution Orchestrator (Phase 12.3)**: Coordinates execution between Intent Resolution, Brain Execution Engine, Planning Runtime, AI Engine, Security Runtime, and OS Integration Runtime (`backend/brain/execution/orchestrator/`).
-4. **Workflow Execution Engine (Phase 12.4)**: Multi-step DAG workflow builder (`backend/brain/execution/workflow/`), cycle detection, topological scheduling, step execution, cancellation, and dependency failure cascades.
-5. **Task Management Runtime (Phase 12.5)**: Observable long-running task manager (`backend/brain/execution/task/`), priority queuing, state persistence, progress monitoring, and pause/resume/cancel controls.
-6. **Automation & Scheduling Runtime (Phase 12.6)**: Provider-independent automation engine (`backend/brain/execution/automation/`), time/event/manual triggers, cron-style scheduling, and execution history tracking.
-7. **Execution Analytics & Observability Runtime (Phase 12.7)**: Metrics collection (`backend/brain/execution/analytics/`), distributed tracing with correlation IDs and nested span trees, and immutable audit logging.
-8. **Execution Recovery & State Management Runtime (Phase 12.8)**: Execution checkpoints (`backend/brain/execution/recovery/`), state snapshots, recovery strategy planning (`RETRY_STEP`, `RESUME_CHECKPOINT`, `ROLLBACK_STAGE`, `FAILOVER`), and step rollback execution.
-9. **Execution Runtime Integration (Phase 12.9)**: Unified top-level integration subsystem (`backend/brain/execution/integration/`), capability registry, execution router, and multi-stage pipeline orchestrator.
-10. **End-to-End Execution Runtime Certification (Phase 12.10)**: Complete architectural dependency audit, end-to-end integration test suite (`test_execution_pipeline.py`), 100% test pass rate across **2,121 backend unit tests**, and Production Ready certification.
-
 ---
 
-Auralis uses a modular architecture that separates voice capture, natural language understanding, memory context building, conversational intelligence and state tracking, execution planning, long-running tasks, background job scheduling, and OS operations:
-
+## Architecture Overview
 
 ```mermaid
 graph TD
-    User([User]) -->|Voice / Text Command| VoiceEngine[Voice Engine]
-    VoiceEngine -->|BrainRequest| BrainController[Brain Controller]
-    BrainController -->|Fetch Memory| ContextBuilder[ContextBuilder]
-    ContextBuilder -->|AssistantContext| ConvIntel[Conversational Intelligence Engine]
-    ConvIntel -->|ResolvedRequest| GoalInterpreter[Goal Interpreter]
-    GoalInterpreter -->|Goal| ReasoningEngine[Reasoning Engine]
-    ReasoningEngine -->|Objectives| TaskPlanner[Dynamic Task Planner]
+    User([User]) -->|Voice / Text Command| Gateway[Assistant Integration Gateway]
     
-    subgraph Planning Engine
-        TaskPlanner --> GoalDecomposer[Goal Decomposer]
-        GoalDecomposer --> ObjectiveGraph[Objective Graph]
-        ObjectiveGraph --> WorkflowMatcher[Workflow Matcher]
-        WorkflowMatcher --> WorkflowComposer[Workflow Composer]
-        WorkflowComposer --> PlanOptimizer[Plan Optimizer]
-        PlanOptimizer --> WorkflowCompiler[Workflow Compiler]
+    subgraph Provider-Independent Assistant Architecture Platform (Phase 13)
+        Gateway --> ConvRuntime[1. Conversation Runtime]
+        Gateway --> DialRuntime[2. Dialogue Runtime]
+        Gateway --> DecRuntime[3. Decision Runtime]
+        Gateway --> MemRuntime[4. Assistant Memory Runtime]
+        Gateway --> ExecRuntimeRef[5. Execution Runtime]
+        Gateway --> RespRuntime[6. Response Runtime]
+        Gateway --> VoiceRuntime[7. Voice Orchestration Runtime]
+        Gateway --> ProRuntime[8. Proactive Notification Runtime]
     end
-    
-    WorkflowCompiler -->|Execution Plan| ExecutionIntegration[Execution Runtime Integration]
-    
-    subgraph Execution Architecture Platform (Phase 12)
-        ExecutionIntegration --> IntentEngine[Intent Resolution Engine]
-        ExecutionIntegration --> Orchestrator[Command Orchestrator]
-        ExecutionIntegration --> WorkflowEngine[Workflow Engine]
-        ExecutionIntegration --> TaskRuntime[Task Runtime]
-        ExecutionIntegration --> AutomationRuntime[Automation Runtime]
-        ExecutionIntegration --> RecoveryRuntime[Recovery Runtime]
-        ExecutionIntegration --> AnalyticsRuntime[Analytics Runtime]
+
+    subgraph Core Brain & Execution Engines
+        DecRuntime --> GoalInterpreter[Goal Interpreter]
+        GoalInterpreter --> TaskPlanner[Dynamic Task Planner]
+        TaskPlanner --> ExecutionIntegration[Execution Runtime Integration]
     end
-    
-    Orchestrator --> FileIntel[File Intelligence]
-    Orchestrator --> DesktopControl[Desktop Control]
-    Orchestrator --> DocIntel[Document Intelligence]
-    Orchestrator --> DevAssistant[Developer Assistant]
-    
-    FileIntel --> OS[Operating System]
-    DesktopControl --> OS
-    DocIntel --> OS
-    DevAssistant --> OS
+
+    subgraph Capabilities & OS Abstraction
+        ExecutionIntegration --> FileIntel[File Intelligence]
+        ExecutionIntegration --> DesktopControl[Desktop Control]
+        ExecutionIntegration --> DevAssistant[Developer Assistant]
+        FileIntel --> OS[Operating System]
+        DesktopControl --> OS
+        DevAssistant --> OS
+    end
 ```
 
 ---
@@ -246,8 +183,7 @@ The project utilizes modern libraries and frameworks across both frontend and ba
 | **Python** | 3.13 | Core programming language. |
 | **SQLAlchemy** | 2.x | Asynchronous ORM and relational database mapping. |
 | **PostgreSQL** | 15+ | Relational database persistence provider. |
-| **Alembic** | 1.16+ | Database schema migration management. |
-| **Pydantic** | 2.x | Data validation and domain settings enforcement. |
+| **Pydantic** | 2.x | Data validation and immutable domain models (`ConfigDict(frozen=True)`). |
 | **Uvicorn** | 0.46.0 | Lightning-fast ASGI server implementation. |
 | **PyAudio** | 0.2.14 | Cross-platform library for capturing audio streams. |
 | **SpeechRecognition** | 3.16.1 | Speech-to-text processing using multiple engine APIs. |
@@ -262,31 +198,29 @@ Auralis/
 ├── backend/                   # FastAPI Backend Application
 │   ├── api/                   # Router declarations and API endpoints
 │   ├── brain/                 # AI Brain Orchestration
+│   │   ├── assistant/         # Assistant Architecture Platform (Phase 13)
+│   │   │   ├── conversation/  # Conversation Runtime (Phase 13.2)
+│   │   │   ├── dialogue/      # Dialogue Management Runtime (Phase 13.3)
+│   │   │   ├── reasoning/     # Decision & Reasoning Coordinator (Phase 13.4)
+│   │   │   ├── memory/        # Assistant Memory Runtime (Phase 13.5)
+│   │   │   ├── response/      # Response Generation & Streaming (Phase 13.6)
+│   │   │   ├── voice/         # Voice Orchestration Runtime (Phase 13.7)
+│   │   │   ├── proactive/     # Proactive Assistant & Notifications (Phase 13.8)
+│   │   │   └── integration/   # Assistant Runtime Integration Layer (Phase 13.9)
 │   │   ├── ai/                # AI Architecture & Runtime Platform (Phase 10)
 │   │   ├── execution/         # Execution Architecture Platform (Phase 12)
-│   │   │   ├── intent/        # Intent Resolution Engine (Phase 12.2)
-│   │   │   ├── orchestrator/  # Command Execution Orchestrator (Phase 12.3)
-│   │   │   ├── workflow/      # Workflow Execution Engine (Phase 12.4)
-│   │   │   ├── task/          # Task Management Runtime (Phase 12.5)
-│   │   │   ├── automation/    # Automation & Scheduling Runtime (Phase 12.6)
-│   │   │   ├── analytics/     # Execution Analytics & Observability (Phase 12.7)
-│   │   │   ├── recovery/      # Execution Recovery & State Management (Phase 12.8)
-│   │   │   └── integration/   # Execution Runtime Integration (Phase 12.9)
 │   │   ├── goal/              # Goal Interpreter
 │   │   ├── reasoning/         # Reasoning Engine
 │   │   ├── planning/          # Dynamic Task Planner & ReferenceResolver
 │   │   └── conversation_intelligence/ # Multi-Turn Dialog & Entity Linking
 │   ├── capabilities/          # OS capabilities (files, desktop, automation, developer)
 │   ├── core/                  # Assistant boundary, intent schemas, planner, and dispatcher
-│   ├── memory/                # Tiered Memory System (PostgresProvider, ContextBuilder, Routines, Proactive, Recommendations)
+│   ├── memory/                # Tiered Memory System
 │   ├── voice/                 # Modular Voice Engine subsystems
-│   ├── tests/                 # 2,121 unit & integration tests across 120+ test modules
+│   ├── tests/                 # 2,172 unit & integration tests across 125+ test modules
 │   ├── main.py                # Backend entry point
 │   └── requirements.txt       # Python package dependencies
 ├── frontend/                  # Vite + React Client App
-│   ├── public/                # Static assets and icons
-│   ├── src/                   # Components, hooks, pages, services, styles
-│   └── vite.config.js         # Proxy configuration and bundler setup
 └── docs/                      # Technical documentation and guides
 ```
 
@@ -298,7 +232,7 @@ Track the development stages of Auralis:
 
 * [x] **Core Pipeline:** Modular FastAPI backend structure and link to Vitest-proxied React dashboard.
 * [x] **Voice Subsystems:** Speech-to-Text (Whisper), Text-to-Speech (Edge-TTS), Session Manager state-machine, Voice UX chimes, and context resolvers.
-* [x] **AI Brain Orchestration (Phase 5):** Pipeline stages (Goal Interpreter, Reasoning Engine, Dynamic Planner, Capability Selector, Multi-step Execution Engine, Self-Correction & Recovery, Progress Monitor, Controller).
+* [x] **AI Brain Orchestration (Phase 5):** Pipeline stages (Goal Interpreter, Reasoning Engine, Dynamic Planner, Capability Selector, Execution Engine, Recovery Engine, Controller).
 * [x] **Tiered Memory Platform (Phase 6):** Preference Engine, Context Memory, Workspace Profiles, Routine Learning n-gram mining, Personalization decider, and unified Memory Coordinator.
 * [x] **Advanced Memory Retrieval & Context Construction (Phase 4):** PostgreSQL ORM Repositories, `ContextBuilder`, `BrainController` context integration, `ReferenceResolver`, `MemoryRanker`, and `ContextWindowConfig`.
 * [x] **Workspace Intelligence & Awareness (Phase 5):** Asynchronous indexers, project detectors, thread-safe caching coordinators, context construction, and brain reasoning pipelines.
@@ -310,6 +244,7 @@ Track the development stages of Auralis:
 * [x] **Provider-Independent AI Architecture & Runtime Pipeline (Phases 10.1 to 10.7):** Provider Framework (Groq Provider, failover), Prompt Intelligence, Tool Calling Runtime, Memory-aware AI, Multi-step Planning Engine, and Runtime Resilience Engine.
 * [x] **Repository Architecture Stabilization & Cleanup (Phases RC-1 to RC-5):** Facade compatibility layers, canonical Brain ownership, conftest/mock fixture consolidation, 100% test pass rate across 1,936 test cases, and Grade A Repository Health Certification.
 * [x] **Provider-Independent Execution Architecture & Runtime Platform (Phases 12.1 to 12.10):** Intent Resolution Engine, Command Orchestrator, Workflow Engine, Task Management Runtime, Automation Runtime, Analytics & Observability Runtime, Recovery & State Management Runtime, Execution Integration, and End-to-End Production Certification (2,121 tests passed).
+* [x] **Provider-Independent Assistant Architecture Platform (Phases 13.1 to 13.10):** Assistant Runtime Foundation, Conversation Runtime, Dialogue Management, Decision Coordinator, Assistant Memory Runtime, Response Streaming, Voice Orchestration, Proactive Notifications, Integration Gateway, and End-to-End Production Certification (2,172 tests passed).
 * [ ] **Future Objectives:**
   * [ ] Operating System Integration (Phase 11).
   * [ ] Document intelligence parser using local PyMuPDF extraction.
@@ -328,7 +263,7 @@ python -m venv venv
 # Install dependencies
 pip install -r backend/requirements.txt
 
-# Run complete test suite (2,121 tests across 120+ test modules)
+# Run complete test suite (2,172 tests across 125+ test modules)
 pytest backend/tests
 
 # Launch backend server
