@@ -1,6 +1,6 @@
 # Auralis Backend API Service
 
-This is the FastAPI backend application for **Auralis**, coordinating local-first natural language intent parsing, operating system adaptations, document intelligence processing, tiered memory context retrieval, and modular voice integration pipelines.
+This is the FastAPI backend application for **Auralis**, coordinating local-first natural language intent parsing, operating system adaptations, document intelligence processing, tiered memory context retrieval, provider-independent execution runtimes, and modular voice integration pipelines.
 
 ---
 
@@ -16,6 +16,15 @@ backend/
 ├── automation/        # Workflow Engine sequential orchestration
 ├── events/            # Centralized event schema interfaces
 ├── brain/             # AI Brain Orchestration & Execution Architecture
+│   ├── assistant/     # Assistant Architecture Platform (Phase 13)
+│   │   ├── conversation/  # Conversation Runtime (Phase 13.2)
+│   │   ├── dialogue/      # Dialogue Management Runtime (Phase 13.3)
+│   │   ├── reasoning/     # Decision & Reasoning Coordinator (Phase 13.4)
+│   │   ├── memory/        # Assistant Memory Runtime (Phase 13.5)
+│   │   ├── response/      # Response Generation & Streaming (Phase 13.6)
+│   │   ├── voice/         # Voice Orchestration Runtime (Phase 13.7)
+│   │   ├── proactive/     # Proactive Assistant & Notifications (Phase 13.8)
+│   │   └── integration/   # Assistant Runtime Integration Layer (Phase 13.9)
 │   ├── ai/            # Provider-Independent AI Architecture & Runtime (Phase 10)
 │   ├── execution/     # Provider-Independent Execution Architecture Platform (Phase 12)
 │   │   ├── intent/       # Intent Resolution Engine (Phase 12.2)
@@ -31,29 +40,8 @@ backend/
 │   ├── planning/      # Dynamic Task Planner & ReferenceResolver
 │   └── conversation_intelligence/ # Multi-Turn Dialog, Entity Linking, & Ambiguity Resolver
 ├── memory/            # Tiered Memory Subsystem
-│   ├── config.py      # Memory settings and provider resolution
-│   ├── models/        # Domain models (MemoryEntry, AssistantContext, etc.)
-│   ├── manager/       # MemoryService, ContextBuilder, MemoryRanker, ContextWindowConfig
-│   ├── repository/    # ORM Repositories (Conversation, Execution, Context, Preference, etc.)
-│   ├── providers/     # InMemoryProvider and PostgresProvider
-│   ├── preferences/   # Preference Engine
-│   ├── context/       # Short-term Context Memory
-│   ├── workspace/     # Workspace Profiles & Intelligence Subsystem
-│   ├── learning/      # Routine Learning Engine
-│   ├── personalization/ # Personalization Engine
-│   ├── coordinator/   # Memory Coordinator
-│   ├── routines/      # Autonomous Routine Engine (detection, library, matching, scheduling)
-│   ├── proactive/     # Proactive Assistant Engine (prediction, suggestions, scoring, feedback)
-│   ├── recommendations/ # Adaptive Recommendation triggers and policy evaluation
-│   └── workflows/     # Workflow mining and runtime observation
 ├── voice/             # Modular Voice Engine subsystems
-│   ├── speech/        # PyAudio device interactions and Speech-to-Text transcription
-│   ├── conversation/  # Voice session state machine and inactivity tracking
-│   ├── tts/           # Edge-TTS synthesis and asynchronous play queues
-│   ├── ux/            # Chimes/sound triggers and notification observers
-│   ├── context/       # Pronoun/ordinal resolution and temporary session memory
-│   └── integration/   # Pipeline loops, EventRouter, and Error Recovery controller
-├── tests/             # Pytest suite verifying core, capabilities, brain, memory, and voice
+├── tests/             # Pytest suite verifying core, capabilities, brain, memory, voice, execution, and assistant (2,172 tests)
 ├── main.py            # API service initialization endpoint
 └── requirements.txt   # Python dependency packages
 ```
@@ -123,6 +111,18 @@ backend/
 * **Execution Runtime Integration (Phase 12.9)**: Top-level integration provider (`backend/brain/execution/integration/`), capability registry, execution router, and multi-stage pipeline orchestrator.
 * **End-to-End Production Certification (Phase 12.10)**: Complete architectural dependency audit, end-to-end pipeline test suite (`test_execution_pipeline.py`), 100% test pass rate across **2,121 backend unit tests**, and Production Ready certification.
 
+### 2.10 Provider-Independent Assistant Architecture Platform (Phase 13)
+* **Assistant Runtime Foundation (Phase 13.1)**: Base assistant controller, provider abstraction, capabilities specification, diagnostic health models, and `AssistantRuntime` singleton (`backend/brain/assistant/`).
+* **Conversation Runtime (Phase 13.2)**: Immutable conversation session models, message history tracking, context variable store, pagination, and `ConversationRuntime` (`backend/brain/assistant/conversation/`).
+* **Dialogue Management Runtime (Phase 13.3)**: State machine turn manager (`IDLE` → `PROCESSING` → `RESPONDING`), clarification/confirmation triggers, policy evaluator, and `DialogueRuntime` (`backend/brain/assistant/dialogue/`).
+* **Decision & Reasoning Coordinator (Phase 13.4)**: Provider-independent decision engine routing request candidates, policy score calculations, and `DecisionRuntime` (`backend/brain/assistant/reasoning/`).
+* **Assistant Memory & Context Integration Runtime (Phase 13.5)**: Context merging engine across AI memory, conversation history, dialogue state, and execution history with priority sorting and token budget enforcement (`backend/brain/assistant/memory/`).
+* **Assistant Response Generation & Streaming Runtime (Phase 13.6)**: Response assembly engine, Markdown/Plain Text/JSON formatters, chunk stream partitioner, and `ResponseRuntime` (`backend/brain/assistant/response/`).
+* **Voice Orchestration Runtime (Phase 13.7)**: Top-level voice session manager, wake-word routing, speech pipeline coordinator, and `VoiceRuntime` (`backend/brain/assistant/voice/`).
+* **Proactive Assistant & Notification Runtime (Phase 13.8)**: Proactive suggestion engine, recommendation ranking, duplicate suppression, cooldown period enforcement, and assistant-level notification manager (`backend/brain/assistant/proactive/`).
+* **Assistant Runtime Integration Layer (Phase 13.9)**: Single integration gateway (`backend/brain/assistant/integration/`), runtime registry, 8-stage pipeline coordinator (`Conversation` → `Dialogue` → `Decision` → `Memory` → `Execution` → `Response` → `Voice` → `Proactive`), and 12-subsystem health aggregator.
+* **End-to-End Production Certification (Phase 13.10)**: End-to-end integration test suite (`test_assistant_end_to_end.py`), zero circular imports audit, multi-threaded safety certification, and 100% test pass rate across **2,172 backend unit tests**.
+
 ---
 
 ## 3. Getting Started
@@ -154,9 +154,6 @@ The backend API documentation is available at `http://127.0.0.1:8000/docs`.
 ### Running Tests
 Execute the entire Pytest suite:
 ```bash
-pytest
+pytest backend/tests
 ```
-Currently, the backend contains **2,121 unit and integration tests across 120+ test modules** with a **100% pass rate**, verifying core flows, file operations, state transitions, speech, memory retrieval, brain orchestration, memory ranking, context windows, reference resolution, workspace intelligence, autonomous routines, proactive assistant, conversational intelligence, long-running tasks, background job scheduler, recurring triggers, persistence hooks, provider-independent AI architecture, prompt intelligence, tool execution, memory-aware AI, multi-step planning, runtime resilience, intent resolution, command orchestration, workflow engines, task management, automation scheduling, execution analytics, recovery state management, execution integration, and end-to-end pipeline steps.
-
-
-
+Currently, the backend contains **2,172 unit and integration tests across 125+ test modules** with a **100% pass rate**, verifying core flows, file operations, state transitions, speech, memory retrieval, brain orchestration, memory ranking, context windows, reference resolution, workspace intelligence, autonomous routines, proactive assistant, conversational intelligence, long-running tasks, background job scheduler, recurring triggers, persistence hooks, provider-independent AI architecture, prompt intelligence, tool execution, memory-aware AI, multi-step planning, runtime resilience, intent resolution, command orchestration, workflow engines, task management, automation scheduling, execution analytics, recovery state management, execution integration, assistant runtime foundation, conversation runtime, dialogue management, decision reasoning coordinator, assistant memory context, response generation streaming, voice orchestration, proactive notifications, assistant integration gateway, and end-to-end assistant pipeline certification.
