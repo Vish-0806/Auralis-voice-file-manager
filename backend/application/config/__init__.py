@@ -1,12 +1,15 @@
-"""Configuration Package Exports (Phase 14.3.2).
+"""Configuration Package Exports (Phase 14.3.3).
 
 Package exports for models, exceptions, interfaces, configuration sources,
-source registry, source manager, configuration provider, configuration runtime, and lazy singleton accessors.
+source registry, source manager, schema manager, resolver, validator, provider, runtime, and lazy singleton accessors.
 """
 
 from backend.application.config.configuration_provider import ConfigurationProvider
+from backend.application.config.configuration_resolver import ConfigurationResolver
 from backend.application.config.configuration_runtime import ConfigurationRuntime
+from backend.application.config.configuration_schema import ConfigurationSchemaManager
 from backend.application.config.configuration_source_manager import ConfigurationSourceManager
+from backend.application.config.configuration_validator import ConfigurationValidator
 from backend.application.config.dotenv_source import DotEnvConfigurationSource
 from backend.application.config.environment_source import EnvironmentConfigurationSource
 from backend.application.config.exceptions import (
@@ -28,22 +31,31 @@ from backend.application.config.interfaces import (
 from backend.application.config.memory_source import MemoryConfigurationSource
 from backend.application.config.models import (
     ConfigurationCapabilities,
+    ConfigurationConstraint,
     ConfigurationContext,
+    ConfigurationDefinition,
     ConfigurationDiagnostics,
     ConfigurationEntry,
+    ConfigurationError,
     ConfigurationHealth,
     ConfigurationProfile,
     ConfigurationProfileType,
+    ConfigurationResolutionResult,
     ConfigurationRuntimeState,
+    ConfigurationSchema,
     ConfigurationSnapshot,
     ConfigurationSource,
     ConfigurationSourceType,
     ConfigurationState,
     ConfigurationStatistics,
+    ConfigurationValidationResult,
+    ConfigurationWarning,
+    ResolutionStatistics,
     SourceHealth,
     SourcePriority,
     SourceRegistration,
     SourceStatistics,
+    ValidationStatistics,
 )
 from backend.application.config.runtime import (
     get_configuration_provider,
@@ -64,6 +76,8 @@ __all__ = [
     "ConfigurationCapabilities",
     "ConfigurationHealth",
     "ConfigurationStatistics",
+    "ResolutionStatistics",
+    "ValidationStatistics",
     "ConfigurationContext",
     "ConfigurationProfile",
     "ConfigurationSource",
@@ -72,6 +86,13 @@ __all__ = [
     "SourceHealth",
     "ConfigurationEntry",
     "ConfigurationSnapshot",
+    "ConfigurationError",
+    "ConfigurationWarning",
+    "ConfigurationConstraint",
+    "ConfigurationDefinition",
+    "ConfigurationSchema",
+    "ConfigurationValidationResult",
+    "ConfigurationResolutionResult",
     "ConfigurationDiagnostics",
     "ConfigurationException",
     "ConfigurationInitializationError",
@@ -89,6 +110,9 @@ __all__ = [
     "EnvironmentConfigurationSource",
     "DotEnvConfigurationSource",
     "SourceRegistry",
+    "ConfigurationSchemaManager",
+    "ConfigurationResolver",
+    "ConfigurationValidator",
     "ConfigurationSourceManager",
     "ConfigurationProvider",
     "ConfigurationRuntime",

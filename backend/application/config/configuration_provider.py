@@ -1,13 +1,13 @@
-"""Configuration Provider (Phase 14.3.2).
+"""Configuration Provider (Phase 14.3.3).
 
 Thread-safe production configuration provider runtime coordinating configuration state,
-sources, context, capabilities, health reporting, statistics, and diagnostics snapshots.
+sources, resolution, validation, context, capabilities, health reporting, statistics, and diagnostics snapshots.
 """
 
 from datetime import datetime, timezone
 import logging
 from threading import RLock
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from backend.application.config.configuration_source_manager import ConfigurationSourceManager
 from backend.application.config.interfaces import IConfigurationProvider
@@ -17,15 +17,18 @@ from backend.application.config.models import (
     ConfigurationDiagnostics,
     ConfigurationHealth,
     ConfigurationProfileType,
+    ConfigurationResolutionResult,
     ConfigurationRuntimeState,
+    ConfigurationSchema,
     ConfigurationStatistics,
+    ConfigurationValidationResult,
 )
 
 logger = logging.getLogger(__name__)
 
 
 class ConfigurationProvider(IConfigurationProvider):
-    """Production ConfigurationProvider runtime executing configuration state & source management."""
+    """Production ConfigurationProvider runtime executing configuration state, source, resolution, and validation management."""
 
     def __init__(
         self,
@@ -49,6 +52,26 @@ class ConfigurationProvider(IConfigurationProvider):
         """Get the underlying ConfigurationSourceManager instance."""
         with self._lock:
             return self._source_manager
+
+    def register_schema(self, schema: ConfigurationSchema) -> bool:
+        """Register a configuration schema."""
+        with self._lock:
+            return self._source_manager.register_schema(schema)
+
+    def resolve(self, key: str, expected_type: Optional[Any] = None, default: Optional[Any] = None) -> Any:
+        """Resolve a configuration property value with type conversion and default fallback."""
+        with self._lock:
+            return self._source_manager.resolve(key, expected_type=expected_type, default=default)
+
+    def resolve_all(self) -> ConfigurationResolutionResult:
+        """Resolve all properties against registered schemas."""
+        with self._lock:
+            return self._source_manager.resolve_all()
+
+    def validate(self, schema: Optional[ConfigurationSchema] = None) -> ConfigurationValidationResult:
+        """Validate configuration values against schemas."""
+        with self._lock:
+            return self._source_manager.validate(schema=schema)
 
     def initialize(self) -> ConfigurationRuntimeState:
         """Initialize provider runtime state to READY."""
@@ -133,6 +156,8 @@ class ConfigurationProvider(IConfigurationProvider):
                 state=self._state,
                 health=self.health(),
                 statistics=stats,
+                resolution_statistics=self._source_manager.resolver.statistics(),
+                validation_statistics=self._source_manager.validator.statistics(),
                 active_profile_name=self._context.environment.value.lower(),
                 active_sources_count=stats.active_sources_count,
                 metrics=stats.metrics,

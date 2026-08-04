@@ -1,4 +1,4 @@
-"""Configuration Runtime Interfaces (Phase 14.3.2).
+"""Configuration Runtime Interfaces (Phase 14.3.3).
 
 Defines Abstract Base Classes (ABCs) establishing explicit design contracts for
 IConfigurationSource, ConfigurationRuntime, ConfigurationProvider, ConfigurationManager,
@@ -14,10 +14,13 @@ from backend.application.config.models import (
     ConfigurationDiagnostics,
     ConfigurationEntry,
     ConfigurationHealth,
+    ConfigurationResolutionResult,
     ConfigurationRuntimeState,
+    ConfigurationSchema,
     ConfigurationSnapshot,
     ConfigurationSourceType,
     ConfigurationStatistics,
+    ConfigurationValidationResult,
     SourceHealth,
     SourceStatistics,
 )
@@ -99,7 +102,9 @@ class IConfigurationValidator(ABC):
     """Abstract interface for Configuration Validator engine."""
 
     @abstractmethod
-    def validate(self) -> bool:
+    def validate(
+        self, values: Optional[Dict[str, Any]] = None, schema: Optional[ConfigurationSchema] = None
+    ) -> ConfigurationValidationResult:
         """Validate loaded configuration against schemas and constraints."""
         raise NotImplementedError
 
@@ -140,6 +145,26 @@ class IConfigurationManager(ABC):
     @abstractmethod
     def unregister_source(self, source_name: str) -> bool:
         """Unregister a configuration source by name."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def resolve(self, key: str, expected_type: Optional[Any] = None, default: Optional[Any] = None) -> Any:
+        """Resolve property value with type conversion and default fallback."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def resolve_all(self) -> ConfigurationResolutionResult:
+        """Resolve all properties against registered schemas with type conversion."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def validate(self, schema: Optional[ConfigurationSchema] = None) -> ConfigurationValidationResult:
+        """Validate configuration values against registered schemas."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def register_schema(self, schema: ConfigurationSchema) -> bool:
+        """Register a configuration schema."""
         raise NotImplementedError
 
 

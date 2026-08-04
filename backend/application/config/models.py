@@ -1,13 +1,14 @@
-"""Configuration Runtime Domain Models (Phase 14.3.2).
+"""Configuration Runtime Domain Models (Phase 14.3.3).
 
 Defines immutable Pydantic v2 domain models and enums representing configuration runtime states,
 source types, profile types, capabilities, health metrics, statistics, configuration context,
-profiles, sources, entries, snapshots, registrations, and diagnostics snapshots.
+profiles, sources, entries, snapshots, definitions, constraints, schemas, validation results,
+resolution results, and diagnostics snapshots.
 """
 
 from datetime import datetime, timezone
 from enum import Enum, IntEnum
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -102,6 +103,27 @@ class ConfigurationStatistics(BaseModel):
     metrics: Dict[str, float] = Field(default_factory=dict)
 
 
+class ResolutionStatistics(BaseModel):
+    """Immutable metrics model for configuration resolution engine."""
+
+    model_config = ConfigDict(frozen=True)
+
+    resolution_count: int = 0
+    conversion_count: int = 0
+    default_applications: int = 0
+    type_mismatches: int = 0
+
+
+class ValidationStatistics(BaseModel):
+    """Immutable metrics model for configuration validation engine."""
+
+    model_config = ConfigDict(frozen=True)
+
+    validation_count: int = 0
+    successful_validations: int = 0
+    failed_validations: int = 0
+
+
 class ConfigurationContext(BaseModel):
     """Immutable model snapshotting runtime execution context for configuration."""
 
@@ -193,6 +215,85 @@ class ConfigurationSnapshot(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class ConfigurationError(BaseModel):
+    """Immutable model representing a configuration error or validation failure."""
+
+    model_config = ConfigDict(frozen=True)
+
+    key: str
+    message: str
+    error_type: str = "VALIDATION_ERROR"
+
+
+class ConfigurationWarning(BaseModel):
+    """Immutable model representing a configuration resolution or validation warning."""
+
+    model_config = ConfigDict(frozen=True)
+
+    key: str
+    message: str
+    warning_type: str = "DEFAULT_APPLIED"
+
+
+class ConfigurationConstraint(BaseModel):
+    """Immutable model representing validation rules and constraints for a property."""
+
+    model_config = ConfigDict(frozen=True)
+
+    min_value: Optional[Any] = None
+    max_value: Optional[Any] = None
+    min_length: Optional[int] = None
+    max_length: Optional[int] = None
+    regex_pattern: Optional[str] = None
+    allowed_values: Optional[Tuple[Any, ...]] = None
+
+
+class ConfigurationDefinition(BaseModel):
+    """Immutable model defining a single configuration schema property."""
+
+    model_config = ConfigDict(frozen=True)
+
+    key: str
+    expected_type: Any = str
+    default_value: Optional[Any] = None
+    required: bool = False
+    constraint: Optional[ConfigurationConstraint] = None
+    description: str = ""
+
+
+class ConfigurationSchema(BaseModel):
+    """Immutable model representing a named collection of property definitions."""
+
+    model_config = ConfigDict(frozen=True)
+
+    schema_name: str
+    definitions: Tuple[ConfigurationDefinition, ...] = Field(default_factory=tuple)
+
+
+class ConfigurationValidationResult(BaseModel):
+    """Immutable report containing validation outcome, errors, and warnings."""
+
+    model_config = ConfigDict(frozen=True)
+
+    is_valid: bool = True
+    errors: Tuple[ConfigurationError, ...] = Field(default_factory=tuple)
+    warnings: Tuple[ConfigurationWarning, ...] = Field(default_factory=tuple)
+    checked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ConfigurationResolutionResult(BaseModel):
+    """Immutable report containing property resolution, type conversions, and defaults."""
+
+    model_config = ConfigDict(frozen=True)
+
+    resolved_values: Dict[str, Any] = Field(default_factory=dict)
+    converted_keys: Tuple[str, ...] = Field(default_factory=tuple)
+    defaulted_keys: Tuple[str, ...] = Field(default_factory=tuple)
+    missing_required_keys: Tuple[str, ...] = Field(default_factory=tuple)
+    errors: Tuple[ConfigurationError, ...] = Field(default_factory=tuple)
+    resolved_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class ConfigurationDiagnostics(BaseModel):
     """Immutable model containing configuration runtime resolution diagnostics."""
 
@@ -201,6 +302,8 @@ class ConfigurationDiagnostics(BaseModel):
     state: ConfigurationRuntimeState = ConfigurationRuntimeState.UNINITIALIZED
     health: ConfigurationHealth = Field(default_factory=ConfigurationHealth)
     statistics: ConfigurationStatistics = Field(default_factory=ConfigurationStatistics)
+    resolution_statistics: ResolutionStatistics = Field(default_factory=ResolutionStatistics)
+    validation_statistics: ValidationStatistics = Field(default_factory=ValidationStatistics)
     active_profile_name: str = "development"
     active_sources_count: int = 0
     metrics: Dict[str, float] = Field(default_factory=dict)
