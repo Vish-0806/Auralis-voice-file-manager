@@ -372,3 +372,21 @@ class ServiceCollection(IServiceCollection):
         """
         with self._lock:
             return tuple(self._descriptors)
+
+    def statistics(self) -> Dict[str, float]:
+        """Get registration statistics metrics.
+
+        Returns:
+            Dict[str, float]: Dictionary of registration metrics.
+        """
+        with self._lock:
+            return {
+                "total_registrations": float(self.total_registrations),
+                "singleton_registrations": float(self.singleton_registrations),
+                "transient_registrations": float(self.transient_registrations),
+                "scoped_registrations": float(self.scoped_registrations),
+                "replacements": float(self.replacements),
+                "removals": float(self.removals),
+                "duplicates_rejected": float(self.duplicates_rejected),
+                "aliases_registered": float(self.aliases_registered),
+            }

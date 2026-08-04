@@ -1,13 +1,14 @@
-"""Dependency Injection Interfaces (Phase 14.2.2).
+"""Dependency Injection Interfaces (Phase 14.2.3).
 
 Defines Abstract Base Classes (ABCs) establishing explicit design contracts for
 ServiceDescriptor, ServiceCollection, ServiceProvider, and DependencyContainer.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from backend.application.di.models import (
+    ContainerDiagnostics,
     ContainerHealth,
     ContainerState,
     ContainerStatistics,
@@ -235,6 +236,15 @@ class IServiceCollection(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def statistics(self) -> Dict[str, float]:
+        """Get registration statistics metrics.
+
+        Returns:
+            Dict[str, float]: Registration metrics dictionary.
+        """
+        raise NotImplementedError
+
 
 class IServiceProvider(ABC):
     """Abstract interface for Service Provider resolution engine."""
@@ -250,7 +260,32 @@ class IServiceProvider(ABC):
             Any: Resolved service instance.
 
         Raises:
-            NotImplementedError: Pending resolution implementation.
+            ServiceResolutionException: If resolution fails.
+            CircularDependencyException: If a circular dependency is detected.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def resolve_required(self, service_type: Any) -> Any:
+        """Resolve a required service instance, raising exception if missing.
+
+        Args:
+            service_type: Target service type.
+
+        Returns:
+            Any: Resolved service instance.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def try_resolve(self, service_type: Any) -> Optional[Any]:
+        """Try resolving a service instance, returning None if missing.
+
+        Args:
+            service_type: Target service type.
+
+        Returns:
+            Optional[Any]: Resolved instance or None.
         """
         raise NotImplementedError
 
@@ -263,9 +298,18 @@ class IServiceProvider(ABC):
 
         Returns:
             Tuple[Any, ...]: Tuple of resolved instances.
+        """
+        raise NotImplementedError
 
-        Raises:
-            NotImplementedError: Pending resolution implementation.
+    @abstractmethod
+    def create_instance(self, implementation_type: Any) -> Any:
+        """Construct an instance using constructor dependency injection.
+
+        Args:
+            implementation_type: Target class type to instantiate.
+
+        Returns:
+            Any: Instantiated object.
         """
         raise NotImplementedError
 
@@ -275,19 +319,12 @@ class IServiceProvider(ABC):
 
         Returns:
             IServiceProvider: Scoped provider instance.
-
-        Raises:
-            NotImplementedError: Scope creation belongs to a later phase.
         """
         raise NotImplementedError
 
     @abstractmethod
     def dispose(self) -> None:
-        """Dispose service provider and scoped instances.
-
-        Raises:
-            NotImplementedError: Disposal logic belongs to a later phase.
-        """
+        """Dispose service provider and scoped instances."""
         raise NotImplementedError
 
     @abstractmethod
@@ -308,9 +345,54 @@ class IServiceProvider(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def diagnostics(self) -> ContainerDiagnostics:
+        """Get resolution diagnostics snapshot.
+
+        Returns:
+            ContainerDiagnostics: Provider diagnostics model.
+        """
+        raise NotImplementedError
+
 
 class IDependencyContainer(ABC):
     """Abstract interface for Dependency Injection Container."""
+
+    @abstractmethod
+    def resolve(self, service_type: Any) -> Any:
+        """Resolve a service instance by service_type.
+
+        Returns:
+            Any: Resolved instance.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def resolve_required(self, service_type: Any) -> Any:
+        """Resolve a required service instance by service_type.
+
+        Returns:
+            Any: Resolved instance.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def try_resolve(self, service_type: Any) -> Optional[Any]:
+        """Try resolving a service instance by service_type.
+
+        Returns:
+            Optional[Any]: Resolved instance or None.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def resolve_all(self, service_type: Any) -> Tuple[Any, ...]:
+        """Resolve all instances for a service_type.
+
+        Returns:
+            Tuple[Any, ...]: Resolved instances tuple.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def initialize(self) -> ContainerState:
@@ -335,7 +417,7 @@ class IDependencyContainer(ABC):
         """Restart container operations.
 
         Returns:
-            ContainerState: Updated state snapshot.
+            ContainerState: Updated container state snapshot.
         """
         raise NotImplementedError
 
@@ -354,5 +436,14 @@ class IDependencyContainer(ABC):
 
         Returns:
             ContainerStatistics: Metrics snapshot.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def diagnostics(self) -> ContainerDiagnostics:
+        """Get container diagnostics snapshot.
+
+        Returns:
+            ContainerDiagnostics: Diagnostics snapshot.
         """
         raise NotImplementedError

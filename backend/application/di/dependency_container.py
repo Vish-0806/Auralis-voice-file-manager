@@ -1,7 +1,7 @@
-"""Dependency Injection Container (Phase 14.2.2).
+"""Dependency Injection Container (Phase 14.2.3).
 
 Runtime container owning ServiceCollection and ServiceProvider, managing container state transitions,
-capabilities, health checks, registration delegation, and statistics aggregation.
+capabilities, health checks, registration delegation, resolution delegation, and diagnostics.
 """
 
 from datetime import datetime, timezone
@@ -19,6 +19,7 @@ from backend.application.di.models import (
     ContainerCapabilities,
     ContainerConfiguration,
     ContainerContext,
+    ContainerDiagnostics,
     ContainerHealth,
     ContainerState,
     ContainerStatistics,
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 class DependencyContainer(IDependencyContainer):
-    """Production dependency injection container runtime executing registration delegation."""
+    """Production dependency injection container runtime executing registration & resolution delegation."""
 
     def __init__(
         self,
@@ -68,15 +69,52 @@ class DependencyContainer(IDependencyContainer):
         with self._lock:
             return self._provider
 
-    def register(self, descriptor: IServiceDescriptor) -> bool:
-        """Register a ServiceDescriptor instance.
+    # =========================================================================
+    # Resolution Delegation APIs
+    # =========================================================================
 
-        Args:
-            descriptor: ServiceDescriptor instance.
+    def resolve(self, service_type: Any) -> Any:
+        """Resolve a service instance by service_type.
 
         Returns:
-            bool: True if registration succeeded.
+            Any: Resolved service instance.
         """
+        with self._lock:
+            return self._provider.resolve(service_type)
+
+    def resolve_required(self, service_type: Any) -> Any:
+        """Resolve a required service instance by service_type.
+
+        Returns:
+            Any: Resolved service instance.
+        """
+        with self._lock:
+            return self._provider.resolve_required(service_type)
+
+    def try_resolve(self, service_type: Any) -> Optional[Any]:
+        """Try resolving a service instance by service_type.
+
+        Returns:
+            Optional[Any]: Resolved service instance or None.
+        """
+        with self._lock:
+            return self._provider.try_resolve(service_type)
+
+    def resolve_all(self, service_type: Any) -> Tuple[Any, ...]:
+        """Resolve all registered instances for service_type.
+
+        Returns:
+            Tuple[Any, ...]: Tuple of resolved instances.
+        """
+        with self._lock:
+            return self._provider.resolve_all(service_type)
+
+    # =========================================================================
+    # Registration Delegation APIs
+    # =========================================================================
+
+    def register(self, descriptor: IServiceDescriptor) -> bool:
+        """Register a ServiceDescriptor instance."""
         with self._lock:
             return self._services.register(descriptor)
 
@@ -89,11 +127,7 @@ class DependencyContainer(IDependencyContainer):
         aliases: Optional[Tuple[str, ...]] = None,
         tags: Optional[Tuple[str, ...]] = None,
     ) -> bool:
-        """Register a SINGLETON service descriptor.
-
-        Returns:
-            bool: True if registration succeeded.
-        """
+        """Register a SINGLETON service descriptor."""
         with self._lock:
             return self._services.add_singleton(
                 service_type=service_type,
@@ -112,11 +146,7 @@ class DependencyContainer(IDependencyContainer):
         aliases: Optional[Tuple[str, ...]] = None,
         tags: Optional[Tuple[str, ...]] = None,
     ) -> bool:
-        """Register a TRANSIENT service descriptor.
-
-        Returns:
-            bool: True if registration succeeded.
-        """
+        """Register a TRANSIENT service descriptor."""
         with self._lock:
             return self._services.add_transient(
                 service_type=service_type,
@@ -134,11 +164,7 @@ class DependencyContainer(IDependencyContainer):
         aliases: Optional[Tuple[str, ...]] = None,
         tags: Optional[Tuple[str, ...]] = None,
     ) -> bool:
-        """Register a SCOPED service descriptor.
-
-        Returns:
-            bool: True if registration succeeded.
-        """
+        """Register a SCOPED service descriptor."""
         with self._lock:
             return self._services.add_scoped(
                 service_type=service_type,
@@ -149,38 +175,17 @@ class DependencyContainer(IDependencyContainer):
             )
 
     def replace(self, descriptor: IServiceDescriptor) -> bool:
-        """Replace an existing service registration.
-
-        Args:
-            descriptor: ServiceDescriptor instance.
-
-        Returns:
-            bool: True if replaced.
-        """
+        """Replace an existing service registration."""
         with self._lock:
             return self._services.replace(descriptor)
 
     def try_add(self, descriptor: IServiceDescriptor) -> bool:
-        """Try adding a service descriptor if not already registered.
-
-        Args:
-            descriptor: ServiceDescriptor instance.
-
-        Returns:
-            bool: True if registered, False if existing.
-        """
+        """Try adding a service descriptor if not already registered."""
         with self._lock:
             return self._services.try_add(descriptor)
 
     def remove(self, service_type: Any) -> bool:
-        """Remove a service registration by service_type.
-
-        Args:
-            service_type: Target service type to remove.
-
-        Returns:
-            bool: True if removed.
-        """
+        """Remove a service registration by service_type."""
         with self._lock:
             return self._services.remove(service_type)
 
@@ -190,89 +195,46 @@ class DependencyContainer(IDependencyContainer):
             self._services.remove_all()
 
     def contains(self, service_type: Any) -> bool:
-        """Check if service_type is registered.
-
-        Args:
-            service_type: Target service type.
-
-        Returns:
-            bool: True if registered.
-        """
+        """Check if service_type is registered."""
         with self._lock:
             return self._services.contains(service_type)
 
     def contains_alias(self, alias: str) -> bool:
-        """Check if an alias is registered.
-
-        Args:
-            alias: Target alias string.
-
-        Returns:
-            bool: True if alias is present.
-        """
+        """Check if an alias is registered."""
         with self._lock:
             return self._services.contains_alias(alias)
 
     def get_descriptor(self, service_type: Any) -> Optional[IServiceDescriptor]:
-        """Get descriptor by service_type.
-
-        Args:
-            service_type: Target service type.
-
-        Returns:
-            Optional[IServiceDescriptor]: Descriptor if registered.
-        """
+        """Get descriptor by service_type."""
         with self._lock:
             return self._services.get_descriptor(service_type)
 
     def get_descriptor_by_alias(self, alias: str) -> Optional[IServiceDescriptor]:
-        """Get descriptor by registered alias.
-
-        Args:
-            alias: Target alias string.
-
-        Returns:
-            Optional[IServiceDescriptor]: Descriptor if found.
-        """
+        """Get descriptor by registered alias."""
         with self._lock:
             return self._services.get_descriptor_by_alias(alias)
 
     def list_services(self) -> Tuple[ServiceDescriptorModel, ...]:
-        """List all service descriptors in registration order.
-
-        Returns:
-            Tuple[ServiceDescriptorModel, ...]: Models tuple.
-        """
+        """List all service descriptors in registration order."""
         with self._lock:
             return self._services.list_services()
 
     def list_by_lifetime(self, lifetime: ServiceLifetime) -> Tuple[ServiceDescriptorModel, ...]:
-        """List service descriptors filtered by lifetime scope.
-
-        Args:
-            lifetime: Lifetime enum filter.
-
-        Returns:
-            Tuple[ServiceDescriptorModel, ...]: Filtered models tuple.
-        """
+        """List service descriptors filtered by lifetime scope."""
         with self._lock:
             return self._services.list_by_lifetime(lifetime)
 
     def list_aliases(self) -> Tuple[str, ...]:
-        """List all registered service aliases.
-
-        Returns:
-            Tuple[str, ...]: Tuple of registered alias strings.
-        """
+        """List all registered service aliases."""
         with self._lock:
             return self._services.list_aliases()
 
-    def initialize(self) -> ContainerState:
-        """Initialize the container and transition to READY state.
+    # =========================================================================
+    # Container Lifecycle & Monitoring APIs
+    # =========================================================================
 
-        Returns:
-            ContainerState: Updated container state snapshot.
-        """
+    def initialize(self) -> ContainerState:
+        """Initialize the container and transition to READY state."""
         with self._lock:
             if self._state == ContainerState.READY:
                 return self._state
@@ -283,11 +245,7 @@ class DependencyContainer(IDependencyContainer):
             return self._state
 
     def shutdown(self) -> ContainerState:
-        """Shutdown the container and transition to STOPPED state.
-
-        Returns:
-            ContainerState: Updated container state snapshot.
-        """
+        """Shutdown the container and transition to STOPPED state."""
         with self._lock:
             if self._state == ContainerState.STOPPED:
                 return self._state
@@ -298,22 +256,14 @@ class DependencyContainer(IDependencyContainer):
             return self._state
 
     def restart(self) -> ContainerState:
-        """Restart container operations.
-
-        Returns:
-            ContainerState: Updated container state snapshot.
-        """
+        """Restart container operations."""
         with self._lock:
             logger.info("Restarting DependencyContainer...")
             self.shutdown()
             return self.initialize()
 
     def health(self) -> ContainerHealth:
-        """Get current container health assessment.
-
-        Returns:
-            ContainerHealth: Health assessment snapshot.
-        """
+        """Get current container health assessment."""
         with self._lock:
             is_healthy = self._state in (ContainerState.READY, ContainerState.INITIALIZED, ContainerState.UNINITIALIZED)
             issues = () if is_healthy else (f"Container state is {self._state.value}.",)
@@ -325,32 +275,18 @@ class DependencyContainer(IDependencyContainer):
             )
 
     def statistics(self) -> ContainerStatistics:
-        """Get container statistics metrics aggregated across collection and provider.
-
-        Returns:
-            ContainerStatistics: Container statistics metrics.
-        """
+        """Get container statistics metrics aggregated across collection and provider."""
         with self._lock:
             provider_stats = self._provider.statistics()
+            service_stats = self._services.statistics()
             metrics: Dict[str, float] = {
                 "registered_services_count": float(self._services.count()),
                 "resolved_services_count": float(provider_stats.resolved_services_count),
                 "active_scopes_count": float(provider_stats.active_scopes_count),
             }
 
-            if isinstance(self._services, ServiceCollection):
-                metrics.update(
-                    {
-                        "total_registrations": float(self._services.total_registrations),
-                        "singleton_registrations": float(self._services.singleton_registrations),
-                        "transient_registrations": float(self._services.transient_registrations),
-                        "scoped_registrations": float(self._services.scoped_registrations),
-                        "replacements": float(self._services.replacements),
-                        "removals": float(self._services.removals),
-                        "duplicates_rejected": float(self._services.duplicates_rejected),
-                        "aliases_registered": float(self._services.aliases_registered),
-                    }
-                )
+            metrics.update(service_stats)
+            metrics.update(provider_stats.metrics)
 
             return ContainerStatistics(
                 registered_services_count=self._services.count(),
@@ -359,12 +295,17 @@ class DependencyContainer(IDependencyContainer):
                 metrics=metrics,
             )
 
-    def capabilities(self) -> ContainerCapabilities:
-        """Get container capability definitions.
+    def diagnostics(self) -> ContainerDiagnostics:
+        """Get container diagnostics snapshot.
 
         Returns:
-            ContainerCapabilities: Immutable capabilities model.
+            ContainerDiagnostics: Diagnostics snapshot.
         """
+        with self._lock:
+            return self._provider.diagnostics()
+
+    def capabilities(self) -> ContainerCapabilities:
+        """Get container capability definitions."""
         return ContainerCapabilities(
             supports_singleton=True,
             supports_transient=True,

@@ -1,7 +1,10 @@
-"""Comprehensive unit tests for Phase 14.2.2 Service Registration Engine."""
+"""Comprehensive unit tests for Phase 14.2.3 Service Resolution Engine."""
 
 import concurrent.futures
+from typing import Optional, Tuple
+# pyrefly: ignore [missing-import]
 import pytest
+# pyrefly: ignore [missing-import]
 from pydantic import ValidationError
 
 from backend.application.di.dependency_container import DependencyContainer
@@ -22,6 +25,7 @@ from backend.application.di.models import (
     ContainerCapabilities,
     ContainerConfiguration,
     ContainerContext,
+    ContainerDiagnostics,
     ContainerHealth,
     ContainerState,
     ContainerStatistics,
@@ -43,7 +47,7 @@ from backend.application.di.service_descriptor import ServiceDescriptor
 from backend.application.di.service_provider import ServiceProvider
 
 
-# Dummy service types for testing
+# Dummy service types & implementation classes for testing
 class IServiceA:
     pass
 
@@ -57,7 +61,8 @@ class IServiceB:
 
 
 class ServiceB(IServiceB):
-    pass
+    def __init__(self, service_a: IServiceA) -> None:
+        self.service_a = service_a
 
 
 class IServiceC:
@@ -65,7 +70,48 @@ class IServiceC:
 
 
 class ServiceC(IServiceC):
-    pass
+    def __init__(self, service_b: IServiceB) -> None:
+        self.service_b = service_b
+
+
+class ServiceWithOptional:
+    def __init__(self, service_a: Optional[IServiceA] = None) -> None:
+        self.service_a = service_a
+
+
+class ServiceWithOptionalNoDefault:
+    def __init__(self, service_a: Optional[IServiceA]) -> None:
+        self.service_a = service_a
+
+
+class ServiceWithDefault:
+    def __init__(self, value: int = 42) -> None:
+        self.value = value
+
+
+class CircularA:
+    def __init__(self, b: "CircularB") -> None:
+        self.b = b
+
+
+class CircularB:
+    def __init__(self, a: CircularA) -> None:
+        self.a = a
+
+
+class CircularThreeA:
+    def __init__(self, b: "CircularThreeB") -> None:
+        self.b = b
+
+
+class CircularThreeB:
+    def __init__(self, c: "CircularThreeC") -> None:
+        self.c = c
+
+
+class CircularThreeC:
+    def __init__(self, a: CircularThreeA) -> None:
+        self.a = a
 
 
 # ============================================================================
@@ -115,6 +161,18 @@ def test_container_statistics_and_health_models():
     health = ContainerHealth(is_healthy=True, state=ContainerState.READY)
     assert health.is_healthy is True
     assert health.state == ContainerState.READY
+
+
+def test_container_diagnostics_model():
+    """Verify ContainerDiagnostics model fields."""
+    diag = ContainerDiagnostics(
+        registered_services_count=10,
+        resolved_services_count=5,
+        cached_singleton_count=2,
+    )
+    assert diag.registered_services_count == 10
+    assert diag.resolved_services_count == 5
+    assert diag.cached_singleton_count == 2
 
 
 def test_service_registration_model():
@@ -206,7 +264,7 @@ def test_service_descriptor_initialization_and_to_model():
 
 def test_service_descriptor_factory_and_instance():
     """Verify ServiceDescriptor with factory and pre-constructed instance."""
-    dummy_factory = lambda: ServiceA()
+    dummy_factory = lambda provider: ServiceA()
     dummy_instance = ServiceA()
 
     desc_factory = ServiceDescriptor(service_type=IServiceA, factory=dummy_factory)
@@ -495,43 +553,322 @@ def test_service_collection_concurrent_removals():
 
 
 # ============================================================================
-# 6. ServiceProvider Component Tests
+# 6. ServiceProvider Resolution Engine Tests (Phase 14.2.3)
 # ============================================================================
 
 
-def test_service_provider_skeleton_raises_not_implemented():
-    """Verify ServiceProvider resolution methods raise NotImplementedError in Phase 14.2.2."""
-    provider = ServiceProvider()
-
-    with pytest.raises(NotImplementedError):
-        provider.resolve(IServiceA)
-
-    with pytest.raises(NotImplementedError):
-        provider.resolve_all(IServiceA)
-
-    with pytest.raises(NotImplementedError):
-        provider.create_scope()
-
-    with pytest.raises(NotImplementedError):
-        provider.dispose()
-
-
-def test_service_provider_health_and_statistics():
-    """Verify ServiceProvider health and statistics metrics."""
+def test_service_provider_singleton_resolution_caching():
+    """Verify SINGLETON lifetime services are constructed once and cached."""
     services = ServiceCollection()
     services.add_singleton(IServiceA, ServiceA)
     provider = ServiceProvider(services=services)
 
-    health = provider.health()
-    assert health.is_healthy is True
-    assert health.state == ContainerState.READY
+    instance1 = provider.resolve(IServiceA)
+    instance2 = provider.resolve(IServiceA)
+
+    assert isinstance(instance1, ServiceA)
+    assert instance1 is instance2
+    assert provider.singleton_hits == 1
+    assert provider.singleton_creations == 1
+
+
+def test_service_provider_transient_resolution_fresh_instances():
+    """Verify TRANSIENT lifetime services create a new instance on every resolve."""
+    services = ServiceCollection()
+    services.add_transient(IServiceA, ServiceA)
+    provider = ServiceProvider(services=services)
+
+    instance1 = provider.resolve(IServiceA)
+    instance2 = provider.resolve(IServiceA)
+
+    assert isinstance(instance1, ServiceA)
+    assert isinstance(instance2, ServiceA)
+    assert instance1 is not instance2
+    assert provider.transient_creations == 2
+
+
+def test_service_provider_factory_resolution():
+    """Verify factory callable resolution with ServiceProvider parameter."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA)
+    services.add_singleton(
+        IServiceB,
+        factory=lambda p: ServiceB(service_a=p.resolve(IServiceA)),
+    )
+    provider = ServiceProvider(services=services)
+
+    instance_b = provider.resolve(IServiceB)
+    assert isinstance(instance_b, ServiceB)
+    assert isinstance(instance_b.service_a, ServiceA)
+    assert provider.factory_executions == 1
+
+
+def test_service_provider_scoped_resolution_raises_not_implemented():
+    """Verify resolving a SCOPED service raises NotImplementedError in Phase 14.2.3."""
+    services = ServiceCollection()
+    services.add_scoped(IServiceA, ServiceA)
+    provider = ServiceProvider(services=services)
+
+    with pytest.raises(NotImplementedError):
+        provider.resolve(IServiceA)
+
+
+def test_service_provider_recursive_constructor_injection():
+    """Verify 2-level and 3-level recursive constructor dependency injection."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA)
+    services.add_singleton(IServiceB, ServiceB)
+    services.add_singleton(IServiceC, ServiceC)
+    provider = ServiceProvider(services=services)
+
+    instance_c = provider.resolve(IServiceC)
+    assert isinstance(instance_c, ServiceC)
+    assert isinstance(instance_c.service_b, ServiceB)
+    assert isinstance(instance_c.service_b.service_a, ServiceA)
+
+
+def test_service_provider_optional_constructor_dependency():
+    """Verify resolving constructor with Optional dependency when present and missing."""
+    services = ServiceCollection()
+    services.add_transient(ServiceWithOptional, ServiceWithOptional)
+    provider = ServiceProvider(services=services)
+
+    # Missing Optional dependency -> resolves with None
+    obj1 = provider.resolve(ServiceWithOptional)
+    assert obj1.service_a is None
+
+    # Register Optional dependency -> resolves with instance
+    services.add_singleton(IServiceA, ServiceA)
+    obj2 = provider.resolve(ServiceWithOptional)
+    assert isinstance(obj2.service_a, ServiceA)
+
+
+def test_service_provider_resolve_missing_optional_parameter_default_none():
+    """Verify resolving constructor with Optional[T] parameter without default value."""
+    services = ServiceCollection()
+    services.add_transient(ServiceWithOptionalNoDefault, ServiceWithOptionalNoDefault)
+    provider = ServiceProvider(services=services)
+
+    obj = provider.resolve(ServiceWithOptionalNoDefault)
+    assert obj.service_a is None
+
+
+def test_service_provider_constructor_default_parameter_fallback():
+    """Verify constructor parameters with default values fall back to default when unresolvable."""
+    services = ServiceCollection()
+    services.add_transient(ServiceWithDefault, ServiceWithDefault)
+    provider = ServiceProvider(services=services)
+
+    obj = provider.resolve(ServiceWithDefault)
+    assert obj.value == 42
+
+
+def test_service_provider_missing_dependency_raises():
+    """Verify resolving unregistered service or missing required dependency raises ServiceResolutionException."""
+    services = ServiceCollection()
+    provider = ServiceProvider(services=services)
+
+    with pytest.raises(ServiceResolutionException):
+        provider.resolve(IServiceA)
+
+    services.add_singleton(IServiceB, ServiceB)  # Missing IServiceA dependency
+    with pytest.raises(ServiceResolutionException):
+        provider.resolve(IServiceB)
+
+
+def test_service_provider_create_instance_non_class_raises():
+    """Verify calling create_instance with non-class type raises ServiceResolutionException."""
+    provider = ServiceProvider()
+    with pytest.raises(ServiceResolutionException):
+        provider.create_instance(123)  # type: ignore[arg-type]
+
+
+def test_service_provider_resolve_instance_placeholder():
+    """Verify descriptor with pre-constructed instance returns that exact instance."""
+    services = ServiceCollection()
+    pre_inst = ServiceA()
+    services.add_singleton(IServiceA, instance=pre_inst)
+    provider = ServiceProvider(services=services)
+
+    assert provider.resolve(IServiceA) is pre_inst
+
+
+def test_service_provider_circular_dependency_detection_two_nodes():
+    """Verify circular dependency detection A -> B -> A raises CircularDependencyException."""
+    services = ServiceCollection()
+    services.add_transient(CircularA, CircularA)
+    services.add_transient(CircularB, CircularB)
+    provider = ServiceProvider(services=services)
+
+    with pytest.raises(CircularDependencyException) as exc_info:
+        provider.resolve(CircularA)
+
+    assert "Circular dependency detected" in str(exc_info.value)
+    assert "CircularA -> CircularB -> CircularA" in str(exc_info.value)
+
+
+def test_service_provider_circular_dependency_detection_three_nodes():
+    """Verify circular dependency detection A -> B -> C -> A raises CircularDependencyException."""
+    services = ServiceCollection()
+    services.add_transient(CircularThreeA, CircularThreeA)
+    services.add_transient(CircularThreeB, CircularThreeB)
+    services.add_transient(CircularThreeC, CircularThreeC)
+    provider = ServiceProvider(services=services)
+
+    with pytest.raises(CircularDependencyException) as exc_info:
+        provider.resolve(CircularThreeA)
+
+    assert "Circular dependency detected" in str(exc_info.value)
+    assert "CircularThreeA -> CircularThreeB -> CircularThreeC -> CircularThreeA" in str(exc_info.value)
+
+
+def test_service_provider_try_resolve():
+    """Verify try_resolve returns instance on success and None on failure or Scoped."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA)
+    services.add_scoped(IServiceB, ServiceB)
+    provider = ServiceProvider(services=services)
+
+    assert isinstance(provider.try_resolve(IServiceA), ServiceA)
+    assert provider.try_resolve(IServiceB) is None  # Scoped -> None
+    assert provider.try_resolve(IServiceC) is None  # Missing -> None
+
+
+def test_service_provider_resolve_required():
+    """Verify resolve_required resolves service instance or raises exception."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA)
+    provider = ServiceProvider(services=services)
+
+    assert isinstance(provider.resolve_required(IServiceA), ServiceA)
+    with pytest.raises(ServiceResolutionException):
+        provider.resolve_required(IServiceB)
+
+
+def test_service_provider_resolve_all():
+    """Verify resolve_all returns tuple of resolved instances."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA)
+    provider = ServiceProvider(services=services)
+
+    res = provider.resolve_all(IServiceA)
+    assert len(res) == 1
+    assert isinstance(res[0], ServiceA)
+
+    assert provider.resolve_all(IServiceB) == ()
+
+
+def test_service_provider_create_instance():
+    """Verify create_instance directly instantiates class with DI."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA)
+    provider = ServiceProvider(services=services)
+
+    instance_b = provider.create_instance(ServiceB)
+    assert isinstance(instance_b, ServiceB)
+    assert isinstance(instance_b.service_a, ServiceA)
+
+
+def test_service_provider_resolve_by_alias():
+    """Verify resolving services by registered alias string."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA, aliases=("service_a_alias",))
+    provider = ServiceProvider(services=services)
+
+    instance = provider.resolve("service_a_alias")
+    assert isinstance(instance, ServiceA)
+
+
+def test_service_provider_signature_caching():
+    """Verify constructor parameter signatures are cached in _signature_cache."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA)
+    provider = ServiceProvider(services=services)
+
+    provider.create_instance(ServiceB)
+    assert ServiceB in provider._signature_cache
+    assert len(provider._signature_cache[ServiceB]) == 1
+
+
+def test_service_provider_resolution_statistics_and_diagnostics():
+    """Verify resolution statistics and detailed diagnostics snapshots."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA)
+    provider = ServiceProvider(services=services)
+
+    provider.resolve(IServiceA)
+    provider.resolve(IServiceA)
 
     stats = provider.statistics()
-    assert stats.registered_services_count == 1
+    assert stats.resolved_services_count == 2
+    assert stats.metrics["singleton_hits"] == 1.0
+
+    diag = provider.diagnostics()
+    assert diag.resolved_services_count == 2
+    assert diag.cached_singleton_count == 1
+    assert diag.active_resolution_stack == ()
+
+
+def test_service_provider_failed_resolutions_counter():
+    """Verify failed_resolutions counter increments on failure."""
+    services = ServiceCollection()
+    provider = ServiceProvider(services=services)
+
+    with pytest.raises(ServiceResolutionException):
+        provider.resolve(IServiceA)
+
+    assert provider.failed_resolutions == 1
+
+
+def test_service_provider_concurrent_singleton_resolution():
+    """Verify thread-safe concurrent SINGLETON resolutions return the exact same instance."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA)
+    provider = ServiceProvider(services=services)
+
+    def do_resolve():
+        return provider.resolve(IServiceA)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(do_resolve) for _ in range(50)]
+        results = [f.result() for f in futures]
+
+    first_instance = results[0]
+    assert all(inst is first_instance for inst in results)
+
+
+def test_service_provider_concurrent_transient_resolution():
+    """Verify thread-safe concurrent TRANSIENT resolutions construct distinct instances."""
+    services = ServiceCollection()
+    services.add_transient(IServiceA, ServiceA)
+    provider = ServiceProvider(services=services)
+
+    def do_resolve():
+        return provider.resolve(IServiceA)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(do_resolve) for _ in range(50)]
+        results = [f.result() for f in futures]
+
+    assert len(set(results)) == 50
+
+
+def test_service_provider_dispose_clears_caches():
+    """Verify ServiceProvider dispose clears singleton and signature caches."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA)
+    provider = ServiceProvider(services=services)
+
+    provider.resolve(IServiceA)
+    assert len(provider._singleton_cache) == 1
+
+    provider.dispose()
+    assert len(provider._singleton_cache) == 0
+    assert len(provider._signature_cache) == 0
 
 
 # ============================================================================
-# 7. DependencyContainer Component Tests
+# 7. DependencyContainer Resolution Delegation Tests
 # ============================================================================
 
 
@@ -549,6 +886,34 @@ def test_dependency_container_lifecycle():
 
     shutdown_state = container.shutdown()
     assert shutdown_state == ContainerState.STOPPED
+
+
+def test_dependency_container_resolution_delegation():
+    """Verify DependencyContainer resolution delegation APIs."""
+    container = DependencyContainer()
+    container.add_singleton(IServiceA, ServiceA)
+    container.add_singleton(IServiceB, ServiceB)
+
+    instance_b = container.resolve(IServiceB)
+    assert isinstance(instance_b, ServiceB)
+
+    req_instance = container.resolve_required(IServiceA)
+    assert isinstance(req_instance, ServiceA)
+
+    try_instance = container.try_resolve(IServiceA)
+    assert isinstance(try_instance, ServiceA)
+
+    all_instances = container.resolve_all(IServiceA)
+    assert len(all_instances) == 1
+
+    diag = container.diagnostics()
+    assert diag.resolved_services_count == 5
+
+
+def test_dependency_container_try_resolve_missing():
+    """Verify DependencyContainer try_resolve returns None for missing service."""
+    container = DependencyContainer()
+    assert container.try_resolve(IServiceA) is None
 
 
 def test_dependency_container_registration_delegation():

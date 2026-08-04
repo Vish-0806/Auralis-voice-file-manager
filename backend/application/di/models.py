@@ -1,8 +1,8 @@
-"""Dependency Injection Domain Models (Phase 14.2.2).
+"""Dependency Injection Domain Models (Phase 14.2.3).
 
 Defines immutable Pydantic v2 domain models and enums representing service lifetimes,
 container states, descriptors, registrations, dependency graph nodes, capabilities,
-health metrics, statistics, configuration, and execution context.
+health metrics, statistics, diagnostics, configuration, and execution context.
 """
 
 from datetime import datetime, timezone
@@ -93,6 +93,21 @@ class ContainerStatistics(BaseModel):
     resolved_services_count: int = 0
     active_scopes_count: int = 0
     metrics: Dict[str, float] = Field(default_factory=dict)
+
+
+class ContainerDiagnostics(BaseModel):
+    """Immutable model containing detailed container resolution diagnostics."""
+
+    model_config = ConfigDict(frozen=True)
+
+    registered_services_count: int = 0
+    resolved_services_count: int = 0
+    cached_singleton_count: int = 0
+    active_resolution_stack: Tuple[str, ...] = Field(default_factory=tuple)
+    failed_resolutions_count: int = 0
+    circular_dependency_count: int = 0
+    metrics: Dict[str, float] = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ContainerHealth(BaseModel):
