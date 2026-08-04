@@ -1,12 +1,12 @@
-"""Configuration Runtime Domain Models (Phase 14.3.1).
+"""Configuration Runtime Domain Models (Phase 14.3.2).
 
 Defines immutable Pydantic v2 domain models and enums representing configuration runtime states,
 source types, profile types, capabilities, health metrics, statistics, configuration context,
-profiles, sources, and diagnostics snapshots.
+profiles, sources, entries, snapshots, registrations, and diagnostics snapshots.
 """
 
 from datetime import datetime, timezone
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import Any, Dict, Optional, Tuple
 # pyrefly: ignore [missing-import]
 from pydantic import BaseModel, ConfigDict, Field
@@ -40,6 +40,18 @@ class ConfigurationProfileType(str, Enum):
     TESTING = "TESTING"
     STAGING = "STAGING"
     PRODUCTION = "PRODUCTION"
+
+
+class SourcePriority(IntEnum):
+    """Default numerical priority levels for configuration sources (higher overrides lower)."""
+
+    MEMORY = 500
+    ENVIRONMENT = 400
+    DOTENV = 300
+    JSON = 200
+    YAML = 100
+    REMOTE = 50
+    DEFAULT = 0
 
 
 class ConfigurationState(BaseModel):
@@ -113,14 +125,72 @@ class ConfigurationProfile(BaseModel):
 
 
 class ConfigurationSource(BaseModel):
-    """Immutable model representing a registered configuration source."""
+    """Immutable model representing a registered configuration source metadata."""
 
     model_config = ConfigDict(frozen=True)
 
     source_type: ConfigurationSourceType = ConfigurationSourceType.MEMORY
     source_name: str = "default_memory"
     enabled: bool = True
+    priority: int = int(SourcePriority.MEMORY)
+
+
+class SourceRegistration(BaseModel):
+    """Immutable record for a registered configuration source."""
+
+    model_config = ConfigDict(frozen=True)
+
+    source_name: str
+    source_type: ConfigurationSourceType
     priority: int = 100
+    enabled: bool = True
+    registered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class SourceStatistics(BaseModel):
+    """Immutable metrics model for an individual configuration source."""
+
+    model_config = ConfigDict(frozen=True)
+
+    total_keys: int = 0
+    lookups_count: int = 0
+    hits_count: int = 0
+    misses_count: int = 0
+    metrics: Dict[str, float] = Field(default_factory=dict)
+
+
+class SourceHealth(BaseModel):
+    """Immutable health assessment for an individual configuration source."""
+
+    model_config = ConfigDict(frozen=True)
+
+    is_healthy: bool = True
+    source_name: str = ""
+    issues: Tuple[str, ...] = Field(default_factory=tuple)
+    checked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ConfigurationEntry(BaseModel):
+    """Immutable record for a single resolved configuration entry."""
+
+    model_config = ConfigDict(frozen=True)
+
+    key: str
+    value: Any
+    source_name: str
+    source_type: ConfigurationSourceType
+    priority: int
+    loaded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ConfigurationSnapshot(BaseModel):
+    """Immutable merged snapshot of all active configuration values."""
+
+    model_config = ConfigDict(frozen=True)
+
+    values: Dict[str, Any] = Field(default_factory=dict)
+    sources_metadata: Tuple[Dict[str, Any], ...] = Field(default_factory=tuple)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ConfigurationDiagnostics(BaseModel):
