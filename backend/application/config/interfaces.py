@@ -1,4 +1,4 @@
-"""Configuration Runtime Interfaces (Phase 14.3.3).
+"""Configuration Runtime Interfaces (Phase 14.3.4).
 
 Defines Abstract Base Classes (ABCs) establishing explicit design contracts for
 IConfigurationSource, ConfigurationRuntime, ConfigurationProvider, ConfigurationManager,
@@ -14,6 +14,7 @@ from backend.application.config.models import (
     ConfigurationDiagnostics,
     ConfigurationEntry,
     ConfigurationHealth,
+    ConfigurationProfileDefinition,
     ConfigurationResolutionResult,
     ConfigurationRuntimeState,
     ConfigurationSchema,
@@ -21,6 +22,8 @@ from backend.application.config.models import (
     ConfigurationSourceType,
     ConfigurationStatistics,
     ConfigurationValidationResult,
+    FeatureEvaluation,
+    FeatureFlag,
     SourceHealth,
     SourceStatistics,
 )
@@ -165,6 +168,36 @@ class IConfigurationManager(ABC):
     @abstractmethod
     def register_schema(self, schema: ConfigurationSchema) -> bool:
         """Register a configuration schema."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def activate_profile(self, profile_name: str) -> bool:
+        """Activate runtime configuration profile."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_active_profile(self) -> ConfigurationProfileDefinition:
+        """Get currently active ConfigurationProfileDefinition."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def register_profile(self, profile: ConfigurationProfileDefinition) -> bool:
+        """Register a configuration profile."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def is_feature_enabled(self, feature_name: str) -> bool:
+        """Evaluate if feature flag is enabled."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def evaluate_feature(self, feature_name: str) -> FeatureEvaluation:
+        """Get detailed FeatureEvaluation report for feature flag."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def register_feature(self, feature: FeatureFlag) -> bool:
+        """Register a feature flag."""
         raise NotImplementedError
 
 

@@ -1,7 +1,7 @@
-"""Configuration Provider (Phase 14.3.3).
+"""Configuration Provider (Phase 14.3.4).
 
 Thread-safe production configuration provider runtime coordinating configuration state,
-sources, resolution, validation, context, capabilities, health reporting, statistics, and diagnostics snapshots.
+sources, resolution, validation, profiles, feature flags, context, capabilities, health reporting, statistics, and diagnostics snapshots.
 """
 
 from datetime import datetime, timezone
@@ -16,19 +16,22 @@ from backend.application.config.models import (
     ConfigurationContext,
     ConfigurationDiagnostics,
     ConfigurationHealth,
+    ConfigurationProfileDefinition,
     ConfigurationProfileType,
     ConfigurationResolutionResult,
     ConfigurationRuntimeState,
     ConfigurationSchema,
     ConfigurationStatistics,
     ConfigurationValidationResult,
+    FeatureEvaluation,
+    FeatureFlag,
 )
 
 logger = logging.getLogger(__name__)
 
 
 class ConfigurationProvider(IConfigurationProvider):
-    """Production ConfigurationProvider runtime executing configuration state, source, resolution, and validation management."""
+    """Production ConfigurationProvider runtime executing configuration state, source, resolution, validation, profiles, and feature flags."""
 
     def __init__(
         self,
@@ -52,6 +55,36 @@ class ConfigurationProvider(IConfigurationProvider):
         """Get the underlying ConfigurationSourceManager instance."""
         with self._lock:
             return self._source_manager
+
+    def activate_profile(self, profile_name: str) -> bool:
+        """Activate runtime configuration profile."""
+        with self._lock:
+            return self._source_manager.activate_profile(profile_name)
+
+    def get_active_profile(self) -> ConfigurationProfileDefinition:
+        """Get currently active profile definition."""
+        with self._lock:
+            return self._source_manager.get_active_profile()
+
+    def register_profile(self, profile: ConfigurationProfileDefinition) -> bool:
+        """Register a configuration profile."""
+        with self._lock:
+            return self._source_manager.register_profile(profile)
+
+    def is_feature_enabled(self, feature_name: str) -> bool:
+        """Evaluate if feature flag is enabled."""
+        with self._lock:
+            return self._source_manager.is_feature_enabled(feature_name)
+
+    def evaluate_feature(self, feature_name: str) -> FeatureEvaluation:
+        """Get detailed FeatureEvaluation report for feature flag."""
+        with self._lock:
+            return self._source_manager.evaluate_feature(feature_name)
+
+    def register_feature(self, feature: FeatureFlag) -> bool:
+        """Register a feature flag."""
+        with self._lock:
+            return self._source_manager.register_feature(feature)
 
     def register_schema(self, schema: ConfigurationSchema) -> bool:
         """Register a configuration schema."""
@@ -130,7 +163,7 @@ class ConfigurationProvider(IConfigurationProvider):
             return ConfigurationStatistics(
                 total_properties_loaded=sm_stats.total_properties_loaded,
                 active_sources_count=sm_stats.active_sources_count,
-                profiles_loaded_count=1,
+                profiles_loaded_count=sm_stats.profiles_loaded_count,
                 reload_count=self._reload_count,
                 metrics=metrics,
             )
@@ -158,7 +191,9 @@ class ConfigurationProvider(IConfigurationProvider):
                 statistics=stats,
                 resolution_statistics=self._source_manager.resolver.statistics(),
                 validation_statistics=self._source_manager.validator.statistics(),
-                active_profile_name=self._context.environment.value.lower(),
+                profile_statistics=self._source_manager.profile_manager.statistics(),
+                feature_statistics=self._source_manager.feature_manager.statistics(),
+                active_profile_name=self.get_active_profile().profile_name,
                 active_sources_count=stats.active_sources_count,
                 metrics=stats.metrics,
                 timestamp=datetime.now(timezone.utc),

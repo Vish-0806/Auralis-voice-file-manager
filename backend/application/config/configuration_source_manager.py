@@ -1,7 +1,7 @@
-"""Configuration Source Manager (Phase 14.3.3).
+"""Configuration Source Manager (Phase 14.3.4).
 
-Coordinates registered configuration sources, resolves values based on deterministic source priority,
-applies schema defaults and type conversions, performs constraint validations, and produces immutable reports.
+Coordinates registered configuration sources, profile overrides, feature flag evaluation,
+type conversions, constraint validations, and diagnostics reports.
 """
 
 from datetime import datetime, timezone
@@ -14,26 +14,32 @@ from backend.application.config.configuration_schema import ConfigurationSchemaM
 from backend.application.config.configuration_validator import ConfigurationValidator
 from backend.application.config.dotenv_source import DotEnvConfigurationSource
 from backend.application.config.environment_source import EnvironmentConfigurationSource
+from backend.application.config.feature_flag_manager import FeatureFlagManager
 from backend.application.config.interfaces import IConfigurationManager, IConfigurationSource
 from backend.application.config.memory_source import MemoryConfigurationSource
 from backend.application.config.models import (
     ConfigurationDiagnostics,
     ConfigurationEntry,
     ConfigurationHealth,
+    ConfigurationProfileDefinition,
     ConfigurationResolutionResult,
     ConfigurationRuntimeState,
     ConfigurationSchema,
     ConfigurationSnapshot,
+    ConfigurationSourceType,
     ConfigurationStatistics,
     ConfigurationValidationResult,
+    FeatureEvaluation,
+    FeatureFlag,
 )
+from backend.application.config.profile_manager import ProfileManager
 from backend.application.config.source_registry import SourceRegistry
 
 logger = logging.getLogger(__name__)
 
 
 class ConfigurationSourceManager(IConfigurationManager):
-    """Production priority-based configuration source resolution, conversion, and validation manager."""
+    """Production priority-based configuration source resolution, profiles, feature flag, conversion, and validation manager."""
 
     def __init__(
         self,
@@ -41,20 +47,17 @@ class ConfigurationSourceManager(IConfigurationManager):
         schema_manager: Optional[ConfigurationSchemaManager] = None,
         resolver: Optional[ConfigurationResolver] = None,
         validator: Optional[ConfigurationValidator] = None,
+        profile_manager: Optional[ProfileManager] = None,
+        feature_manager: Optional[FeatureFlagManager] = None,
     ) -> None:
-        """Initialize ConfigurationSourceManager using Constructor Dependency Injection.
-
-        Args:
-            registry: Optional SourceRegistry instance.
-            schema_manager: Optional ConfigurationSchemaManager instance.
-            resolver: Optional ConfigurationResolver instance.
-            validator: Optional ConfigurationValidator instance.
-        """
+        """Initialize ConfigurationSourceManager using Constructor Dependency Injection."""
         self._lock = RLock()
         self._registry = registry or SourceRegistry()
         self._schema_manager = schema_manager or ConfigurationSchemaManager()
         self._resolver = resolver or ConfigurationResolver(schema_manager=self._schema_manager)
         self._validator = validator or ConfigurationValidator(schema_manager=self._schema_manager)
+        self._profile_manager = profile_manager or ProfileManager()
+        self._feature_manager = feature_manager or FeatureFlagManager()
 
         # Register default sources if registry is empty
         if self._registry.count() == 0:
@@ -90,6 +93,50 @@ class ConfigurationSourceManager(IConfigurationManager):
         with self._lock:
             return self._validator
 
+    @property
+    def profile_manager(self) -> ProfileManager:
+        """Get underlying ProfileManager."""
+        with self._lock:
+            return self._profile_manager
+
+    @property
+    def feature_manager(self) -> FeatureFlagManager:
+        """Get underlying FeatureFlagManager."""
+        with self._lock:
+            return self._feature_manager
+
+    def activate_profile(self, profile_name: str) -> bool:
+        """Activate runtime configuration profile."""
+        with self._lock:
+            return self._profile_manager.activate_profile(profile_name)
+
+    def get_active_profile(self) -> ConfigurationProfileDefinition:
+        """Get currently active profile definition."""
+        with self._lock:
+            return self._profile_manager.get_active_profile()
+
+    def register_profile(self, profile: ConfigurationProfileDefinition) -> bool:
+        """Register a configuration profile."""
+        with self._lock:
+            return self._profile_manager.register_profile(profile)
+
+    def is_feature_enabled(self, feature_name: str) -> bool:
+        """Evaluate if feature flag is enabled."""
+        with self._lock:
+            active_p = self.get_active_profile().profile_name
+            return self._feature_manager.is_enabled(feature_name, active_profile_name=active_p)
+
+    def evaluate_feature(self, feature_name: str) -> FeatureEvaluation:
+        """Get detailed FeatureEvaluation report for feature flag."""
+        with self._lock:
+            active_p = self.get_active_profile().profile_name
+            return self._feature_manager.evaluate(feature_name, active_profile_name=active_p)
+
+    def register_feature(self, feature: FeatureFlag) -> bool:
+        """Register a feature flag."""
+        with self._lock:
+            return self._feature_manager.register_feature(feature)
+
     def register_schema(self, schema: ConfigurationSchema) -> bool:
         """Register a configuration schema."""
         with self._lock:
@@ -106,18 +153,12 @@ class ConfigurationSourceManager(IConfigurationManager):
             return self._registry.unregister_source(source_name)
 
     def get_entry(self, key: str) -> Optional[ConfigurationEntry]:
-        """Get detailed ConfigurationEntry with source metadata for the highest priority source matching key.
-
-        Args:
-            key: Configuration key string.
-
-        Returns:
-            Optional[ConfigurationEntry]: Resolved entry model or None if missing.
-        """
+        """Get detailed ConfigurationEntry with source metadata for the highest priority source matching key."""
         with self._lock:
             self._lookups_count += 1
-            sorted_sources = self._registry.sort_sources()
 
+            # Check sources first
+            sorted_sources = self._registry.sort_sources()
             for source in sorted_sources:
                 if source.enabled and source.contains(key):
                     val = source.get(key)
@@ -131,11 +172,25 @@ class ConfigurationSourceManager(IConfigurationManager):
                         loaded_at=datetime.now(timezone.utc),
                     )
 
+            # Check profile overrides next
+            prof_overrides = self._profile_manager.resolve_profile()
+            if key in prof_overrides:
+                self._hits_count += 1
+                active_p = self.get_active_profile().profile_name
+                return ConfigurationEntry(
+                    key=key,
+                    value=prof_overrides[key],
+                    source_name=f"profile:{active_p}",
+                    source_type=ConfigurationSourceType.MEMORY,
+                    priority=250,
+                    loaded_at=datetime.now(timezone.utc),
+                )
+
             self._misses_count += 1
             return None
 
     def get(self, key: str, default: Optional[Any] = None) -> Any:
-        """Get configuration value for key from the highest priority active source."""
+        """Get configuration value for key from the highest priority active source or profile."""
         entry = self.get_entry(key)
         return entry.value if entry is not None else default
 
@@ -158,17 +213,24 @@ class ConfigurationSourceManager(IConfigurationManager):
             return self._validator.validate(resolved_result.resolved_values, schema=schema)
 
     def has(self, key: str) -> bool:
-        """Check if a configuration key exists in any active source."""
+        """Check if a configuration key exists in any active source or profile."""
         with self._lock:
             for source in self._registry.sort_sources():
                 if source.enabled and source.contains(key):
                     return True
-            return False
+            prof_overrides = self._profile_manager.resolve_profile()
+            return key in prof_overrides
 
     def get_all(self) -> Dict[str, Any]:
         """Get all merged configuration key-value pairs."""
         with self._lock:
             merged: Dict[str, Any] = {}
+
+            # Apply profile overrides first
+            prof_overrides = self._profile_manager.resolve_profile()
+            merged.update(prof_overrides)
+
+            # Apply sources from lowest to highest priority
             sources = list(self._registry.sort_sources())
             sources.reverse()
 
@@ -214,6 +276,16 @@ class ConfigurationSourceManager(IConfigurationManager):
                     all_healthy = False
                     issues.extend(s_health.issues)
 
+            prof_health = self._profile_manager.health()
+            if not prof_health.is_healthy:
+                all_healthy = False
+                issues.extend(prof_health.issues)
+
+            feat_health = self._feature_manager.health()
+            if not feat_health.is_healthy:
+                all_healthy = False
+                issues.extend(feat_health.issues)
+
             val_res = self.validate()
             if not val_res.is_valid:
                 all_healthy = False
@@ -233,6 +305,8 @@ class ConfigurationSourceManager(IConfigurationManager):
             all_values = self.get_all()
             res_stats = self._resolver.statistics()
             val_stats = self._validator.statistics()
+            prof_stats = self._profile_manager.statistics()
+            feat_stats = self._feature_manager.statistics()
 
             metrics = {
                 "total_properties_loaded": float(len(all_values)),
@@ -243,12 +317,14 @@ class ConfigurationSourceManager(IConfigurationManager):
                 "conversions_count": float(res_stats.conversion_count),
                 "defaults_count": float(res_stats.default_applications),
                 "validations_count": float(val_stats.validation_count),
+                "profiles_count": float(prof_stats.registered_profiles_count),
+                "features_count": float(feat_stats.total_features),
             }
 
             return ConfigurationStatistics(
                 total_properties_loaded=len(all_values),
                 active_sources_count=self._registry.count(),
-                profiles_loaded_count=1,
+                profiles_loaded_count=prof_stats.registered_profiles_count,
                 reload_count=0,
                 metrics=metrics,
             )
@@ -262,7 +338,9 @@ class ConfigurationSourceManager(IConfigurationManager):
                 statistics=self.statistics(),
                 resolution_statistics=self._resolver.statistics(),
                 validation_statistics=self._validator.statistics(),
-                active_profile_name="development",
+                profile_statistics=self._profile_manager.statistics(),
+                feature_statistics=self._feature_manager.statistics(),
+                active_profile_name=self.get_active_profile().profile_name,
                 active_sources_count=self._registry.count(),
                 metrics={
                     "lookups": float(self._lookups_count),

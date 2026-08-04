@@ -1,7 +1,7 @@
-"""Configuration Package Exports (Phase 14.3.3).
+"""Configuration Package Exports (Phase 14.3.4).
 
 Package exports for models, exceptions, interfaces, configuration sources,
-source registry, source manager, schema manager, resolver, validator, provider, runtime, and lazy singleton accessors.
+source registry, source manager, schema manager, resolver, validator, profile manager, feature flag manager, provider, runtime, and lazy singleton accessors.
 """
 
 from backend.application.config.configuration_provider import ConfigurationProvider
@@ -20,6 +20,7 @@ from backend.application.config.exceptions import (
     ConfigurationSourceError,
     ConfigurationValidationError,
 )
+from backend.application.config.feature_flag_manager import FeatureFlagManager
 from backend.application.config.interfaces import (
     IConfigurationDiagnostics,
     IConfigurationManager,
@@ -39,6 +40,8 @@ from backend.application.config.models import (
     ConfigurationError,
     ConfigurationHealth,
     ConfigurationProfile,
+    ConfigurationProfileDefinition,
+    ConfigurationProfileSnapshot,
     ConfigurationProfileType,
     ConfigurationResolutionResult,
     ConfigurationRuntimeState,
@@ -50,6 +53,12 @@ from backend.application.config.models import (
     ConfigurationStatistics,
     ConfigurationValidationResult,
     ConfigurationWarning,
+    FeatureEvaluation,
+    FeatureFlag,
+    FeatureHealth,
+    FeatureStatistics,
+    ProfileHealth,
+    ProfileStatistics,
     ResolutionStatistics,
     SourceHealth,
     SourcePriority,
@@ -57,6 +66,7 @@ from backend.application.config.models import (
     SourceStatistics,
     ValidationStatistics,
 )
+from backend.application.config.profile_manager import ProfileManager
 from backend.application.config.runtime import (
     get_configuration_provider,
     get_configuration_runtime,
@@ -78,8 +88,16 @@ __all__ = [
     "ConfigurationStatistics",
     "ResolutionStatistics",
     "ValidationStatistics",
+    "ProfileStatistics",
+    "ProfileHealth",
+    "FeatureStatistics",
+    "FeatureHealth",
     "ConfigurationContext",
     "ConfigurationProfile",
+    "ConfigurationProfileDefinition",
+    "ConfigurationProfileSnapshot",
+    "FeatureFlag",
+    "FeatureEvaluation",
     "ConfigurationSource",
     "SourceRegistration",
     "SourceStatistics",
@@ -113,6 +131,8 @@ __all__ = [
     "ConfigurationSchemaManager",
     "ConfigurationResolver",
     "ConfigurationValidator",
+    "ProfileManager",
+    "FeatureFlagManager",
     "ConfigurationSourceManager",
     "ConfigurationProvider",
     "ConfigurationRuntime",

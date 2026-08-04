@@ -1,9 +1,9 @@
-"""Configuration Runtime Domain Models (Phase 14.3.3).
+"""Configuration Runtime Domain Models (Phase 14.3.4).
 
 Defines immutable Pydantic v2 domain models and enums representing configuration runtime states,
 source types, profile types, capabilities, health metrics, statistics, configuration context,
 profiles, sources, entries, snapshots, definitions, constraints, schemas, validation results,
-resolution results, and diagnostics snapshots.
+resolution results, feature flags, evaluations, profile definitions, and diagnostics snapshots.
 """
 
 from datetime import datetime, timezone
@@ -124,6 +124,48 @@ class ValidationStatistics(BaseModel):
     failed_validations: int = 0
 
 
+class ProfileStatistics(BaseModel):
+    """Immutable metrics model for configuration profile management."""
+
+    model_config = ConfigDict(frozen=True)
+
+    registered_profiles_count: int = 0
+    active_profile_switches_count: int = 0
+    inheritance_resolutions_count: int = 0
+
+
+class ProfileHealth(BaseModel):
+    """Immutable health model for configuration profile subsystem."""
+
+    model_config = ConfigDict(frozen=True)
+
+    is_healthy: bool = True
+    active_profile_name: str = "development"
+    issues: Tuple[str, ...] = Field(default_factory=tuple)
+    checked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class FeatureStatistics(BaseModel):
+    """Immutable metrics model for feature flag subsystem."""
+
+    model_config = ConfigDict(frozen=True)
+
+    total_features: int = 0
+    enabled_features: int = 0
+    evaluations_count: int = 0
+    cache_hits: int = 0
+
+
+class FeatureHealth(BaseModel):
+    """Immutable health model for feature flag subsystem."""
+
+    model_config = ConfigDict(frozen=True)
+
+    is_healthy: bool = True
+    issues: Tuple[str, ...] = Field(default_factory=tuple)
+    checked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class ConfigurationContext(BaseModel):
     """Immutable model snapshotting runtime execution context for configuration."""
 
@@ -144,6 +186,58 @@ class ConfigurationProfile(BaseModel):
     profile_name: str = "development"
     active: bool = True
     priority: int = 100
+
+
+class ConfigurationProfileDefinition(BaseModel):
+    """Immutable model defining a configuration profile with overrides and inheritance."""
+
+    model_config = ConfigDict(frozen=True)
+
+    profile_type: ConfigurationProfileType = ConfigurationProfileType.DEVELOPMENT
+    profile_name: str = "development"
+    parent_profile_name: Optional[str] = None
+    overrides: Dict[str, Any] = Field(default_factory=dict)
+    active: bool = True
+    priority: int = 100
+
+
+class ConfigurationProfileSnapshot(BaseModel):
+    """Immutable snapshot of active profile and merged overrides."""
+
+    model_config = ConfigDict(frozen=True)
+
+    active_profile_name: str = "development"
+    parent_profile_name: Optional[str] = None
+    merged_values: Dict[str, Any] = Field(default_factory=dict)
+    active_features_count: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class FeatureFlag(BaseModel):
+    """Immutable model defining a feature flag configuration."""
+
+    model_config = ConfigDict(frozen=True)
+
+    feature_name: str
+    enabled: bool = True
+    description: str = ""
+    rollout_percentage: float = 100.0
+    allowed_profiles: Tuple[ConfigurationProfileType, ...] = Field(default_factory=tuple)
+    allowed_environments: Tuple[str, ...] = Field(default_factory=tuple)
+    dependencies: Tuple[str, ...] = Field(default_factory=tuple)
+
+
+class FeatureEvaluation(BaseModel):
+    """Immutable result of a feature flag evaluation."""
+
+    model_config = ConfigDict(frozen=True)
+
+    feature_name: str
+    enabled: bool
+    reason: str
+    profile_name: str = "development"
+    environment_name: str = "development"
+    evaluated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ConfigurationSource(BaseModel):
@@ -304,6 +398,8 @@ class ConfigurationDiagnostics(BaseModel):
     statistics: ConfigurationStatistics = Field(default_factory=ConfigurationStatistics)
     resolution_statistics: ResolutionStatistics = Field(default_factory=ResolutionStatistics)
     validation_statistics: ValidationStatistics = Field(default_factory=ValidationStatistics)
+    profile_statistics: ProfileStatistics = Field(default_factory=ProfileStatistics)
+    feature_statistics: FeatureStatistics = Field(default_factory=FeatureStatistics)
     active_profile_name: str = "development"
     active_sources_count: int = 0
     metrics: Dict[str, float] = Field(default_factory=dict)
