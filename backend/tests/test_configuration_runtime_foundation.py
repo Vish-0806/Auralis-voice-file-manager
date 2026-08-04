@@ -38,6 +38,8 @@ from backend.application.config.interfaces import (
     IConfigurationValidator,
 )
 from backend.application.config.memory_source import MemoryConfigurationSource
+from backend.application.config.secret_manager import SecretManager
+from backend.application.config.secret_store import SecretStore
 from backend.application.config.models import (
     ConfigurationCapabilities,
     ConfigurationConstraint,
@@ -68,6 +70,15 @@ from backend.application.config.models import (
     ProfileHealth,
     ProfileStatistics,
     ResolutionStatistics,
+    SecretAccessRecord,
+    SecretDefinition,
+    SecretEntry,
+    SecretHealth,
+    SecretPolicy,
+    SecretReference,
+    SecretSnapshot,
+    SecretStatistics,
+    SecretType,
     SourceHealth,
     SourcePriority,
     SourceRegistration,
@@ -1116,6 +1127,326 @@ def test_configuration_validator_validate_property_regex_mismatch():
 
     assert len(errs) == 1
     assert errs[0].error_type == "REGEX_MISMATCH"
+
+
+def test_secret_type_enum():
+    """Verify SecretType enum values."""
+    assert SecretType.PASSWORD.value == "PASSWORD"
+    assert SecretType.TOKEN.value == "TOKEN"
+    assert SecretType.API_KEY.value == "API_KEY"
+    assert SecretType.CERTIFICATE.value == "CERTIFICATE"
+    assert SecretType.PRIVATE_KEY.value == "PRIVATE_KEY"
+    assert SecretType.CONNECTION_STRING.value == "CONNECTION_STRING"
+    assert SecretType.CUSTOM.value == "CUSTOM"
+
+
+def test_secret_policy_and_definition_models():
+    """Verify SecretPolicy and SecretDefinition models."""
+    policy = SecretPolicy(allow_read=True, allow_write=False)
+    defn = SecretDefinition(secret_name="db_pass", secret_type=SecretType.PASSWORD, policy=policy)
+
+    assert defn.secret_name == "db_pass"
+    assert defn.policy.allow_read is True
+    assert defn.policy.allow_write is False
+
+
+def test_secret_store_register_get_and_duplicate():
+    """Verify SecretStore registration, retrieval, and duplicate rejection."""
+    store = SecretStore()
+    entry = SecretEntry(secret_name="sec1", secret_type=SecretType.PASSWORD, raw_value="supersecret", redacted_value="********")
+
+    assert store.register_secret(entry) is True
+    assert store.contains("sec1") is True
+    assert store.get_secret("sec1") == entry
+
+    with pytest.raises(ConfigurationSourceError):
+        store.register_secret(entry)
+
+
+def test_secret_store_update_remove_clear():
+    """Verify SecretStore update, remove, and clear operations."""
+    store = SecretStore()
+    entry = SecretEntry(secret_name="sec2", secret_type=SecretType.TOKEN, raw_value="tok_123", redacted_value="tok********")
+    store.register_secret(entry)
+
+    updated_entry = SecretEntry(secret_name="sec2", secret_type=SecretType.TOKEN, raw_value="tok_456", redacted_value="tok********")
+    assert store.update_secret(updated_entry) is True
+    assert store.get_secret("sec2").raw_value == "tok_456"
+
+    assert store.remove_secret("sec2") is True
+    assert store.contains("sec2") is False
+
+    store.register_secret(entry)
+    store.clear()
+    assert len(store.list_secret_names()) == 0
+
+
+def test_secret_manager_redact_algorithms():
+    """Verify SecretManager redaction rules across secret types."""
+    mgr = SecretManager()
+    assert mgr.redact("mypassword", SecretType.PASSWORD) == "********"
+    assert mgr.redact("abcdef12345", SecretType.TOKEN) == "abc********"
+    assert mgr.redact("sk-1234567890abcdef", SecretType.API_KEY) == "sk-************"
+    assert "BEGIN CERTIFICATE" in mgr.redact("certdata", SecretType.CERTIFICATE)
+    assert "BEGIN PRIVATE KEY" in mgr.redact("keydata", SecretType.PRIVATE_KEY)
+    assert mgr.redact("postgresql://user:secretpass@localhost:5432/db", SecretType.CONNECTION_STRING) == "postgresql://user:****@localhost:5432/db"
+    assert mgr.redact("customsecret", SecretType.CUSTOM) == "************"
+
+
+def test_secret_manager_policy_enforcement_read_denied():
+    """Verify SecretManager enforces allow_read policy."""
+    mgr = SecretManager()
+    policy = SecretPolicy(allow_read=False)
+    mgr.register_secret("no_read", "val", SecretType.PASSWORD, policy=policy)
+
+    assert mgr.get_secret("no_read") is None
+    assert mgr.statistics().policy_violations_count == 1
+
+
+def test_secret_manager_policy_enforcement_write_denied():
+    """Verify SecretManager enforces allow_write policy on update."""
+    mgr = SecretManager()
+    policy = SecretPolicy(allow_read=True, allow_write=False)
+    mgr.register_secret("no_write", "val", SecretType.PASSWORD, policy=policy)
+
+    assert mgr.update_secret("no_write", "new_val") is False
+    assert mgr.statistics().policy_violations_count == 1
+
+
+def test_secret_manager_list_references_and_snapshot():
+    """Verify SecretManager list_secret_references and create_snapshot."""
+    mgr = SecretManager()
+    mgr.register_secret("s1", "pass1", SecretType.PASSWORD)
+    mgr.register_secret("s2", "tok2", SecretType.TOKEN)
+
+    refs = mgr.list_secret_references()
+    assert len(refs) == 2
+    assert any(r.secret_name == "s1" for r in refs)
+
+    snapshot = mgr.create_snapshot()
+    assert isinstance(snapshot, SecretSnapshot)
+    assert "s1" in snapshot.redacted_values
+    assert snapshot.redacted_values["s1"] == "********"
+
+
+def test_configuration_source_manager_secret_integration():
+    """Verify ConfigurationSourceManager secret registration, get_entry, has, and get_all."""
+    manager = ConfigurationSourceManager()
+    assert manager.register_secret("app_db_pass", "secret123", SecretType.PASSWORD) is True
+
+    assert manager.has("app_db_pass") is True
+    assert manager.get_secret("app_db_pass") == "secret123"
+    assert manager.get_redacted_secret("app_db_pass") == "********"
+
+    entry = manager.get_entry("app_db_pass")
+    assert entry is not None
+    assert entry.value == "********"  # Never raw secret
+    assert entry.source_name == "secret_manager"
+
+    all_vals = manager.get_all()
+    assert all_vals["app_db_pass"] == "********"
+
+
+def test_configuration_provider_secret_delegation():
+    """Verify ConfigurationProvider delegates secret management operations."""
+    provider = ConfigurationProvider()
+    assert provider.register_secret("api_token", "sk-live-12345", SecretType.API_KEY) is True
+    assert provider.get_secret("api_token") == "sk-live-12345"
+    assert provider.get_redacted_secret("api_token") == "sk-************"
+
+    snapshot = provider.create_secret_snapshot()
+    assert "api_token" in snapshot.redacted_values
+
+
+def test_concurrent_secret_register_and_read():
+    """Verify thread-safe concurrent secret registration and reading."""
+    mgr = SecretManager()
+
+    def do_sec_op(i: int):
+        name = f"sec_thread_{i}"
+        mgr.register_secret(name, f"val_{i}", SecretType.PASSWORD)
+        return mgr.get_secret(name)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(do_sec_op, i) for i in range(50)]
+        results = [f.result() for f in futures]
+
+    assert len(results) == 50
+    assert all(r.startswith("val_") for r in results)
+
+
+def test_secret_store_get_missing_returns_none():
+    """Verify SecretStore get_secret returns None for missing secret."""
+    store = SecretStore()
+    assert store.get_secret("absent") is None
+
+
+def test_secret_store_update_missing_returns_false():
+    """Verify SecretStore update_secret returns False for missing secret."""
+    store = SecretStore()
+    entry = SecretEntry(secret_name="absent", secret_type=SecretType.PASSWORD, raw_value="v", redacted_value="*")
+    assert store.update_secret(entry) is False
+
+
+def test_secret_store_remove_missing_returns_false():
+    """Verify SecretStore remove_secret returns False for missing secret."""
+    store = SecretStore()
+    assert store.remove_secret("absent") is False
+
+
+def test_secret_manager_get_missing_returns_none():
+    """Verify SecretManager get_secret returns None for missing secret."""
+    mgr = SecretManager()
+    assert mgr.get_secret("absent") is None
+
+
+def test_secret_manager_get_redacted_missing_returns_none():
+    """Verify SecretManager get_redacted_secret returns None for missing secret."""
+    mgr = SecretManager()
+    assert mgr.get_redacted_secret("absent") is None
+
+
+def test_secret_manager_health_and_statistics():
+    """Verify SecretManager health and statistics models."""
+    mgr = SecretManager()
+    mgr.register_secret("sec_stat", "v", SecretType.PASSWORD)
+    mgr.get_secret("sec_stat")
+
+    health = mgr.health()
+    stats = mgr.statistics()
+
+    assert health.is_healthy is True
+    assert stats.registered_secret_count == 1
+    assert stats.access_count == 1
+    assert stats.modification_count == 1
+
+
+def test_configuration_source_manager_diagnostics_includes_secret_stats():
+    """Verify ConfigurationSourceManager diagnostics includes secret_statistics."""
+    manager = ConfigurationSourceManager()
+    manager.register_secret("diag_sec", "val", SecretType.PASSWORD)
+    diag = manager.diagnostics()
+    assert diag.secret_statistics.registered_secret_count == 1
+
+
+def test_configuration_provider_diagnostics_includes_secret_stats():
+    """Verify ConfigurationProvider diagnostics includes secret_statistics."""
+    provider = ConfigurationProvider()
+    provider.register_secret("diag_sec_2", "val", SecretType.PASSWORD)
+    diag = provider.diagnostics()
+    assert diag.secret_statistics.registered_secret_count == 1
+
+
+def test_secret_reference_model_fields():
+    """Verify SecretReference model fields."""
+    ref = SecretReference(
+        secret_name="s",
+        secret_type=SecretType.PASSWORD,
+        redacted_value="********",
+        policy=SecretPolicy(),
+    )
+    assert ref.secret_name == "s"
+    assert ref.redacted_value == "********"
+
+
+def test_secret_access_record_model_fields():
+    """Verify SecretAccessRecord model fields."""
+    rec = SecretAccessRecord(secret_name="s", operation="READ", allowed=True)
+    assert rec.secret_name == "s"
+    assert rec.operation == "READ"
+    assert rec.allowed is True
+
+
+def test_secret_health_and_statistics_models():
+    """Verify SecretHealth and SecretStatistics models."""
+    h = SecretHealth(is_healthy=True)
+    s = SecretStatistics(registered_secret_count=3, access_count=10)
+    assert h.is_healthy is True
+    assert s.registered_secret_count == 3
+    assert s.access_count == 10
+
+
+def test_secret_manager_redact_empty_string():
+    """Verify redact empty string returns default mask."""
+    mgr = SecretManager()
+    assert mgr.redact("", SecretType.PASSWORD) == "********"
+
+
+def test_secret_manager_redact_short_token():
+    """Verify redact short token string handling."""
+    mgr = SecretManager()
+    assert mgr.redact("ab", SecretType.TOKEN) == "tok********"
+
+
+def test_secret_manager_redact_short_api_key():
+    """Verify redact short API key handling."""
+    mgr = SecretManager()
+    assert mgr.redact("a", SecretType.API_KEY) == "sk-************"
+
+
+def test_secret_manager_redact_custom_type():
+    """Verify redact CUSTOM secret type algorithm."""
+    mgr = SecretManager()
+    assert mgr.redact("short", SecretType.CUSTOM) == "********"
+
+
+def test_secret_store_list_secret_names_order():
+    """Verify list_secret_names returns tuple of names."""
+    store = SecretStore()
+    e1 = SecretEntry(secret_name="a", secret_type=SecretType.PASSWORD, raw_value="v1", redacted_value="*")
+    e2 = SecretEntry(secret_name="b", secret_type=SecretType.PASSWORD, raw_value="v2", redacted_value="*")
+    store.register_secret(e1)
+    store.register_secret(e2)
+
+    names = store.list_secret_names()
+    assert len(names) == 2
+    assert "a" in names and "b" in names
+
+
+def test_secret_manager_access_history_max_capacity():
+    """Verify SecretManager access records cap at 500 records."""
+    mgr = SecretManager()
+    for i in range(520):
+        mgr.get_secret(f"missing_{i}")
+
+    assert len(mgr._access_records) == 500
+
+
+def test_secret_manager_update_secret_missing_returns_false():
+    """Verify update_secret returns False when updating non-existent secret."""
+    mgr = SecretManager()
+    assert mgr.update_secret("missing_sec", "new_val") is False
+
+
+def test_secret_manager_update_secret_policy():
+    """Verify update_secret with updated policy."""
+    mgr = SecretManager()
+    mgr.register_secret("sec_pol", "old_val", SecretType.PASSWORD)
+
+    new_pol = SecretPolicy(allow_read=False)
+    assert mgr.update_secret("sec_pol", "new_val", policy=new_pol) is True
+    assert mgr.get_secret("sec_pol") is None  # Read denied by updated policy
+
+
+def test_configuration_source_manager_secret_manager_property():
+    """Verify ConfigurationSourceManager secret_manager property access."""
+    manager = ConfigurationSourceManager()
+    assert isinstance(manager.secret_manager, SecretManager)
+
+
+def test_concurrent_secret_updates():
+    """Verify thread-safe concurrent secret updates."""
+    mgr = SecretManager()
+    mgr.register_secret("concurrent_upd_sec", "initial_val", SecretType.PASSWORD)
+
+    def do_update(i: int):
+        return mgr.update_secret("concurrent_upd_sec", f"val_{i}", SecretType.PASSWORD)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(do_update, i) for i in range(20)]
+        results = [f.result() for f in futures]
+
+    assert all(r is True for r in results)
 
 
 def test_concurrent_profile_activation():

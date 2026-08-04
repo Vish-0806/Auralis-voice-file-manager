@@ -1,7 +1,7 @@
-"""Configuration Package Exports (Phase 14.3.4).
+"""Configuration Package Exports (Phase 14.3.5).
 
 Package exports for models, exceptions, interfaces, configuration sources,
-source registry, source manager, schema manager, resolver, validator, profile manager, feature flag manager, provider, runtime, and lazy singleton accessors.
+source registry, source manager, schema manager, resolver, validator, profile manager, feature flag manager, secret store, secret manager, provider, runtime, and lazy singleton accessors.
 """
 
 from backend.application.config.configuration_provider import ConfigurationProvider
@@ -60,6 +60,15 @@ from backend.application.config.models import (
     ProfileHealth,
     ProfileStatistics,
     ResolutionStatistics,
+    SecretAccessRecord,
+    SecretDefinition,
+    SecretEntry,
+    SecretHealth,
+    SecretPolicy,
+    SecretReference,
+    SecretSnapshot,
+    SecretStatistics,
+    SecretType,
     SourceHealth,
     SourcePriority,
     SourceRegistration,
@@ -75,12 +84,15 @@ from backend.application.config.runtime import (
     set_configuration_provider,
     set_configuration_runtime,
 )
+from backend.application.config.secret_manager import SecretManager
+from backend.application.config.secret_store import SecretStore
 from backend.application.config.source_registry import SourceRegistry
 
 __all__ = [
     "ConfigurationRuntimeState",
     "ConfigurationSourceType",
     "ConfigurationProfileType",
+    "SecretType",
     "SourcePriority",
     "ConfigurationState",
     "ConfigurationCapabilities",
@@ -92,6 +104,14 @@ __all__ = [
     "ProfileHealth",
     "FeatureStatistics",
     "FeatureHealth",
+    "SecretStatistics",
+    "SecretHealth",
+    "SecretPolicy",
+    "SecretDefinition",
+    "SecretReference",
+    "SecretEntry",
+    "SecretSnapshot",
+    "SecretAccessRecord",
     "ConfigurationContext",
     "ConfigurationProfile",
     "ConfigurationProfileDefinition",
@@ -133,6 +153,8 @@ __all__ = [
     "ConfigurationValidator",
     "ProfileManager",
     "FeatureFlagManager",
+    "SecretStore",
+    "SecretManager",
     "ConfigurationSourceManager",
     "ConfigurationProvider",
     "ConfigurationRuntime",

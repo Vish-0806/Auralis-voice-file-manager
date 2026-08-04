@@ -1,4 +1,4 @@
-"""Configuration Runtime Interfaces (Phase 14.3.4).
+"""Configuration Runtime Interfaces (Phase 14.3.5).
 
 Defines Abstract Base Classes (ABCs) establishing explicit design contracts for
 IConfigurationSource, ConfigurationRuntime, ConfigurationProvider, ConfigurationManager,
@@ -24,6 +24,9 @@ from backend.application.config.models import (
     ConfigurationValidationResult,
     FeatureEvaluation,
     FeatureFlag,
+    SecretPolicy,
+    SecretSnapshot,
+    SecretType,
     SourceHealth,
     SourceStatistics,
 )
@@ -198,6 +201,32 @@ class IConfigurationManager(ABC):
     @abstractmethod
     def register_feature(self, feature: FeatureFlag) -> bool:
         """Register a feature flag."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def register_secret(
+        self,
+        secret_name: str,
+        raw_value: str,
+        secret_type: SecretType = SecretType.PASSWORD,
+        policy: Optional[SecretPolicy] = None,
+    ) -> bool:
+        """Register a secret configuration value safely."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_secret(self, secret_name: str) -> Optional[str]:
+        """Get raw secret value if allowed by policy."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_redacted_secret(self, secret_name: str) -> Optional[str]:
+        """Get redacted/masked secret value for export or UI rendering."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_secret_snapshot(self) -> SecretSnapshot:
+        """Create an immutable redacted secret snapshot."""
         raise NotImplementedError
 
 

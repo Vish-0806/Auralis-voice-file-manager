@@ -1,7 +1,7 @@
-"""Configuration Provider (Phase 14.3.4).
+"""Configuration Provider (Phase 14.3.5).
 
 Thread-safe production configuration provider runtime coordinating configuration state,
-sources, resolution, validation, profiles, feature flags, context, capabilities, health reporting, statistics, and diagnostics snapshots.
+sources, resolution, validation, profiles, feature flags, secret management, context, capabilities, health reporting, statistics, and diagnostics snapshots.
 """
 
 from datetime import datetime, timezone
@@ -25,13 +25,16 @@ from backend.application.config.models import (
     ConfigurationValidationResult,
     FeatureEvaluation,
     FeatureFlag,
+    SecretPolicy,
+    SecretSnapshot,
+    SecretType,
 )
 
 logger = logging.getLogger(__name__)
 
 
 class ConfigurationProvider(IConfigurationProvider):
-    """Production ConfigurationProvider runtime executing configuration state, source, resolution, validation, profiles, and feature flags."""
+    """Production ConfigurationProvider runtime executing configuration state, source, resolution, validation, profiles, feature flags, and secret management."""
 
     def __init__(
         self,
@@ -55,6 +58,32 @@ class ConfigurationProvider(IConfigurationProvider):
         """Get the underlying ConfigurationSourceManager instance."""
         with self._lock:
             return self._source_manager
+
+    def register_secret(
+        self,
+        secret_name: str,
+        raw_value: str,
+        secret_type: SecretType = SecretType.PASSWORD,
+        policy: Optional[SecretPolicy] = None,
+    ) -> bool:
+        """Register a secret configuration value safely."""
+        with self._lock:
+            return self._source_manager.register_secret(secret_name, raw_value, secret_type=secret_type, policy=policy)
+
+    def get_secret(self, secret_name: str) -> Optional[str]:
+        """Get raw secret value if allowed by policy."""
+        with self._lock:
+            return self._source_manager.get_secret(secret_name)
+
+    def get_redacted_secret(self, secret_name: str) -> Optional[str]:
+        """Get redacted/masked secret value for export or UI rendering."""
+        with self._lock:
+            return self._source_manager.get_redacted_secret(secret_name)
+
+    def create_secret_snapshot(self) -> SecretSnapshot:
+        """Create an immutable redacted secret snapshot."""
+        with self._lock:
+            return self._source_manager.create_secret_snapshot()
 
     def activate_profile(self, profile_name: str) -> bool:
         """Activate runtime configuration profile."""
@@ -193,6 +222,7 @@ class ConfigurationProvider(IConfigurationProvider):
                 validation_statistics=self._source_manager.validator.statistics(),
                 profile_statistics=self._source_manager.profile_manager.statistics(),
                 feature_statistics=self._source_manager.feature_manager.statistics(),
+                secret_statistics=self._source_manager.secret_manager.statistics(),
                 active_profile_name=self.get_active_profile().profile_name,
                 active_sources_count=stats.active_sources_count,
                 metrics=stats.metrics,

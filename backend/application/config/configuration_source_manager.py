@@ -1,7 +1,7 @@
-"""Configuration Source Manager (Phase 14.3.4).
+"""Configuration Source Manager (Phase 14.3.5).
 
 Coordinates registered configuration sources, profile overrides, feature flag evaluation,
-type conversions, constraint validations, and diagnostics reports.
+secret management, type conversions, constraint validations, and diagnostics reports.
 """
 
 from datetime import datetime, timezone
@@ -31,15 +31,19 @@ from backend.application.config.models import (
     ConfigurationValidationResult,
     FeatureEvaluation,
     FeatureFlag,
+    SecretPolicy,
+    SecretSnapshot,
+    SecretType,
 )
 from backend.application.config.profile_manager import ProfileManager
+from backend.application.config.secret_manager import SecretManager
 from backend.application.config.source_registry import SourceRegistry
 
 logger = logging.getLogger(__name__)
 
 
 class ConfigurationSourceManager(IConfigurationManager):
-    """Production priority-based configuration source resolution, profiles, feature flag, conversion, and validation manager."""
+    """Production priority-based configuration source resolution, profiles, feature flags, secret management, conversion, and validation manager."""
 
     def __init__(
         self,
@@ -49,6 +53,7 @@ class ConfigurationSourceManager(IConfigurationManager):
         validator: Optional[ConfigurationValidator] = None,
         profile_manager: Optional[ProfileManager] = None,
         feature_manager: Optional[FeatureFlagManager] = None,
+        secret_manager: Optional[SecretManager] = None,
     ) -> None:
         """Initialize ConfigurationSourceManager using Constructor Dependency Injection."""
         self._lock = RLock()
@@ -58,6 +63,7 @@ class ConfigurationSourceManager(IConfigurationManager):
         self._validator = validator or ConfigurationValidator(schema_manager=self._schema_manager)
         self._profile_manager = profile_manager or ProfileManager()
         self._feature_manager = feature_manager or FeatureFlagManager()
+        self._secret_manager = secret_manager or SecretManager()
 
         # Register default sources if registry is empty
         if self._registry.count() == 0:
@@ -104,6 +110,38 @@ class ConfigurationSourceManager(IConfigurationManager):
         """Get underlying FeatureFlagManager."""
         with self._lock:
             return self._feature_manager
+
+    @property
+    def secret_manager(self) -> SecretManager:
+        """Get underlying SecretManager."""
+        with self._lock:
+            return self._secret_manager
+
+    def register_secret(
+        self,
+        secret_name: str,
+        raw_value: str,
+        secret_type: SecretType = SecretType.PASSWORD,
+        policy: Optional[SecretPolicy] = None,
+    ) -> bool:
+        """Register a secret configuration value safely."""
+        with self._lock:
+            return self._secret_manager.register_secret(secret_name, raw_value, secret_type=secret_type, policy=policy)
+
+    def get_secret(self, secret_name: str) -> Optional[str]:
+        """Get raw secret value if allowed by policy."""
+        with self._lock:
+            return self._secret_manager.get_secret(secret_name)
+
+    def get_redacted_secret(self, secret_name: str) -> Optional[str]:
+        """Get redacted/masked secret value for export or UI rendering."""
+        with self._lock:
+            return self._secret_manager.get_redacted_secret(secret_name)
+
+    def create_secret_snapshot(self) -> SecretSnapshot:
+        """Create an immutable redacted secret snapshot."""
+        with self._lock:
+            return self._secret_manager.create_snapshot()
 
     def activate_profile(self, profile_name: str) -> bool:
         """Activate runtime configuration profile."""
@@ -157,7 +195,20 @@ class ConfigurationSourceManager(IConfigurationManager):
         with self._lock:
             self._lookups_count += 1
 
-            # Check sources first
+            # Check registered secrets first (high security priority)
+            redacted_sec = self._secret_manager.get_redacted_secret(key)
+            if redacted_sec is not None:
+                self._hits_count += 1
+                return ConfigurationEntry(
+                    key=key,
+                    value=redacted_sec,
+                    source_name="secret_manager",
+                    source_type=ConfigurationSourceType.MEMORY,
+                    priority=600,
+                    loaded_at=datetime.now(timezone.utc),
+                )
+
+            # Check sources next
             sorted_sources = self._registry.sort_sources()
             for source in sorted_sources:
                 if source.enabled and source.contains(key):
@@ -190,7 +241,7 @@ class ConfigurationSourceManager(IConfigurationManager):
             return None
 
     def get(self, key: str, default: Optional[Any] = None) -> Any:
-        """Get configuration value for key from the highest priority active source or profile."""
+        """Get configuration value for key from secrets, sources, or profile overrides."""
         entry = self.get_entry(key)
         return entry.value if entry is not None else default
 
@@ -213,8 +264,10 @@ class ConfigurationSourceManager(IConfigurationManager):
             return self._validator.validate(resolved_result.resolved_values, schema=schema)
 
     def has(self, key: str) -> bool:
-        """Check if a configuration key exists in any active source or profile."""
+        """Check if a configuration key exists in secrets, sources, or profile overrides."""
         with self._lock:
+            if self._secret_manager.store.contains(key):
+                return True
             for source in self._registry.sort_sources():
                 if source.enabled and source.contains(key):
                     return True
@@ -222,7 +275,7 @@ class ConfigurationSourceManager(IConfigurationManager):
             return key in prof_overrides
 
     def get_all(self) -> Dict[str, Any]:
-        """Get all merged configuration key-value pairs."""
+        """Get all merged configuration key-value pairs (redacted values for secrets)."""
         with self._lock:
             merged: Dict[str, Any] = {}
 
@@ -238,6 +291,12 @@ class ConfigurationSourceManager(IConfigurationManager):
                 if source.enabled:
                     for k, v in source.items():
                         merged[k] = v
+
+            # Secrets override all values with redacted representation
+            for sec_name in self._secret_manager.store.list_secret_names():
+                redacted = self._secret_manager.get_redacted_secret(sec_name)
+                if redacted is not None:
+                    merged[sec_name] = redacted
 
             return merged
 
@@ -265,7 +324,7 @@ class ConfigurationSourceManager(IConfigurationManager):
             )
 
     def health(self) -> ConfigurationHealth:
-        """Get health assessment of the source manager and registered sources."""
+        """Get health assessment of the source manager and registered components."""
         with self._lock:
             issues: List[str] = []
             all_healthy = True
@@ -285,6 +344,11 @@ class ConfigurationSourceManager(IConfigurationManager):
             if not feat_health.is_healthy:
                 all_healthy = False
                 issues.extend(feat_health.issues)
+
+            sec_health = self._secret_manager.health()
+            if not sec_health.is_healthy:
+                all_healthy = False
+                issues.extend(sec_health.issues)
 
             val_res = self.validate()
             if not val_res.is_valid:
@@ -307,6 +371,7 @@ class ConfigurationSourceManager(IConfigurationManager):
             val_stats = self._validator.statistics()
             prof_stats = self._profile_manager.statistics()
             feat_stats = self._feature_manager.statistics()
+            sec_stats = self._secret_manager.statistics()
 
             metrics = {
                 "total_properties_loaded": float(len(all_values)),
@@ -319,6 +384,7 @@ class ConfigurationSourceManager(IConfigurationManager):
                 "validations_count": float(val_stats.validation_count),
                 "profiles_count": float(prof_stats.registered_profiles_count),
                 "features_count": float(feat_stats.total_features),
+                "secrets_count": float(sec_stats.registered_secret_count),
             }
 
             return ConfigurationStatistics(
@@ -340,6 +406,7 @@ class ConfigurationSourceManager(IConfigurationManager):
                 validation_statistics=self._validator.statistics(),
                 profile_statistics=self._profile_manager.statistics(),
                 feature_statistics=self._feature_manager.statistics(),
+                secret_statistics=self._secret_manager.statistics(),
                 active_profile_name=self.get_active_profile().profile_name,
                 active_sources_count=self._registry.count(),
                 metrics={

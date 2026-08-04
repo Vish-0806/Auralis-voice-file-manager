@@ -1,9 +1,10 @@
-"""Configuration Runtime Domain Models (Phase 14.3.4).
+"""Configuration Runtime Domain Models (Phase 14.3.5).
 
 Defines immutable Pydantic v2 domain models and enums representing configuration runtime states,
 source types, profile types, capabilities, health metrics, statistics, configuration context,
 profiles, sources, entries, snapshots, definitions, constraints, schemas, validation results,
-resolution results, feature flags, evaluations, profile definitions, and diagnostics snapshots.
+resolution results, feature flags, evaluations, profile definitions, secrets, secret policies,
+secret entries, access logs, and diagnostics snapshots.
 """
 
 from datetime import datetime, timezone
@@ -41,6 +42,18 @@ class ConfigurationProfileType(str, Enum):
     TESTING = "TESTING"
     STAGING = "STAGING"
     PRODUCTION = "PRODUCTION"
+
+
+class SecretType(str, Enum):
+    """Secret configuration property types."""
+
+    PASSWORD = "PASSWORD"
+    TOKEN = "TOKEN"
+    API_KEY = "API_KEY"
+    CERTIFICATE = "CERTIFICATE"
+    PRIVATE_KEY = "PRIVATE_KEY"
+    CONNECTION_STRING = "CONNECTION_STRING"
+    CUSTOM = "CUSTOM"
 
 
 class SourcePriority(IntEnum):
@@ -164,6 +177,97 @@ class FeatureHealth(BaseModel):
     is_healthy: bool = True
     issues: Tuple[str, ...] = Field(default_factory=tuple)
     checked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class SecretStatistics(BaseModel):
+    """Immutable metrics model for secret management subsystem."""
+
+    model_config = ConfigDict(frozen=True)
+
+    registered_secret_count: int = 0
+    access_count: int = 0
+    modification_count: int = 0
+    redaction_count: int = 0
+    policy_violations_count: int = 0
+
+
+class SecretHealth(BaseModel):
+    """Immutable health model for secret management subsystem."""
+
+    model_config = ConfigDict(frozen=True)
+
+    is_healthy: bool = True
+    issues: Tuple[str, ...] = Field(default_factory=tuple)
+    checked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class SecretPolicy(BaseModel):
+    """Immutable model defining access policies for a secret."""
+
+    model_config = ConfigDict(frozen=True)
+
+    allow_read: bool = True
+    allow_write: bool = True
+    allow_export: bool = False
+    allow_logging: bool = False
+    allow_redaction: bool = True
+
+
+class SecretDefinition(BaseModel):
+    """Immutable model defining a secret configuration property."""
+
+    model_config = ConfigDict(frozen=True)
+
+    secret_name: str
+    secret_type: SecretType = SecretType.PASSWORD
+    description: str = ""
+    policy: SecretPolicy = Field(default_factory=SecretPolicy)
+
+
+class SecretReference(BaseModel):
+    """Immutable metadata reference for a secret with redacted value."""
+
+    model_config = ConfigDict(frozen=True)
+
+    secret_name: str
+    secret_type: SecretType
+    redacted_value: str
+    policy: SecretPolicy
+
+
+class SecretEntry(BaseModel):
+    """Immutable internal record for a secret."""
+
+    model_config = ConfigDict(frozen=True)
+
+    secret_name: str
+    secret_type: SecretType
+    raw_value: str
+    redacted_value: str
+    policy: SecretPolicy = Field(default_factory=SecretPolicy)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class SecretSnapshot(BaseModel):
+    """Immutable snapshot of secrets metadata and redacted values."""
+
+    model_config = ConfigDict(frozen=True)
+
+    registered_secrets_metadata: Tuple[Dict[str, Any], ...] = Field(default_factory=tuple)
+    redacted_values: Dict[str, str] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class SecretAccessRecord(BaseModel):
+    """Immutable record for secret access audit trail."""
+
+    model_config = ConfigDict(frozen=True)
+
+    secret_name: str
+    operation: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    allowed: bool = True
 
 
 class ConfigurationContext(BaseModel):
@@ -400,6 +504,7 @@ class ConfigurationDiagnostics(BaseModel):
     validation_statistics: ValidationStatistics = Field(default_factory=ValidationStatistics)
     profile_statistics: ProfileStatistics = Field(default_factory=ProfileStatistics)
     feature_statistics: FeatureStatistics = Field(default_factory=FeatureStatistics)
+    secret_statistics: SecretStatistics = Field(default_factory=SecretStatistics)
     active_profile_name: str = "development"
     active_sources_count: int = 0
     metrics: Dict[str, float] = Field(default_factory=dict)
