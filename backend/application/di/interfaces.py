@@ -1,4 +1,4 @@
-"""Dependency Injection Interfaces (Phase 14.2.4).
+"""Dependency Injection Interfaces (Phase 14.2.5).
 
 Defines Abstract Base Classes (ABCs) establishing explicit design contracts for
 ServiceDescriptor, ServiceCollection, ServiceProvider, and DependencyContainer.
@@ -12,6 +12,9 @@ from backend.application.di.models import (
     ContainerHealth,
     ContainerState,
     ContainerStatistics,
+    DependencyAnalysis,
+    DependencyCertification,
+    DependencyIssue,
     ServiceDescriptorModel,
     ServiceLifetime,
 )
@@ -374,126 +377,109 @@ class IDependencyContainer(ABC):
 
     @abstractmethod
     def resolve(self, service_type: Any) -> Any:
-        """Resolve a service instance by service_type.
-
-        Returns:
-            Any: Resolved instance.
-        """
+        """Resolve a service instance by service_type."""
         raise NotImplementedError
 
     @abstractmethod
     def resolve_required(self, service_type: Any) -> Any:
-        """Resolve a required service instance by service_type.
-
-        Returns:
-            Any: Resolved instance.
-        """
+        """Resolve a required service instance by service_type."""
         raise NotImplementedError
 
     @abstractmethod
     def try_resolve(self, service_type: Any) -> Optional[Any]:
-        """Try resolving a service instance by service_type.
-
-        Returns:
-            Optional[Any]: Resolved instance or None.
-        """
+        """Try resolving a service instance by service_type."""
         raise NotImplementedError
 
     @abstractmethod
     def resolve_all(self, service_type: Any) -> Tuple[Any, ...]:
-        """Resolve all instances for a service_type.
-
-        Returns:
-            Tuple[Any, ...]: Resolved instances tuple.
-        """
+        """Resolve all instances for a service_type."""
         raise NotImplementedError
 
     @abstractmethod
     def create_scope(self) -> IServiceProvider:
-        """Create a new child scope ServiceProvider instance.
-
-        Returns:
-            IServiceProvider: Scoped child service provider.
-        """
+        """Create a new child scope ServiceProvider instance."""
         raise NotImplementedError
 
     @abstractmethod
     def dispose_scope(self, scope_id: str) -> bool:
-        """Dispose a child scope by scope_id string.
-
-        Returns:
-            bool: True if disposed.
-        """
+        """Dispose a child scope by scope_id string."""
         raise NotImplementedError
 
     @abstractmethod
     def active_scopes(self) -> Tuple[str, ...]:
-        """List all active scope_ids.
-
-        Returns:
-            Tuple[str, ...]: Tuple of active scope_id strings.
-        """
+        """List all active scope_ids."""
         raise NotImplementedError
 
     @abstractmethod
     def scope_statistics(self) -> Dict[str, float]:
-        """Get scope statistics metrics.
+        """Get scope statistics metrics."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def analyze_graph(self) -> DependencyAnalysis:
+        """Analyze complete dependency graph.
 
         Returns:
-            Dict[str, float]: Scope statistics dictionary.
+            DependencyAnalysis: Graph analysis snapshot.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def validate_graph(self) -> Tuple[DependencyIssue, ...]:
+        """Validate dependency graph for cycles, missing dependencies, and lifetime errors.
+
+        Returns:
+            Tuple[DependencyIssue, ...]: Tuple of identified issues.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def certify(self) -> DependencyCertification:
+        """Certify container for production deployment.
+
+        Returns:
+            DependencyCertification: Enterprise certification report.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def export_graph(self, format_type: str = "mermaid") -> str:
+        """Export graph visualization format (mermaid, dot, adjacency_list, adjacency_map).
+
+        Args:
+            format_type: Output format string.
+
+        Returns:
+            str: Formatted graph representation string.
         """
         raise NotImplementedError
 
     @abstractmethod
     def initialize(self) -> ContainerState:
-        """Initialize the dependency container and provider.
-
-        Returns:
-            ContainerState: Updated state snapshot.
-        """
+        """Initialize the dependency container and provider."""
         raise NotImplementedError
 
     @abstractmethod
     def shutdown(self) -> ContainerState:
-        """Shutdown the container and dispose service providers.
-
-        Returns:
-            ContainerState: Updated state snapshot.
-        """
+        """Shutdown the container and dispose service providers."""
         raise NotImplementedError
 
     @abstractmethod
     def restart(self) -> ContainerState:
-        """Restart container operations.
-
-        Returns:
-            ContainerState: Updated container state snapshot.
-        """
+        """Restart container operations."""
         raise NotImplementedError
 
     @abstractmethod
     def health(self) -> ContainerHealth:
-        """Get container health snapshot.
-
-        Returns:
-            ContainerHealth: Health assessment.
-        """
+        """Get container health snapshot."""
         raise NotImplementedError
 
     @abstractmethod
     def statistics(self) -> ContainerStatistics:
-        """Get container statistics.
-
-        Returns:
-            ContainerStatistics: Metrics snapshot.
-        """
+        """Get container statistics."""
         raise NotImplementedError
 
     @abstractmethod
     def diagnostics(self) -> ContainerDiagnostics:
-        """Get container diagnostics snapshot.
-
-        Returns:
-            ContainerDiagnostics: Diagnostics snapshot.
-        """
+        """Get container diagnostics snapshot."""
         raise NotImplementedError

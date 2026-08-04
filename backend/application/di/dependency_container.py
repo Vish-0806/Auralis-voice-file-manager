@@ -1,7 +1,8 @@
-"""Dependency Injection Container (Phase 14.2.4).
+"""Dependency Injection Container (Phase 14.2.5).
 
-Runtime container owning ServiceCollection and ServiceProvider, managing container state transitions,
-capabilities, health checks, registration delegation, resolution delegation, child scopes, and diagnostics.
+Runtime container owning ServiceCollection, ServiceProvider, and DependencyGraphAnalyzer,
+managing container state transitions, capabilities, health checks, registration delegation,
+resolution delegation, child scopes, dependency graph analysis, certification, and diagnostics.
 """
 
 from datetime import datetime, timezone
@@ -9,6 +10,7 @@ import logging
 from threading import RLock
 from typing import Any, Callable, Dict, Optional, Tuple
 
+from backend.application.di.dependency_graph_analyzer import DependencyGraphAnalyzer
 from backend.application.di.interfaces import (
     IDependencyContainer,
     IServiceCollection,
@@ -23,6 +25,9 @@ from backend.application.di.models import (
     ContainerHealth,
     ContainerState,
     ContainerStatistics,
+    DependencyAnalysis,
+    DependencyCertification,
+    DependencyIssue,
     ServiceDescriptorModel,
     ServiceLifetime,
 )
@@ -33,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 class DependencyContainer(IDependencyContainer):
-    """Production dependency injection container runtime executing registration, resolution, & scope delegation."""
+    """Production dependency injection container runtime executing registration, resolution, scopes, & certification."""
 
     def __init__(
         self,
@@ -52,6 +57,7 @@ class DependencyContainer(IDependencyContainer):
         self._config = config or ContainerConfiguration()
         self._services = services or ServiceCollection()
         self._provider = provider or ServiceProvider(services=self._services)
+        self._analyzer = DependencyGraphAnalyzer()
         self._state: ContainerState = ContainerState.UNINITIALIZED
         self._context: ContainerContext = ContainerContext(
             container_id=self._config.container_name,
@@ -70,27 +76,61 @@ class DependencyContainer(IDependencyContainer):
             return self._provider
 
     # =========================================================================
+    # Dependency Graph & Certification APIs (Phase 14.2.5)
+    # =========================================================================
+
+    def analyze_graph(self) -> DependencyAnalysis:
+        """Analyze complete dependency graph.
+
+        Returns:
+            DependencyAnalysis: Graph analysis model.
+        """
+        with self._lock:
+            return self._analyzer.analyze_graph(self._services)
+
+    def validate_graph(self) -> Tuple[DependencyIssue, ...]:
+        """Validate dependency graph for cycles, missing dependencies, and lifetime errors.
+
+        Returns:
+            Tuple[DependencyIssue, ...]: Identified validation issues.
+        """
+        with self._lock:
+            graph = self._analyzer.build_graph(self._services)
+            return self._analyzer.validate_graph(self._services, graph)
+
+    def certify(self) -> DependencyCertification:
+        """Certify container dependency structure for production deployment.
+
+        Returns:
+            DependencyCertification: Enterprise certification report.
+        """
+        with self._lock:
+            return self._analyzer.certify(self._services)
+
+    def export_graph(self, format_type: str = "mermaid") -> str:
+        """Export dependency graph in specified representation format.
+
+        Args:
+            format_type: Output format string ("mermaid", "dot", "adjacency_list", "adjacency_map").
+
+        Returns:
+            str: Formatted graph representation string.
+        """
+        with self._lock:
+            graph = self._analyzer.build_graph(self._services)
+            return self._analyzer.export_graph(graph, format_type=format_type)
+
+    # =========================================================================
     # Child Scope Management APIs (Phase 14.2.4)
     # =========================================================================
 
     def create_scope(self) -> IServiceProvider:
-        """Create a new child ServiceProvider scope.
-
-        Returns:
-            IServiceProvider: Scoped child service provider.
-        """
+        """Create a new child ServiceProvider scope."""
         with self._lock:
             return self._provider.create_scope()
 
     def dispose_scope(self, scope_id: str) -> bool:
-        """Dispose a child scope matching scope_id string.
-
-        Args:
-            scope_id: Target child scope identifier string.
-
-        Returns:
-            bool: True if child scope was found and disposed.
-        """
+        """Dispose a child scope matching scope_id string."""
         with self._lock:
             if isinstance(self._provider, ServiceProvider):
                 for child in list(self._provider._child_scopes):
@@ -102,11 +142,7 @@ class DependencyContainer(IDependencyContainer):
             return False
 
     def active_scopes(self) -> Tuple[str, ...]:
-        """List all active scope_ids.
-
-        Returns:
-            Tuple[str, ...]: Tuple of active scope_id strings.
-        """
+        """List all active scope_ids."""
         with self._lock:
             if isinstance(self._provider, ServiceProvider):
                 return tuple(
@@ -115,11 +151,7 @@ class DependencyContainer(IDependencyContainer):
             return ()
 
     def scope_statistics(self) -> Dict[str, float]:
-        """Get scope statistics metrics.
-
-        Returns:
-            Dict[str, float]: Scope statistics dictionary.
-        """
+        """Get scope statistics metrics."""
         with self._lock:
             stats = self._provider.statistics()
             return {
@@ -341,7 +373,31 @@ class DependencyContainer(IDependencyContainer):
     def diagnostics(self) -> ContainerDiagnostics:
         """Get container diagnostics snapshot."""
         with self._lock:
-            return self._provider.diagnostics()
+            diag = self._provider.diagnostics()
+            certification = self.certify()
+            graph = self._analyzer.build_graph(self._services)
+
+            return ContainerDiagnostics(
+                registered_services_count=diag.registered_services_count,
+                resolved_services_count=diag.resolved_services_count,
+                cached_singleton_count=diag.cached_singleton_count,
+                active_resolution_stack=diag.active_resolution_stack,
+                failed_resolutions_count=diag.failed_resolutions_count,
+                circular_dependency_count=diag.circular_dependency_count,
+                active_scope_count=diag.active_scope_count,
+                disposed_scope_count=diag.disposed_scope_count,
+                current_scope_id=diag.current_scope_id,
+                scope_depth=diag.scope_depth,
+                scoped_cache_size=diag.scoped_cache_size,
+                singleton_cache_size=diag.singleton_cache_size,
+                certification=certification,
+                graph_summary={
+                    "total_nodes": len(graph.nodes),
+                    "total_edges": len(graph.edges),
+                },
+                metrics=diag.metrics,
+                timestamp=datetime.now(timezone.utc),
+            )
 
     def capabilities(self) -> ContainerCapabilities:
         """Get container capability definitions."""

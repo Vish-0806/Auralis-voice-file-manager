@@ -1,11 +1,11 @@
-"""Dependency Injection Subsystem (Phase 14.2.1).
+"""Dependency Injection Framework (Phase 14.2.5).
 
-Package representing the Dependency Injection Container Foundation for the Auralis application.
-Exposes domain models, exceptions, ABC interfaces, service descriptors, collections, providers,
-containers, and global thread-safe accessors.
+Package exports for models, exceptions, interfaces, service descriptor,
+service collection, service provider, dependency graph analyzer, dependency container, and runtime accessors.
 """
 
 from backend.application.di.dependency_container import DependencyContainer
+from backend.application.di.dependency_graph_analyzer import DependencyGraphAnalyzer
 from backend.application.di.exceptions import (
     CircularDependencyException,
     DependencyInjectionException,
@@ -23,10 +23,18 @@ from backend.application.di.models import (
     ContainerCapabilities,
     ContainerConfiguration,
     ContainerContext,
+    ContainerDiagnostics,
     ContainerHealth,
     ContainerState,
     ContainerStatistics,
+    DependencyAnalysis,
+    DependencyCertification,
+    DependencyEdge,
+    DependencyGraph,
     DependencyGraphNode,
+    DependencyIssue,
+    DependencyNode,
+    GraphStatistics,
     ServiceDescriptorModel,
     ServiceLifetime,
     ServiceRegistration,
@@ -44,34 +52,38 @@ from backend.application.di.service_descriptor import ServiceDescriptor
 from backend.application.di.service_provider import ServiceProvider
 
 __all__ = [
-    # Models & Enums
     "ServiceLifetime",
     "ContainerState",
     "ServiceDescriptorModel",
     "ServiceRegistration",
     "DependencyGraphNode",
+    "DependencyNode",
+    "DependencyEdge",
+    "DependencyGraph",
+    "DependencyIssue",
+    "GraphStatistics",
+    "DependencyAnalysis",
+    "DependencyCertification",
     "ContainerCapabilities",
     "ContainerStatistics",
+    "ContainerDiagnostics",
     "ContainerHealth",
     "ContainerConfiguration",
     "ContainerContext",
-    # Exceptions
     "DependencyInjectionException",
     "ServiceRegistrationException",
     "ServiceResolutionException",
     "CircularDependencyException",
     "ServiceValidationException",
-    # Interfaces
     "IServiceDescriptor",
     "IServiceCollection",
     "IServiceProvider",
     "IDependencyContainer",
-    # Implementations
     "ServiceDescriptor",
     "ServiceCollection",
     "ServiceProvider",
+    "DependencyGraphAnalyzer",
     "DependencyContainer",
-    # Runtime Helpers
     "get_dependency_container",
     "set_dependency_container",
     "reset_dependency_container",
