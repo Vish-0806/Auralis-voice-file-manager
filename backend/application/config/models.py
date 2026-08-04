@@ -1,10 +1,10 @@
-"""Configuration Runtime Domain Models (Phase 14.3.5).
+"""Configuration Runtime Domain Models (Phase 14.3.6).
 
 Defines immutable Pydantic v2 domain models and enums representing configuration runtime states,
 source types, profile types, capabilities, health metrics, statistics, configuration context,
 profiles, sources, entries, snapshots, definitions, constraints, schemas, validation results,
 resolution results, feature flags, evaluations, profile definitions, secrets, secret policies,
-secret entries, access logs, and diagnostics snapshots.
+secret entries, access logs, certification results, and diagnostics snapshots.
 """
 
 from datetime import datetime, timezone
@@ -199,6 +199,19 @@ class SecretHealth(BaseModel):
     is_healthy: bool = True
     issues: Tuple[str, ...] = Field(default_factory=tuple)
     checked_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ConfigurationCertificationResult(BaseModel):
+    """Immutable report containing complete production certification status."""
+
+    model_config = ConfigDict(frozen=True)
+
+    is_certified: bool = True
+    checks_passed: int = 0
+    checks_failed: int = 0
+    issues: Tuple[str, ...] = Field(default_factory=tuple)
+    availability_percentage: float = 100.0
+    certified_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class SecretPolicy(BaseModel):

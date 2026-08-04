@@ -1,7 +1,7 @@
-"""Configuration Provider (Phase 14.3.5).
+"""Configuration Provider (Phase 14.3.6).
 
 Thread-safe production configuration provider runtime coordinating configuration state,
-sources, resolution, validation, profiles, feature flags, secret management, context, capabilities, health reporting, statistics, and diagnostics snapshots.
+sources, resolution, validation, profiles, feature flags, secret management, certification, context, capabilities, health reporting, statistics, and diagnostics snapshots.
 """
 
 from datetime import datetime, timezone
@@ -9,10 +9,12 @@ import logging
 from threading import RLock
 from typing import Any, Dict, Optional
 
+from backend.application.config.configuration_certifier import ConfigurationCertifier
 from backend.application.config.configuration_source_manager import ConfigurationSourceManager
 from backend.application.config.interfaces import IConfigurationProvider
 from backend.application.config.models import (
     ConfigurationCapabilities,
+    ConfigurationCertificationResult,
     ConfigurationContext,
     ConfigurationDiagnostics,
     ConfigurationHealth,
@@ -34,22 +36,25 @@ logger = logging.getLogger(__name__)
 
 
 class ConfigurationProvider(IConfigurationProvider):
-    """Production ConfigurationProvider runtime executing configuration state, source, resolution, validation, profiles, feature flags, and secret management."""
+    """Production ConfigurationProvider runtime executing configuration state, source, resolution, validation, profiles, feature flags, secret management, and certification."""
 
     def __init__(
         self,
         source_manager: Optional[ConfigurationSourceManager] = None,
         config_context: Optional[ConfigurationContext] = None,
+        certifier: Optional[ConfigurationCertifier] = None,
     ) -> None:
         """Initialize ConfigurationProvider using Constructor Dependency Injection.
 
         Args:
             source_manager: Optional ConfigurationSourceManager instance.
             config_context: Optional ConfigurationContext snapshot.
+            certifier: Optional ConfigurationCertifier instance.
         """
         self._lock = RLock()
         self._context = config_context or ConfigurationContext()
         self._source_manager = source_manager or ConfigurationSourceManager()
+        self._certifier = certifier or ConfigurationCertifier(source_manager=self._source_manager)
         self._state: ConfigurationRuntimeState = ConfigurationRuntimeState.UNINITIALIZED
         self._reload_count: int = 0
 
@@ -58,6 +63,22 @@ class ConfigurationProvider(IConfigurationProvider):
         """Get the underlying ConfigurationSourceManager instance."""
         with self._lock:
             return self._source_manager
+
+    @property
+    def certifier(self) -> ConfigurationCertifier:
+        """Get the underlying ConfigurationCertifier instance."""
+        with self._lock:
+            return self._certifier
+
+    def certify(self) -> ConfigurationCertificationResult:
+        """Run production certification analysis across configuration subsystems."""
+        with self._lock:
+            return self._certifier.certify()
+
+    def validate_runtime(self) -> bool:
+        """Validate configuration runtime readiness."""
+        with self._lock:
+            return self._certifier.validate_runtime()
 
     def register_secret(
         self,

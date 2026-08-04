@@ -1,4 +1,4 @@
-"""Configuration Runtime Interfaces (Phase 14.3.5).
+"""Configuration Runtime Interfaces (Phase 14.3.6).
 
 Defines Abstract Base Classes (ABCs) establishing explicit design contracts for
 IConfigurationSource, ConfigurationRuntime, ConfigurationProvider, ConfigurationManager,
@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from backend.application.config.models import (
     ConfigurationCapabilities,
+    ConfigurationCertificationResult,
     ConfigurationContext,
     ConfigurationDiagnostics,
     ConfigurationEntry,
@@ -273,6 +274,16 @@ class IConfigurationProvider(ABC):
         """Get execution context snapshot."""
         raise NotImplementedError
 
+    @abstractmethod
+    def certify(self) -> ConfigurationCertificationResult:
+        """Run production certification analysis."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def validate_runtime(self) -> bool:
+        """Validate configuration runtime readiness."""
+        raise NotImplementedError
+
 
 class IConfigurationRuntime(ABC):
     """Abstract interface for Configuration Runtime lifecycle & execution."""
@@ -315,4 +326,14 @@ class IConfigurationRuntime(ABC):
     @abstractmethod
     def context(self) -> ConfigurationContext:
         """Get configuration context snapshot."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def certify(self) -> ConfigurationCertificationResult:
+        """Run production certification analysis."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def validate_runtime(self) -> bool:
+        """Validate configuration runtime readiness."""
         raise NotImplementedError

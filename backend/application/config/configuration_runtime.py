@@ -1,7 +1,7 @@
-"""Configuration Runtime (Phase 14.3.1).
+"""Configuration Runtime (Phase 14.3.6).
 
-Thread-safe production configuration runtime managing lifecycle state transitions,
-provider coordination, monitoring, capabilities, health, statistics, and diagnostics.
+Thread-safe production ConfigurationRuntime managing high-level provider lifecycle,
+health assessment, statistics, capabilities, diagnostics, and certification.
 """
 
 from datetime import datetime, timezone
@@ -13,6 +13,7 @@ from backend.application.config.configuration_provider import ConfigurationProvi
 from backend.application.config.interfaces import IConfigurationProvider, IConfigurationRuntime
 from backend.application.config.models import (
     ConfigurationCapabilities,
+    ConfigurationCertificationResult,
     ConfigurationContext,
     ConfigurationDiagnostics,
     ConfigurationHealth,
@@ -24,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class ConfigurationRuntime(IConfigurationRuntime):
-    """Production ConfigurationRuntime managing lifecycle transitions and provider delegation."""
+    """Production ConfigurationRuntime executing lifecycle management and provider delegation."""
 
     def __init__(self, provider: Optional[IConfigurationProvider] = None) -> None:
         """Initialize ConfigurationRuntime using Constructor Dependency Injection.
@@ -34,109 +35,62 @@ class ConfigurationRuntime(IConfigurationRuntime):
         """
         self._lock = RLock()
         self._provider = provider or ConfigurationProvider()
-        self._state: ConfigurationRuntimeState = ConfigurationRuntimeState.UNINITIALIZED
 
     @property
     def provider(self) -> IConfigurationProvider:
-        """Get the underlying IConfigurationProvider instance."""
+        """Get underlying IConfigurationProvider instance."""
         with self._lock:
             return self._provider
 
-    def initialize(self) -> ConfigurationRuntimeState:
-        """Initialize configuration runtime and provider transition to READY state.
-
-        Returns:
-            ConfigurationRuntimeState: Updated state snapshot.
-        """
+    def certify(self) -> ConfigurationCertificationResult:
+        """Run production certification analysis."""
         with self._lock:
-            if self._state == ConfigurationRuntimeState.READY:
-                return self._state
+            return self._provider.certify()
+
+    def validate_runtime(self) -> bool:
+        """Validate configuration runtime readiness."""
+        with self._lock:
+            return self._provider.validate_runtime()
+
+    def initialize(self) -> ConfigurationRuntimeState:
+        """Initialize configuration runtime and provider."""
+        with self._lock:
             logger.info("Initializing ConfigurationRuntime...")
-            self._state = ConfigurationRuntimeState.INITIALIZING
-            self._provider.initialize()
-            self._state = ConfigurationRuntimeState.READY
-            logger.info("ConfigurationRuntime initialized successfully. State -> READY.")
-            return self._state
+            return self._provider.initialize()
 
     def shutdown(self) -> ConfigurationRuntimeState:
-        """Shutdown configuration runtime and provider transition to STOPPED state.
-
-        Returns:
-            ConfigurationRuntimeState: Updated state snapshot.
-        """
+        """Shutdown configuration runtime and provider."""
         with self._lock:
-            if self._state == ConfigurationRuntimeState.STOPPED:
-                return self._state
             logger.info("Shutting down ConfigurationRuntime...")
-            self._state = ConfigurationRuntimeState.STOPPING
-            self._provider.shutdown()
-            self._state = ConfigurationRuntimeState.STOPPED
-            logger.info("ConfigurationRuntime shutdown complete. State -> STOPPED.")
-            return self._state
+            return self._provider.shutdown()
 
     def restart(self) -> ConfigurationRuntimeState:
-        """Restart configuration runtime operations.
-
-        Returns:
-            ConfigurationRuntimeState: Updated state snapshot.
-        """
+        """Restart configuration runtime and provider."""
         with self._lock:
             logger.info("Restarting ConfigurationRuntime...")
-            self.shutdown()
-            return self.initialize()
+            return self._provider.restart()
 
     def health(self) -> ConfigurationHealth:
-        """Get current configuration health assessment snapshot.
-
-        Returns:
-            ConfigurationHealth: Provider health snapshot model.
-        """
+        """Get health assessment snapshot of configuration runtime."""
         with self._lock:
-            is_healthy = self._state in (
-                ConfigurationRuntimeState.READY,
-                ConfigurationRuntimeState.INITIALIZING,
-                ConfigurationRuntimeState.UNINITIALIZED,
-            )
-            issues = () if is_healthy else (f"ConfigurationRuntime state is {self._state.value}.",)
-            return ConfigurationHealth(
-                is_healthy=is_healthy and self._provider.health().is_healthy,
-                state=self._state,
-                issues=issues,
-                checked_at=datetime.now(timezone.utc),
-            )
+            return self._provider.health()
 
     def statistics(self) -> ConfigurationStatistics:
-        """Get aggregated configuration statistics.
-
-        Returns:
-            ConfigurationStatistics: Metrics snapshot model.
-        """
+        """Get statistics metrics snapshot of configuration runtime."""
         with self._lock:
             return self._provider.statistics()
 
     def capabilities(self) -> ConfigurationCapabilities:
-        """Get configuration runtime capabilities.
-
-        Returns:
-            ConfigurationCapabilities: Capabilities declaration model.
-        """
+        """Get capability definitions of configuration runtime."""
         with self._lock:
             return self._provider.capabilities()
 
     def diagnostics(self) -> ConfigurationDiagnostics:
-        """Get detailed configuration runtime diagnostics.
-
-        Returns:
-            ConfigurationDiagnostics: Diagnostics snapshot model.
-        """
+        """Get diagnostics snapshot of configuration runtime."""
         with self._lock:
             return self._provider.diagnostics()
 
     def context(self) -> ConfigurationContext:
-        """Get configuration execution context snapshot.
-
-        Returns:
-            ConfigurationContext: Context model snapshot.
-        """
+        """Get configuration execution context snapshot."""
         with self._lock:
             return self._provider.get_context()

@@ -1,9 +1,10 @@
-"""Configuration Package Exports (Phase 14.3.5).
+"""Configuration Package Exports (Phase 14.3.6).
 
 Package exports for models, exceptions, interfaces, configuration sources,
-source registry, source manager, schema manager, resolver, validator, profile manager, feature flag manager, secret store, secret manager, provider, runtime, and lazy singleton accessors.
+source registry, source manager, schema manager, resolver, validator, profile manager, feature flag manager, secret store, secret manager, certifier, provider, runtime, and lazy singleton accessors.
 """
 
+from backend.application.config.configuration_certifier import ConfigurationCertifier
 from backend.application.config.configuration_provider import ConfigurationProvider
 from backend.application.config.configuration_resolver import ConfigurationResolver
 from backend.application.config.configuration_runtime import ConfigurationRuntime
@@ -32,6 +33,7 @@ from backend.application.config.interfaces import (
 from backend.application.config.memory_source import MemoryConfigurationSource
 from backend.application.config.models import (
     ConfigurationCapabilities,
+    ConfigurationCertificationResult,
     ConfigurationConstraint,
     ConfigurationContext,
     ConfigurationDefinition,
@@ -132,6 +134,7 @@ __all__ = [
     "ConfigurationValidationResult",
     "ConfigurationResolutionResult",
     "ConfigurationDiagnostics",
+    "ConfigurationCertificationResult",
     "ConfigurationException",
     "ConfigurationInitializationError",
     "ConfigurationValidationError",
@@ -155,6 +158,7 @@ __all__ = [
     "FeatureFlagManager",
     "SecretStore",
     "SecretManager",
+    "ConfigurationCertifier",
     "ConfigurationSourceManager",
     "ConfigurationProvider",
     "ConfigurationRuntime",
