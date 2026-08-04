@@ -1,6 +1,6 @@
 # Auralis Backend API Service
 
-This is the FastAPI backend application for **Auralis**, coordinating local-first natural language intent parsing, operating system adaptations, document intelligence processing, tiered memory context retrieval, provider-independent execution runtimes, and modular voice integration pipelines.
+This is the FastAPI backend application for **Auralis**, coordinating local-first natural language intent parsing, operating system adaptations, document intelligence processing, tiered memory context retrieval, provider-independent execution runtimes, application container & dependency injection infrastructure, certified configuration management, and modular voice integration pipelines.
 
 ---
 
@@ -11,6 +11,9 @@ The backend codebase is divided into independent packages matching specific boun
 ```
 backend/
 ├── api/               # API Router endpoints (routes.py, voice_routes.py, assistant_routes.py, etc.)
+├── application/       # Application Container & Infrastructure (Phase 14)
+│   ├── config/        # Certified Configuration Runtime Subsystem (Phase 14.3)
+│   └── di/            # Dependency Injection Subsystem (Phase 14.2)
 ├── core/              # Assistant boundary, intent schemas, planner, and dispatcher
 ├── capabilities/      # Specific OS operations (files, desktop capability, automation, system)
 ├── automation/        # Workflow Engine sequential orchestration
@@ -41,7 +44,7 @@ backend/
 │   └── conversation_intelligence/ # Multi-Turn Dialog, Entity Linking, & Ambiguity Resolver
 ├── memory/            # Tiered Memory Subsystem
 ├── voice/             # Modular Voice Engine subsystems
-├── tests/             # Pytest suite verifying core, capabilities, brain, memory, voice, execution, and assistant (2,172 tests)
+├── tests/             # Pytest suite verifying core, capabilities, brain, memory, voice, execution, assistant, and application (2,487 tests)
 ├── main.py            # API service initialization endpoint
 └── requirements.txt   # Python dependency packages
 ```
@@ -99,7 +102,7 @@ backend/
 * **Multi-Step Planning Engine (Phase 10.6)**: `AIPlanner`, `DefaultGoalAnalyzer`, `DefaultPlanGenerator`, `DefaultPlanValidator`, `DefaultExecutionPlanner` (topological graph cycle detection), and `DefaultExecutionMonitor`.
 * **Runtime Validation & Resilience (Phase 10.7)**: `AIResilienceRuntime`, `DefaultRetryManager` (exponential backoff), `DefaultTimeoutManager`, `DefaultCancellationManager`, `DefaultFailureClassifier`, `DefaultRecoveryManager`, `DefaultCircuitBreaker` (CLOSED/OPEN/HALF_OPEN), and `DefaultEventDispatcher`.
 
-### 2.9 Provider-Independent Execution Architecture & Runtime Subsystem (Phase 12)
+### 2.9 Provider-Independent Execution Architecture & Runtime Platform (Phase 12)
 * **Brain Execution Engine (Phase 12.1)**: Core request analyzer, execution pipeline, decision engine router, and `ExecutionRuntime` singleton lifecycle manager.
 * **Intent Resolution Engine (Phase 12.2)**: Provider-independent intent recognizer (`backend/brain/execution/intent/`), filler word remover, entity extractor (paths, apps, dates, devices), scoring engine, and ambiguity resolver.
 * **Command Execution Orchestrator (Phase 12.3)**: Coordinates execution between Intent Resolution, Brain Engine, Planning Runtime, AI Engine, Security Runtime, and OS Integration Runtime (`backend/brain/execution/orchestrator/`).
@@ -122,6 +125,17 @@ backend/
 * **Proactive Assistant & Notification Runtime (Phase 13.8)**: Proactive suggestion engine, recommendation ranking, duplicate suppression, cooldown period enforcement, and assistant-level notification manager (`backend/brain/assistant/proactive/`).
 * **Assistant Runtime Integration Layer (Phase 13.9)**: Single integration gateway (`backend/brain/assistant/integration/`), runtime registry, 8-stage pipeline coordinator (`Conversation` → `Dialogue` → `Decision` → `Memory` → `Execution` → `Response` → `Voice` → `Proactive`), and 12-subsystem health aggregator.
 * **End-to-End Production Certification (Phase 13.10)**: End-to-end integration test suite (`test_assistant_end_to_end.py`), zero circular imports audit, multi-threaded safety certification, and 100% test pass rate across **2,172 backend unit tests**.
+
+### 2.11 Application Container & Infrastructure Subsystems (Phase 14)
+* **Production Application Runtime (Phase 14.1)**: `RuntimeRegistry`, `BootstrapManager`, `StartupValidator`, `InitializationManager`, `ApplicationProvider`, `ApplicationRuntime`, and `Runtime` (`backend/application/`).
+* **Dependency Injection Subsystem (Phase 14.2)**: `ServiceCollection`, `ServiceDescriptor`, `ServiceLifetime` (`SINGLETON`, `TRANSIENT`, `SCOPED`), `ServiceRegistry`, `DependencyContainer`, `ContainerScope`, and `DependencyGraphAnalyzer` with cycle detection (`backend/application/di/`).
+* **Certified Configuration Runtime Subsystem (Phase 14.3)**:
+  - **Configuration Runtime Foundation (14.3.1)**: Provider-independent state machine, capabilities declaration, and ABC interfaces (`backend/application/config/`).
+  - **Configuration Source Management (14.3.2)**: Multi-source priority resolver (`Memory (500) > Environment (400) > DotEnv (300) > Defaults (0)`).
+  - **Configuration Resolution & Validation (14.3.3)**: `ConfigurationSchemaManager`, `ConfigurationResolver` (automatic type casting), and `ConfigurationValidator` (constraint verification).
+  - **Configuration Profiles & Feature Flags (14.3.4)**: Profile inheritance (`development`, `testing`, `production`), active profile switching, feature flags, dependency checks, and deterministic MD5 rollout percentages.
+  - **Secrets & Sensitive Configuration (14.3.5)**: In-memory thread-safe `SecretStore`, `SecretManager`, access policy enforcement (`allow_read`, `allow_write`, `allow_export`), value redaction algorithms (`redact()`), and audit access logging.
+  - **End-to-End Production Certification (14.3.6)**: Aggregate diagnostics, health checks, dependency audits, certified readiness, and end-to-end integration suite (`test_configuration_end_to_end.py`).
 
 ---
 
@@ -156,4 +170,4 @@ Execute the entire Pytest suite:
 ```bash
 pytest backend/tests
 ```
-Currently, the backend contains **2,172 unit and integration tests across 125+ test modules** with a **100% pass rate**, verifying core flows, file operations, state transitions, speech, memory retrieval, brain orchestration, memory ranking, context windows, reference resolution, workspace intelligence, autonomous routines, proactive assistant, conversational intelligence, long-running tasks, background job scheduler, recurring triggers, persistence hooks, provider-independent AI architecture, prompt intelligence, tool execution, memory-aware AI, multi-step planning, runtime resilience, intent resolution, command orchestration, workflow engines, task management, automation scheduling, execution analytics, recovery state management, execution integration, assistant runtime foundation, conversation runtime, dialogue management, decision reasoning coordinator, assistant memory context, response generation streaming, voice orchestration, proactive notifications, assistant integration gateway, and end-to-end assistant pipeline certification.
+Currently, the backend contains **2,487 unit and integration tests across 135+ test modules** with a **100% pass rate**, verifying core flows, file operations, state transitions, speech, memory retrieval, brain orchestration, memory ranking, context windows, reference resolution, workspace intelligence, autonomous routines, proactive assistant, conversational intelligence, long-running tasks, background job scheduler, recurring triggers, persistence hooks, provider-independent AI architecture, prompt intelligence, tool execution, memory-aware AI, multi-step planning, runtime resilience, intent resolution, command orchestration, workflow engines, task management, automation scheduling, execution analytics, recovery state management, execution integration, assistant runtime foundation, conversation runtime, dialogue management, decision reasoning coordinator, assistant memory context, response generation streaming, voice orchestration, proactive notifications, assistant integration gateway, application runtime platform, dependency injection container, priority configuration source management, configuration profiles, feature flags, secret management, and end-to-end configuration runtime certification.
