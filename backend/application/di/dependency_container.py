@@ -1,7 +1,7 @@
-"""Dependency Injection Container (Phase 14.2.3).
+"""Dependency Injection Container (Phase 14.2.4).
 
 Runtime container owning ServiceCollection and ServiceProvider, managing container state transitions,
-capabilities, health checks, registration delegation, resolution delegation, and diagnostics.
+capabilities, health checks, registration delegation, resolution delegation, child scopes, and diagnostics.
 """
 
 from datetime import datetime, timezone
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 class DependencyContainer(IDependencyContainer):
-    """Production dependency injection container runtime executing registration & resolution delegation."""
+    """Production dependency injection container runtime executing registration, resolution, & scope delegation."""
 
     def __init__(
         self,
@@ -70,42 +70,85 @@ class DependencyContainer(IDependencyContainer):
             return self._provider
 
     # =========================================================================
+    # Child Scope Management APIs (Phase 14.2.4)
+    # =========================================================================
+
+    def create_scope(self) -> IServiceProvider:
+        """Create a new child ServiceProvider scope.
+
+        Returns:
+            IServiceProvider: Scoped child service provider.
+        """
+        with self._lock:
+            return self._provider.create_scope()
+
+    def dispose_scope(self, scope_id: str) -> bool:
+        """Dispose a child scope matching scope_id string.
+
+        Args:
+            scope_id: Target child scope identifier string.
+
+        Returns:
+            bool: True if child scope was found and disposed.
+        """
+        with self._lock:
+            if isinstance(self._provider, ServiceProvider):
+                for child in list(self._provider._child_scopes):
+                    if child.scope_id == scope_id:
+                        child.dispose()
+                        self._provider._child_scopes.remove(child)
+                        logger.info("Disposed scope '%s' via DependencyContainer.", scope_id)
+                        return True
+            return False
+
+    def active_scopes(self) -> Tuple[str, ...]:
+        """List all active scope_ids.
+
+        Returns:
+            Tuple[str, ...]: Tuple of active scope_id strings.
+        """
+        with self._lock:
+            if isinstance(self._provider, ServiceProvider):
+                return tuple(
+                    c.scope_id for c in self._provider._child_scopes if not c.is_disposed
+                )
+            return ()
+
+    def scope_statistics(self) -> Dict[str, float]:
+        """Get scope statistics metrics.
+
+        Returns:
+            Dict[str, float]: Scope statistics dictionary.
+        """
+        with self._lock:
+            stats = self._provider.statistics()
+            return {
+                "scopes_created": stats.metrics.get("scopes_created", 0.0),
+                "scopes_disposed": stats.metrics.get("scopes_disposed", 0.0),
+                "active_scopes": stats.metrics.get("active_scopes", 0.0),
+            }
+
+    # =========================================================================
     # Resolution Delegation APIs
     # =========================================================================
 
     def resolve(self, service_type: Any) -> Any:
-        """Resolve a service instance by service_type.
-
-        Returns:
-            Any: Resolved service instance.
-        """
+        """Resolve a service instance by service_type."""
         with self._lock:
             return self._provider.resolve(service_type)
 
     def resolve_required(self, service_type: Any) -> Any:
-        """Resolve a required service instance by service_type.
-
-        Returns:
-            Any: Resolved service instance.
-        """
+        """Resolve a required service instance by service_type."""
         with self._lock:
             return self._provider.resolve_required(service_type)
 
     def try_resolve(self, service_type: Any) -> Optional[Any]:
-        """Try resolving a service instance by service_type.
-
-        Returns:
-            Optional[Any]: Resolved service instance or None.
-        """
+        """Try resolving a service instance by service_type."""
         with self._lock:
             return self._provider.try_resolve(service_type)
 
     def resolve_all(self, service_type: Any) -> Tuple[Any, ...]:
-        """Resolve all registered instances for service_type.
-
-        Returns:
-            Tuple[Any, ...]: Tuple of resolved instances.
-        """
+        """Resolve all registered instances for service_type."""
         with self._lock:
             return self._provider.resolve_all(service_type)
 
@@ -296,11 +339,7 @@ class DependencyContainer(IDependencyContainer):
             )
 
     def diagnostics(self) -> ContainerDiagnostics:
-        """Get container diagnostics snapshot.
-
-        Returns:
-            ContainerDiagnostics: Diagnostics snapshot.
-        """
+        """Get container diagnostics snapshot."""
         with self._lock:
             return self._provider.diagnostics()
 

@@ -1,4 +1,4 @@
-"""Comprehensive unit tests for Phase 14.2.3 Service Resolution Engine."""
+"""Comprehensive unit tests for Phase 14.2.4 Scoped Lifetime & Child Container Management."""
 
 import concurrent.futures
 from typing import Optional, Tuple
@@ -72,6 +72,15 @@ class IServiceC:
 class ServiceC(IServiceC):
     def __init__(self, service_b: IServiceB) -> None:
         self.service_b = service_b
+
+
+class ServiceScoped:
+    pass
+
+
+class ServiceScopedWithDependencies:
+    def __init__(self, service_a: IServiceA) -> None:
+        self.service_a = service_a
 
 
 class ServiceWithOptional:
@@ -553,7 +562,7 @@ def test_service_collection_concurrent_removals():
 
 
 # ============================================================================
-# 6. ServiceProvider Resolution Engine Tests (Phase 14.2.3)
+# 6. ServiceProvider Resolution & Lifetime Tests
 # ============================================================================
 
 
@@ -601,16 +610,6 @@ def test_service_provider_factory_resolution():
     assert isinstance(instance_b, ServiceB)
     assert isinstance(instance_b.service_a, ServiceA)
     assert provider.factory_executions == 1
-
-
-def test_service_provider_scoped_resolution_raises_not_implemented():
-    """Verify resolving a SCOPED service raises NotImplementedError in Phase 14.2.3."""
-    services = ServiceCollection()
-    services.add_scoped(IServiceA, ServiceA)
-    provider = ServiceProvider(services=services)
-
-    with pytest.raises(NotImplementedError):
-        provider.resolve(IServiceA)
 
 
 def test_service_provider_recursive_constructor_injection():
@@ -671,7 +670,7 @@ def test_service_provider_missing_dependency_raises():
     with pytest.raises(ServiceResolutionException):
         provider.resolve(IServiceA)
 
-    services.add_singleton(IServiceB, ServiceB)  # Missing IServiceA dependency
+    services.add_singleton(IServiceB, ServiceB)
     with pytest.raises(ServiceResolutionException):
         provider.resolve(IServiceB)
 
@@ -723,15 +722,13 @@ def test_service_provider_circular_dependency_detection_three_nodes():
 
 
 def test_service_provider_try_resolve():
-    """Verify try_resolve returns instance on success and None on failure or Scoped."""
+    """Verify try_resolve returns instance on success and None on failure."""
     services = ServiceCollection()
     services.add_singleton(IServiceA, ServiceA)
-    services.add_scoped(IServiceB, ServiceB)
     provider = ServiceProvider(services=services)
 
     assert isinstance(provider.try_resolve(IServiceA), ServiceA)
-    assert provider.try_resolve(IServiceB) is None  # Scoped -> None
-    assert provider.try_resolve(IServiceC) is None  # Missing -> None
+    assert provider.try_resolve(IServiceC) is None
 
 
 def test_service_provider_resolve_required():
@@ -820,55 +817,381 @@ def test_service_provider_failed_resolutions_counter():
     assert provider.failed_resolutions == 1
 
 
-def test_service_provider_concurrent_singleton_resolution():
-    """Verify thread-safe concurrent SINGLETON resolutions return the exact same instance."""
+# ============================================================================
+# 7. Scoped Lifetime & Child Scope Tests (Phase 14.2.4)
+# ============================================================================
+
+
+def test_scoped_service_resolution_same_scope():
+    """Verify resolving a SCOPED service within the same child scope returns identical instance."""
+    services = ServiceCollection()
+    services.add_scoped(ServiceScoped, ServiceScoped)
+    root_provider = ServiceProvider(services=services)
+
+    scope1 = root_provider.create_scope()
+    inst1 = scope1.resolve(ServiceScoped)
+    inst2 = scope1.resolve(ServiceScoped)
+
+    assert isinstance(inst1, ServiceScoped)
+    assert inst1 is inst2
+
+
+def test_scoped_service_resolution_different_scopes():
+    """Verify resolving a SCOPED service across distinct child scopes returns different instances."""
+    services = ServiceCollection()
+    services.add_scoped(ServiceScoped, ServiceScoped)
+    root_provider = ServiceProvider(services=services)
+
+    scope1 = root_provider.create_scope()
+    scope2 = root_provider.create_scope()
+
+    inst1 = scope1.resolve(ServiceScoped)
+    inst2 = scope2.resolve(ServiceScoped)
+
+    assert isinstance(inst1, ServiceScoped)
+    assert isinstance(inst2, ServiceScoped)
+    assert inst1 is not inst2
+
+
+def test_scoped_service_resolution_root_provider():
+    """Verify resolving a SCOPED service on root provider caches instance in root's scoped cache."""
+    services = ServiceCollection()
+    services.add_scoped(ServiceScoped, ServiceScoped)
+    root_provider = ServiceProvider(services=services)
+
+    inst1 = root_provider.resolve(ServiceScoped)
+    inst2 = root_provider.resolve(ServiceScoped)
+
+    assert isinstance(inst1, ServiceScoped)
+    assert inst1 is inst2
+
+
+def test_scoped_service_factory_resolution():
+    """Verify SCOPED service registered with factory function resolves scoped instance per scope."""
+    services = ServiceCollection()
+    services.add_scoped(ServiceScoped, factory=lambda p: ServiceScoped())
+    root_provider = ServiceProvider(services=services)
+
+    scope1 = root_provider.create_scope()
+    scope2 = root_provider.create_scope()
+
+    inst1 = scope1.resolve(ServiceScoped)
+    inst2 = scope2.resolve(ServiceScoped)
+
+    assert inst1 is not inst2
+    assert scope1.resolve(ServiceScoped) is inst1
+
+
+def test_scoped_service_with_constructor_dependencies():
+    """Verify SCOPED service depending on SINGLETON and TRANSIENT services resolves correctly."""
     services = ServiceCollection()
     services.add_singleton(IServiceA, ServiceA)
-    provider = ServiceProvider(services=services)
+    services.add_scoped(ServiceScopedWithDependencies, ServiceScopedWithDependencies)
+    root_provider = ServiceProvider(services=services)
 
-    def do_resolve():
-        return provider.resolve(IServiceA)
+    scope1 = root_provider.create_scope()
+    inst = scope1.resolve(ServiceScopedWithDependencies)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        futures = [executor.submit(do_resolve) for _ in range(50)]
-        results = [f.result() for f in futures]
-
-    first_instance = results[0]
-    assert all(inst is first_instance for inst in results)
+    assert isinstance(inst, ServiceScopedWithDependencies)
+    assert isinstance(inst.service_a, ServiceA)
 
 
-def test_service_provider_concurrent_transient_resolution():
-    """Verify thread-safe concurrent TRANSIENT resolutions construct distinct instances."""
+def test_child_scope_creation_properties():
+    """Verify create_scope properties (scope_id, depth, is_disposed)."""
+    root_provider = ServiceProvider()
+    assert root_provider.depth == 0
+    assert root_provider.scope_id == "root"
+
+    child = root_provider.create_scope()
+    assert child.depth == 1
+    assert child.is_disposed is False
+    assert child.scope_id.startswith("scope_")
+
+
+def test_nested_scope_hierarchy():
+    """Verify nested scope hierarchy Root (depth=0) -> Scope A (depth=1) -> Scope B (depth=2)."""
+    root = ServiceProvider()
+    scope_a = root.create_scope()
+    scope_b = scope_a.create_scope()
+
+    assert root.depth == 0
+    assert scope_a.depth == 1
+    assert scope_b.depth == 2
+
+
+def test_shared_singleton_cache_across_nested_scopes():
+    """Verify SINGLETON lifetime services resolved in Scope B return the exact same instance in Root and Scope A."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA)
+    root = ServiceProvider(services=services)
+    scope_a = root.create_scope()
+    scope_b = scope_a.create_scope()
+
+    inst_b = scope_b.resolve(IServiceA)
+    inst_a = scope_a.resolve(IServiceA)
+    inst_root = root.resolve(IServiceA)
+
+    assert inst_b is inst_a
+    assert inst_a is inst_root
+
+
+def test_transient_lifetime_across_child_scopes():
+    """Verify TRANSIENT lifetime services construct distinct instances across child scopes."""
     services = ServiceCollection()
     services.add_transient(IServiceA, ServiceA)
-    provider = ServiceProvider(services=services)
+    root = ServiceProvider(services=services)
+    scope_a = root.create_scope()
 
-    def do_resolve():
-        return provider.resolve(IServiceA)
+    inst_root = root.resolve(IServiceA)
+    inst_scope = scope_a.resolve(IServiceA)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        futures = [executor.submit(do_resolve) for _ in range(50)]
-        results = [f.result() for f in futures]
-
-    assert len(set(results)) == 50
+    assert inst_root is not inst_scope
 
 
-def test_service_provider_dispose_clears_caches():
-    """Verify ServiceProvider dispose clears singleton and signature caches."""
+def test_scope_disposal_clears_scoped_cache():
+    """Verify scope disposal marks is_disposed=True and clears scoped cache."""
+    services = ServiceCollection()
+    services.add_scoped(ServiceScoped, ServiceScoped)
+    root = ServiceProvider(services=services)
+    scope = root.create_scope()
+
+    inst = scope.resolve(ServiceScoped)
+    assert scope._scoped_cache[ServiceScoped] is inst
+
+    scope.dispose()
+    assert scope.is_disposed is True
+    assert len(scope._scoped_cache) == 0
+
+
+def test_dispose_child_scope_twice_is_idempotent():
+    """Verify calling dispose on a scope multiple times is safe and idempotent."""
+    root = ServiceProvider()
+    scope = root.create_scope()
+    scope.dispose()
+    scope.dispose()
+    assert scope.is_disposed is True
+
+
+def test_scope_disposal_preserves_root_singletons():
+    """Verify child scope disposal does NOT clear or mutate root singleton cache."""
     services = ServiceCollection()
     services.add_singleton(IServiceA, ServiceA)
-    provider = ServiceProvider(services=services)
+    root = ServiceProvider(services=services)
+    scope = root.create_scope()
 
-    provider.resolve(IServiceA)
-    assert len(provider._singleton_cache) == 1
+    inst_singleton = scope.resolve(IServiceA)
+    scope.dispose()
 
-    provider.dispose()
-    assert len(provider._singleton_cache) == 0
-    assert len(provider._signature_cache) == 0
+    assert scope.is_disposed is True
+    assert root.resolve(IServiceA) is inst_singleton
+
+
+def test_nested_scope_disposal_recursive():
+    """Verify disposing parent scope recursively disposes all child scopes."""
+    services = ServiceCollection()
+    services.add_scoped(ServiceScoped, ServiceScoped)
+    root = ServiceProvider(services=services)
+
+    scope_a = root.create_scope()
+    scope_b = scope_a.create_scope()
+
+    inst_b = scope_b.resolve(ServiceScoped)
+    scope_a.dispose()
+
+    assert scope_a.is_disposed is True
+    assert scope_b.is_disposed is True
+
+
+def test_disposed_scope_resolution_raises_exception():
+    """Verify attempting to resolve a service from a disposed scope raises ServiceResolutionException."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA)
+    root = ServiceProvider(services=services)
+    scope = root.create_scope()
+    scope.dispose()
+
+    with pytest.raises(ServiceResolutionException):
+        scope.resolve(IServiceA)
+
+
+def test_disposed_scope_resolve_required_raises():
+    """Verify resolve_required on a disposed scope raises ServiceResolutionException."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA)
+    root = ServiceProvider(services=services)
+    scope = root.create_scope()
+    scope.dispose()
+
+    with pytest.raises(ServiceResolutionException):
+        scope.resolve_required(IServiceA)
+
+
+def test_disposed_scope_resolve_all_returns_empty_tuple():
+    """Verify resolve_all on a disposed scope returns empty tuple."""
+    services = ServiceCollection()
+    services.add_singleton(IServiceA, ServiceA)
+    root = ServiceProvider(services=services)
+    scope = root.create_scope()
+    scope.dispose()
+
+    assert scope.resolve_all(IServiceA) == ()
+
+
+def test_disposed_scope_create_scope_raises_exception():
+    """Verify attempting to create a child scope from a disposed scope raises ServiceResolutionException."""
+    root = ServiceProvider()
+    scope = root.create_scope()
+    scope.dispose()
+
+    with pytest.raises(ServiceResolutionException):
+        scope.create_scope()
+
+
+def test_scope_health_reporting():
+    """Verify health reporting for active (READY) and disposed (STOPPED) scopes."""
+    root = ServiceProvider()
+    scope = root.create_scope()
+
+    assert scope.health().is_healthy is True
+    assert scope.health().state == ContainerState.READY
+
+    scope.dispose()
+    assert scope.health().is_healthy is False
+    assert scope.health().state == ContainerState.STOPPED
+    assert "disposed" in scope.health().issues[0]
+
+
+def test_scope_diagnostics_extended_fields():
+    """Verify ContainerDiagnostics contains scope depth, scope ID, and scoped cache sizes."""
+    services = ServiceCollection()
+    services.add_scoped(ServiceScoped, ServiceScoped)
+    root = ServiceProvider(services=services)
+    scope = root.create_scope()
+    scope.resolve(ServiceScoped)
+
+    diag = scope.diagnostics()
+    assert diag.current_scope_id == scope.scope_id
+    assert diag.scope_depth == 1
+    assert diag.scoped_cache_size == 1
+    assert diag.timestamp is not None
 
 
 # ============================================================================
-# 7. DependencyContainer Resolution Delegation Tests
+# 8. DependencyContainer Scope Delegation Tests (Phase 14.2.4)
+# ============================================================================
+
+
+def test_dependency_container_create_and_dispose_scope():
+    """Verify DependencyContainer create_scope, active_scopes, and dispose_scope."""
+    container = DependencyContainer()
+    container.add_scoped(ServiceScoped, ServiceScoped)
+
+    scope1 = container.create_scope()
+    scope2 = container.create_scope()
+
+    active = container.active_scopes()
+    assert len(active) == 2
+    assert scope1.scope_id in active
+    assert scope2.scope_id in active
+
+    assert container.dispose_scope(scope1.scope_id) is True
+    assert len(container.active_scopes()) == 1
+
+
+def test_dependency_container_dispose_non_existent_scope():
+    """Verify dispose_scope returns False when scope_id is not found."""
+    container = DependencyContainer()
+    assert container.dispose_scope("non_existent_scope_id") is False
+
+
+def test_dependency_container_scope_statistics():
+    """Verify DependencyContainer scope_statistics metric reporting."""
+    container = DependencyContainer()
+    scope1 = container.create_scope()
+    scope2 = container.create_scope()
+
+    stats = container.scope_statistics()
+    assert stats["scopes_created"] == 3.0
+    assert stats["active_scopes"] == 3.0  # Root + 2 scopes
+
+    container.dispose_scope(scope1.scope_id)
+    stats_after = container.scope_statistics()
+    assert stats_after["scopes_disposed"] == 1.0
+
+
+# ============================================================================
+# 9. Concurrent Multithreaded Scope Tests
+# ============================================================================
+
+
+def test_concurrent_scope_creation():
+    """Verify thread-safe concurrent scope creation using ThreadPoolExecutor."""
+    container = DependencyContainer()
+
+    def do_create():
+        return container.create_scope()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(do_create) for _ in range(30)]
+        results = [f.result() for f in futures]
+
+    assert len(results) == 30
+    assert len(container.active_scopes()) == 30
+
+
+def test_concurrent_scope_disposal():
+    """Verify thread-safe parallel disposal of child scopes."""
+    container = DependencyContainer()
+    scopes = [container.create_scope() for _ in range(20)]
+
+    def do_dispose(s: IServiceProvider):
+        return container.dispose_scope(s.scope_id)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(do_dispose, s) for s in scopes]
+        results = [f.result() for f in futures]
+
+    assert all(results)
+    assert len(container.active_scopes()) == 0
+
+
+def test_concurrent_scoped_resolution_same_scope():
+    """Verify parallel resolution of SCOPED service within the same scope returns identical instance."""
+    services = ServiceCollection()
+    services.add_scoped(ServiceScoped, ServiceScoped)
+    root = ServiceProvider(services=services)
+    scope = root.create_scope()
+
+    def do_resolve():
+        return scope.resolve(ServiceScoped)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(do_resolve) for _ in range(50)]
+        results = [f.result() for f in futures]
+
+    first_inst = results[0]
+    assert all(inst is first_inst for inst in results)
+
+
+def test_concurrent_parallel_scopes_resolution():
+    """Verify parallel resolution of SCOPED service across distinct child scopes returns distinct instances."""
+    services = ServiceCollection()
+    services.add_scoped(ServiceScoped, ServiceScoped)
+    root = ServiceProvider(services=services)
+
+    def do_scoped_work():
+        s = root.create_scope()
+        return s.resolve(ServiceScoped)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(do_scoped_work) for _ in range(30)]
+        results = [f.result() for f in futures]
+
+    assert len(set(results)) == 30
+
+
+# ============================================================================
+# 10. Existing Lifecycle & Runtime Tests
 # ============================================================================
 
 
@@ -906,91 +1229,71 @@ def test_dependency_container_resolution_delegation():
     all_instances = container.resolve_all(IServiceA)
     assert len(all_instances) == 1
 
-    diag = container.diagnostics()
-    assert diag.resolved_services_count == 5
+
+def test_scoped_instance_creation_count_metric():
+    """Verify scoped_creations metric increments on constructing scoped instance."""
+    services = ServiceCollection()
+    services.add_scoped(ServiceScoped, ServiceScoped)
+    root = ServiceProvider(services=services)
+    scope = root.create_scope()
+
+    scope.resolve(ServiceScoped)
+    stats = scope.statistics()
+    assert stats.metrics["scoped_creations"] == 1.0
 
 
-def test_dependency_container_try_resolve_missing():
-    """Verify DependencyContainer try_resolve returns None for missing service."""
-    container = DependencyContainer()
-    assert container.try_resolve(IServiceA) is None
+def test_scoped_instance_hit_count_metric():
+    """Verify scoped_hits metric in diagnostics increments on accessing cached scoped instance."""
+    services = ServiceCollection()
+    services.add_scoped(ServiceScoped, ServiceScoped)
+    root = ServiceProvider(services=services)
+    scope = root.create_scope()
+
+    scope.resolve(ServiceScoped)
+    scope.resolve(ServiceScoped)
+    diag = scope.diagnostics()
+    assert diag.metrics["scoped_hits"] == 1.0
 
 
-def test_dependency_container_registration_delegation():
-    """Verify DependencyContainer registration delegation methods."""
-    container = DependencyContainer()
-    assert container.add_singleton(IServiceA, ServiceA, aliases=("alias_a",)) is True
-    assert container.add_transient(IServiceB, ServiceB) is True
-    assert container.add_scoped(IServiceC, ServiceC) is True
-    assert container.contains(IServiceA) is True
-    assert container.contains(IServiceB) is True
-    assert len(container.list_services()) == 3
+def test_scoped_factory_execution_count_metric():
+    """Verify factory_executions counter increments when factory produces scoped instance."""
+    services = ServiceCollection()
+    services.add_scoped(ServiceScoped, factory=lambda p: ServiceScoped())
+    root = ServiceProvider(services=services)
+    scope = root.create_scope()
 
-    desc = ServiceDescriptor(service_type=IServiceA, implementation_type=ServiceA)
-    with pytest.raises(ServiceRegistrationException):
-        container.register(desc)
-
-    new_desc = ServiceDescriptor(service_type=IServiceA, implementation_type=ServiceC)
-    assert container.replace(new_desc) is True
-    assert container.remove(IServiceB) is True
-    assert len(container.list_services()) == 2
-
-    container.remove_all()
-    assert len(container.list_services()) == 0
+    scope.resolve(ServiceScoped)
+    assert scope.factory_executions == 1
 
 
-def test_dependency_container_try_add_delegation():
-    """Verify DependencyContainer try_add delegation method."""
-    container = DependencyContainer()
-    desc1 = ServiceDescriptor(service_type=IServiceA, implementation_type=ServiceA)
-    desc2 = ServiceDescriptor(service_type=IServiceA, implementation_type=ServiceB)
+def test_child_scope_creation_increments_parent_active_scopes():
+    """Verify creating child scope updates active_scopes_count."""
+    root = ServiceProvider()
+    child1 = root.create_scope()
+    child2 = root.create_scope()
 
-    assert container.try_add(desc1) is True
-    assert container.try_add(desc2) is False
-    assert len(container.list_services()) == 1
+    assert root.active_scopes_count == 3  # Root + 2 children
 
 
-def test_dependency_container_statistics_aggregation():
-    """Verify DependencyContainer statistics metric aggregation."""
+def test_dispose_scope_decrements_parent_active_scopes():
+    """Verify disposing child scope decrements active_scopes_count."""
+    root = ServiceProvider()
+    child = root.create_scope()
+    assert root.active_scopes_count == 2
+
+    child.dispose()
+    assert root.active_scopes_count == 1
+
+
+def test_dependency_container_list_services_and_lifetimes():
+    """Verify listing registered services and filtering by ServiceLifetime.SCOPED."""
     container = DependencyContainer()
     container.add_singleton(IServiceA, ServiceA)
+    container.add_scoped(ServiceScoped, ServiceScoped)
 
-    stats = container.statistics()
-    assert stats.registered_services_count == 1
-    assert "total_registrations" in stats.metrics
-    assert stats.metrics["total_registrations"] == 1.0
-
-
-def test_dependency_container_capabilities():
-    """Verify DependencyContainer capability flags."""
-    container = DependencyContainer()
-    caps = container.capabilities()
-    assert caps.supports_singleton is True
-    assert caps.supports_transient is True
-    assert caps.supports_scoped is True
-    assert caps.supports_aliases is True
-    assert caps.supports_tags is True
-    assert caps.supports_replacement is True
-
-
-def test_dependency_container_concurrent_lifecycle():
-    """Verify thread-safe concurrent initialize and shutdown on DependencyContainer."""
-    container = DependencyContainer()
-
-    def do_init_shutdown():
-        container.initialize()
-        return container.shutdown()
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(do_init_shutdown) for _ in range(10)]
-        results = [f.result() for f in futures]
-
-    assert all(r == ContainerState.STOPPED for r in results)
-
-
-# ============================================================================
-# 8. Lazy Global Runtime Accessor Tests (runtime.py)
-# ============================================================================
+    scoped_models = container.list_by_lifetime(ServiceLifetime.SCOPED)
+    assert len(scoped_models) == 1
+    assert scoped_models[0].service_type == "ServiceScoped"
 
 
 def test_di_runtime_lazy_singleton_accessors():

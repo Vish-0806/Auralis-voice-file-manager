@@ -1,4 +1,4 @@
-"""Dependency Injection Interfaces (Phase 14.2.3).
+"""Dependency Injection Interfaces (Phase 14.2.4).
 
 Defines Abstract Base Classes (ABCs) establishing explicit design contracts for
 ServiceDescriptor, ServiceCollection, ServiceProvider, and DependencyContainer.
@@ -249,6 +249,24 @@ class IServiceCollection(ABC):
 class IServiceProvider(ABC):
     """Abstract interface for Service Provider resolution engine."""
 
+    @property
+    @abstractmethod
+    def scope_id(self) -> str:
+        """Get scope identifier string."""
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def depth(self) -> int:
+        """Get depth of the scope hierarchy (0 for root)."""
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def is_disposed(self) -> bool:
+        """Check if the scope has been disposed."""
+        raise NotImplementedError
+
     @abstractmethod
     def resolve(self, service_type: Any) -> Any:
         """Resolve a service instance by service type.
@@ -258,10 +276,6 @@ class IServiceProvider(ABC):
 
         Returns:
             Any: Resolved service instance.
-
-        Raises:
-            ServiceResolutionException: If resolution fails.
-            CircularDependencyException: If a circular dependency is detected.
         """
         raise NotImplementedError
 
@@ -391,6 +405,42 @@ class IDependencyContainer(ABC):
 
         Returns:
             Tuple[Any, ...]: Resolved instances tuple.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_scope(self) -> IServiceProvider:
+        """Create a new child scope ServiceProvider instance.
+
+        Returns:
+            IServiceProvider: Scoped child service provider.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def dispose_scope(self, scope_id: str) -> bool:
+        """Dispose a child scope by scope_id string.
+
+        Returns:
+            bool: True if disposed.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def active_scopes(self) -> Tuple[str, ...]:
+        """List all active scope_ids.
+
+        Returns:
+            Tuple[str, ...]: Tuple of active scope_id strings.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def scope_statistics(self) -> Dict[str, float]:
+        """Get scope statistics metrics.
+
+        Returns:
+            Dict[str, float]: Scope statistics dictionary.
         """
         raise NotImplementedError
 
