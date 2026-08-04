@@ -61,6 +61,11 @@ from backend.application.startup_validator import StartupValidator
 def test_application_lifecycle_state_enum():
     """Verify ApplicationLifecycleState enum values."""
     assert ApplicationLifecycleState.UNINITIALIZED.value == "UNINITIALIZED"
+    assert ApplicationLifecycleState.BOOTSTRAPPING.value == "BOOTSTRAPPING"
+    assert ApplicationLifecycleState.REGISTERING.value == "REGISTERING"
+    assert ApplicationLifecycleState.VALIDATING.value == "VALIDATING"
+    assert ApplicationLifecycleState.INITIALIZING.value == "INITIALIZING"
+    assert ApplicationLifecycleState.READY.value == "READY"
     assert ApplicationLifecycleState.RUNNING.value == "RUNNING"
     assert ApplicationLifecycleState.SHUTDOWN.value == "SHUTDOWN"
 
@@ -87,12 +92,18 @@ def test_application_configuration_model():
         config.debug = False  # type: ignore[misc]
 
 
-def test_application_capabilities_model():
-    """Verify ApplicationCapabilities defaults."""
+def test_application_capabilities_model_fields():
+    """Verify ApplicationCapabilities defaults and feature flags."""
     caps = ApplicationCapabilities()
     assert caps.voice_enabled is True
     assert caps.ai_reasoning_enabled is True
     assert caps.planning_enabled is True
+    assert caps.supports_restart is True
+    assert caps.supports_bootstrap is True
+    assert caps.supports_runtime_registration is True
+    assert caps.supports_health_checks is True
+    assert caps.supports_validation is True
+    assert caps.supports_shutdown is True
 
 
 def test_application_health_model():
@@ -137,7 +148,6 @@ def test_runtime_registry_registration_and_lookup():
     assert retrieved is not None
     assert retrieved.name == "brain_runtime"
 
-    # Test interface aliases
     assert registry.get_registration("brain_runtime") is retrieved
     assert registry.list_registrations() == registry.list_runtimes()
 
@@ -259,7 +269,6 @@ def test_initialization_manager_rollback_on_failure():
 
     for idx, name in enumerate(DETERMINISTIC_INITIALIZATION_ORDER):
         if idx == 3:
-            # Component 4 fails
             def fail_init():
                 return False
             init_mgr.register_initializer(name, fail_init)
@@ -274,7 +283,6 @@ def test_initialization_manager_rollback_on_failure():
     with pytest.raises(InitializationError):
         init_mgr.initialize_all()
 
-    # First 3 components (0, 1, 2) should be rolled back in reverse
     expected_rolled_back = list(reversed(DETERMINISTIC_INITIALIZATION_ORDER[:3]))
     assert rolled_back == expected_rolled_back
     assert init_mgr.rollback_count == 1
@@ -301,7 +309,6 @@ def test_initialization_manager_restart_all():
 
     init_mgr.restart_all()
     assert init_mgr.restart_count == 1
-    # Check that shutdown events occurred before init events
     assert events[0].startswith("shutdown_")
     assert events[len(DETERMINISTIC_INITIALIZATION_ORDER)].startswith("init_")
 
@@ -321,7 +328,7 @@ def test_initialization_manager_concurrent_checks():
 
 
 # ============================================================================
-# 5. Startup Validator Tests
+# 4. Startup Validator Tests
 # ============================================================================
 
 
@@ -379,7 +386,7 @@ def test_startup_validator_validate_versions_and_health():
 
 
 # ============================================================================
-# 6. Bootstrap Manager Tests
+# 5. Bootstrap Manager Tests
 # ============================================================================
 
 
@@ -440,7 +447,6 @@ def test_bootstrap_manager_validation_failure():
 def test_bootstrap_manager_initialization_failure():
     """Verify BootstrapManager handles subsystem initialization failures."""
     init_mgr = InitializationManager()
-    # Register failing initializer for standard brain_runtime
     init_mgr.register_initializer("brain_runtime", lambda: False)
 
     boot_mgr = BootstrapManager(initialization_manager=init_mgr)
@@ -477,45 +483,291 @@ def test_bootstrap_manager_multiple_boots():
 
 
 # ============================================================================
-# 7. Global Runtime Helpers & Skeleton Tests
+# 6. Production ApplicationRuntime Tests
 # ============================================================================
 
 
-def test_global_runtime_and_provider_helpers():
-    """Verify global thread-safe get/set/reset accessors in runtime.py."""
-    reset_application_runtime()
-    reset_application_provider()
+def test_application_runtime_full_lifecycle_state_transitions():
+    """Verify ApplicationRuntime state transitions during initialize()."""
+    registry = RuntimeRegistry()
+    registry.register_runtime(RuntimeRegistration(name="brain_runtime"))
+    app_runtime = ApplicationRuntime(runtime_registry=registry)
 
-    with pytest.raises(ApplicationBootstrapError):
-        get_application_runtime()
+    assert app_runtime.status() == ApplicationLifecycleState.UNINITIALIZED
 
-    with pytest.raises(ApplicationBootstrapError):
-        get_application_provider()
-
-    dummy_runtime = ApplicationRuntime()
-    dummy_provider = ApplicationProvider()
-
-    set_application_runtime(dummy_runtime)
-    set_application_provider(dummy_provider)
-
-    assert get_application_runtime() is dummy_runtime
-    assert get_application_provider() is dummy_provider
-
-    reset_application_runtime()
-    reset_application_provider()
-
-    with pytest.raises(ApplicationBootstrapError):
-        get_application_runtime()
+    state = app_runtime.initialize()
+    assert state.status == ApplicationLifecycleState.RUNNING
+    assert state.is_active is True
+    assert app_runtime.status() == ApplicationLifecycleState.RUNNING
 
 
-def test_skeletons_raise_not_implemented_error():
-    """Verify placeholder skeleton classes raise NotImplementedError on un-implemented methods."""
+def test_application_runtime_start_alias():
+    """Verify start() method initializes if not running."""
+    registry = RuntimeRegistry()
+    registry.register_runtime(RuntimeRegistration(name="brain_runtime"))
+    app_runtime = ApplicationRuntime(runtime_registry=registry)
+
+    state = app_runtime.start()
+    assert state.status == ApplicationLifecycleState.RUNNING
+
+
+def test_application_runtime_restart():
+    """Verify ApplicationRuntime restart behavior."""
+    registry = RuntimeRegistry()
+    registry.register_runtime(RuntimeRegistration(name="brain_runtime"))
+    app_runtime = ApplicationRuntime(runtime_registry=registry)
+
+    app_runtime.initialize()
+    state = app_runtime.restart()
+    assert state.status == ApplicationLifecycleState.RUNNING
+    stats = app_runtime.statistics()
+    assert stats.metrics["restart_count"] >= 1.0
+
+
+def test_application_runtime_shutdown_and_stop():
+    """Verify ApplicationRuntime shutdown and stop."""
     app_runtime = ApplicationRuntime()
-    app_provider = ApplicationProvider()
+    app_runtime.initialize()
 
-    with pytest.raises(NotImplementedError):
+    state = app_runtime.shutdown()
+    assert state.status == ApplicationLifecycleState.STOPPED
+    assert state.is_active is False
+
+    app_runtime.initialize()
+    stop_state = app_runtime.stop()
+    assert stop_state.status == ApplicationLifecycleState.STOPPED
+
+
+def test_application_runtime_health_aggregation():
+    """Verify ApplicationRuntime health aggregation."""
+    registry = RuntimeRegistry()
+    registry.register_runtime(RuntimeRegistration(name="r1", is_active=True))
+    app_runtime = ApplicationRuntime(runtime_registry=registry)
+
+    app_runtime.initialize()
+    health = app_runtime.health()
+    assert health.is_healthy is True
+    assert health.subsystem_health["r1"] is True
+    assert health.subsystem_health["runtime_registry"] is True
+
+
+def test_application_runtime_statistics_aggregation():
+    """Verify ApplicationRuntime statistics metrics aggregation."""
+    registry = RuntimeRegistry()
+    registry.register_runtime(RuntimeRegistration(name="sys1"))
+    app_runtime = ApplicationRuntime(runtime_registry=registry)
+
+    app_runtime.initialize()
+    stats = app_runtime.statistics()
+    assert stats.registered_runtimes_count == 1
+    assert "uptime_seconds" in stats.metrics
+    assert "boot_count" in stats.metrics
+
+
+def test_application_runtime_capabilities():
+    """Verify ApplicationCapabilities returned by ApplicationRuntime."""
+    app_runtime = ApplicationRuntime()
+    caps = app_runtime.capabilities()
+    assert caps.supports_restart is True
+    assert caps.supports_bootstrap is True
+    assert caps.supports_runtime_registration is True
+    assert caps.supports_health_checks is True
+    assert caps.supports_validation is True
+    assert caps.supports_shutdown is True
+
+
+def test_application_runtime_diagnostics():
+    """Verify ApplicationRuntime diagnostics generation."""
+    app_runtime = ApplicationRuntime()
+    diag = app_runtime.diagnostics()
+    assert isinstance(diag, ApplicationDiagnostics)
+    assert len(diag.diagnostic_messages) > 0
+
+
+def test_application_runtime_register_lookup_and_clear():
+    """Verify ApplicationRuntime sub-registry delegation."""
+    app_runtime = ApplicationRuntime()
+    reg = RuntimeRegistration(name="custom_sub")
+
+    assert app_runtime.register_runtime(reg) is True
+    assert app_runtime.lookup_runtime("custom_sub") == reg
+    app_runtime.clear()
+    assert app_runtime.lookup_runtime("custom_sub") is None
+
+
+def test_application_runtime_boot():
+    """Verify ApplicationRuntime boot delegation."""
+    registry = RuntimeRegistry()
+    registry.register_runtime(RuntimeRegistration(name="sys1"))
+    app_runtime = ApplicationRuntime(runtime_registry=registry)
+
+    boot_state = app_runtime.boot()
+    assert boot_state.status == ApplicationLifecycleState.RUNNING
+
+
+def test_application_runtime_validation_failure():
+    """Verify ApplicationRuntime handles validation failure gracefully."""
+    registry = RuntimeRegistry()
+    # Register an inactive runtime to force validation failure
+    registry.register_runtime(RuntimeRegistration(name="bad_sys", is_active=False))
+    app_runtime = ApplicationRuntime(runtime_registry=registry)
+
+    with pytest.raises(ApplicationBootstrapError):
         app_runtime.initialize()
-    with pytest.raises(NotImplementedError):
-        app_runtime.start()
-    with pytest.raises(NotImplementedError):
-        app_provider.get_runtime()
+
+    assert app_runtime.status() == ApplicationLifecycleState.FAILED
+
+
+def test_application_runtime_initialization_failure():
+    """Verify ApplicationRuntime handles initialization failure."""
+    registry = RuntimeRegistry()
+    registry.register_runtime(RuntimeRegistration(name="brain_runtime"))
+    init_mgr = InitializationManager(runtime_registry=registry)
+    init_mgr.register_initializer("brain_runtime", lambda: False)
+
+    app_runtime = ApplicationRuntime(
+        runtime_registry=registry, initialization_manager=init_mgr
+    )
+
+    with pytest.raises(InitializationError):
+        app_runtime.initialize()
+
+    assert app_runtime.status() == ApplicationLifecycleState.FAILED
+
+
+# ============================================================================
+# 7. Production ApplicationProvider Tests
+# ============================================================================
+
+
+def test_application_provider_lifecycle():
+    """Verify ApplicationProvider lifecycle operations."""
+    registry = RuntimeRegistry()
+    registry.register_runtime(RuntimeRegistration(name="sys1"))
+    provider = ApplicationProvider(runtime_registry=registry)
+
+    state = provider.initialize()
+    assert state.status == ApplicationLifecycleState.RUNNING
+
+    restart_state = provider.restart()
+    assert restart_state.status == ApplicationLifecycleState.RUNNING
+
+    shutdown_state = provider.shutdown()
+    assert shutdown_state.status == ApplicationLifecycleState.STOPPED
+
+
+def test_application_provider_boot_and_validate():
+    """Verify ApplicationProvider boot and validate methods."""
+    registry = RuntimeRegistry()
+    registry.register_runtime(RuntimeRegistration(name="sys1"))
+    provider = ApplicationProvider(runtime_registry=registry)
+
+    boot_state = provider.boot()
+    assert boot_state.status == ApplicationLifecycleState.RUNNING
+
+    diag = provider.validate()
+    assert isinstance(diag, ApplicationDiagnostics)
+
+
+def test_application_provider_runtime_delegation():
+    """Verify ApplicationProvider sub-runtime management methods."""
+    provider = ApplicationProvider()
+    reg = RuntimeRegistration(name="sub_service")
+
+    assert provider.register_runtime(reg) is True
+    assert provider.get_runtime("sub_service") == reg
+    assert len(provider.list_runtimes()) == 1
+    assert provider.unregister_runtime("sub_service") is True
+    assert len(provider.list_runtimes()) == 0
+
+
+def test_application_provider_health_stats_capabilities_diagnostics():
+    """Verify ApplicationProvider aggregate inspections."""
+    provider = ApplicationProvider()
+    provider.initialize()
+
+    assert provider.health().is_healthy is True
+    assert "uptime_seconds" in provider.statistics().metrics
+    assert provider.capabilities().supports_restart is True
+    assert isinstance(provider.diagnostics(), ApplicationDiagnostics)
+    assert provider.get_configuration().app_name == "Auralis"
+    assert isinstance(provider.get_context(), ApplicationContext)
+
+
+# ============================================================================
+# 8. Lazy Global Runtime Accessor Tests (runtime.py)
+# ============================================================================
+
+
+def test_runtime_py_lazy_singleton_accessors():
+    """Verify lazy initialization and management in runtime.py."""
+    reset_application_runtime()
+    reset_application_provider()
+
+    # Accessors lazily instantiate singletons if None
+    rt = get_application_runtime()
+    assert isinstance(rt, IApplicationRuntime)
+
+    prov = get_application_provider()
+    assert isinstance(prov, IApplicationProvider)
+
+    # Manual setter and reset
+    new_rt = ApplicationRuntime()
+    set_application_runtime(new_rt)
+    assert get_application_runtime() is new_rt
+
+    reset_application_runtime()
+    reset_application_provider()
+
+
+# ============================================================================
+# 9. Concurrency Tests
+# ============================================================================
+
+
+def test_application_runtime_concurrent_initialize():
+    """Verify thread-safe concurrent initialize calls on ApplicationRuntime."""
+    registry = RuntimeRegistry()
+    registry.register_runtime(RuntimeRegistration(name="sys1"))
+    app_runtime = ApplicationRuntime(runtime_registry=registry)
+
+    def do_init():
+        return app_runtime.initialize()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(do_init) for _ in range(10)]
+        results = [f.result() for f in futures]
+
+    assert all(r.status == ApplicationLifecycleState.RUNNING for r in results)
+
+
+def test_application_runtime_concurrent_restart():
+    """Verify thread-safe concurrent restart calls on ApplicationRuntime."""
+    registry = RuntimeRegistry()
+    registry.register_runtime(RuntimeRegistration(name="sys1"))
+    app_runtime = ApplicationRuntime(runtime_registry=registry)
+    app_runtime.initialize()
+
+    def do_restart():
+        return app_runtime.restart()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(do_restart) for _ in range(10)]
+        results = [f.result() for f in futures]
+
+    assert all(r.status == ApplicationLifecycleState.RUNNING for r in results)
+
+
+def test_application_runtime_concurrent_shutdown():
+    """Verify thread-safe concurrent shutdown calls on ApplicationRuntime."""
+    app_runtime = ApplicationRuntime()
+    app_runtime.initialize()
+
+    def do_shutdown():
+        return app_runtime.shutdown()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(do_shutdown) for _ in range(10)]
+        results = [f.result() for f in futures]
+
+    assert all(r.status == ApplicationLifecycleState.STOPPED for r in results)

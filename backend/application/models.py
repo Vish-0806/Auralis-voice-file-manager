@@ -16,8 +16,11 @@ class ApplicationLifecycleState(str, Enum):
     """Lifecycle states for the application runtime."""
 
     UNINITIALIZED = "UNINITIALIZED"
+    BOOTSTRAPPING = "BOOTSTRAPPING"
+    REGISTERING = "REGISTERING"
+    VALIDATING = "VALIDATING"
     INITIALIZING = "INITIALIZING"
-    INITIALIZED = "INITIALIZED"
+    READY = "READY"
     STARTING = "STARTING"
     RUNNING = "RUNNING"
     PAUSED = "PAUSED"
@@ -64,6 +67,12 @@ class ApplicationCapabilities(BaseModel):
     planning_enabled: bool = True
     os_automation_enabled: bool = True
     background_tasks_enabled: bool = True
+    supports_restart: bool = True
+    supports_bootstrap: bool = True
+    supports_runtime_registration: bool = True
+    supports_health_checks: bool = True
+    supports_validation: bool = True
+    supports_shutdown: bool = True
     custom_capabilities: Dict[str, bool] = Field(default_factory=dict)
 
 
