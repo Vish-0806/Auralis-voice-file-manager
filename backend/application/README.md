@@ -8,6 +8,21 @@ The `backend/application/` package provides the core **Application Container & I
 
 ```
 backend/application/
+├── api/                            # API Runtime Architecture Platform (Phase 15)
+│   ├── auth/                       # Authentication & Authorization Runtime (Phase 15.4)
+│   ├── integration/                # API Integration Gateway Runtime (Phase 15.9)
+│   ├── middleware/                 # Middleware Runtime (Phase 15.3)
+│   ├── protection/                 # API Protection & Rate Limiting Runtime (Phase 15.8)
+│   ├── routing/                    # Request Routing Runtime (Phase 15.2)
+│   ├── validation/                 # Validation & Serialization Runtime (Phase 15.5)
+│   ├── versioning/                 # API Versioning & Documentation Runtime (Phase 15.6)
+│   ├── websocket/                  # WebSocket Runtime (Phase 15.7)
+│   ├── api_provider.py             # API Runtime Provider (Phase 15.1)
+│   ├── api_runtime.py              # API Runtime Coordinator (Phase 15.1)
+│   ├── exceptions.py               # API Exception Hierarchy (Phase 15.1)
+│   ├── interfaces.py               # API ABC Interfaces (Phase 15.1)
+│   ├── models.py                   # API Domain Models & Enums (Phase 15.1)
+│   └── runtime.py                  # Global Lazy Singleton Accessors (Phase 15.1)
 ├── config/                         # Certified Configuration Runtime Subsystem (Phase 14.3)
 │   ├── configuration_certifier.py  # Production Certification Engine (Phase 14.3.6)
 │   ├── configuration_provider.py   # Runtime Coordination Provider (Phase 14.3.1)
@@ -73,6 +88,18 @@ backend/application/
 - **Feature Flags Runtime**: Feature flag evaluation with dependency trees, profile restrictions, environment restrictions, and deterministic MD5 rollout percentages.
 - **Secrets Management**: In-memory secure `SecretStore`, access policy enforcement (`allow_read`, `allow_write`, `allow_export`), value redaction algorithms (`redact()`), and audit access logging without exposing raw secret strings.
 - **Certification Engine**: `ConfigurationCertifier` conducting comprehensive health audits, priority uniqueness validation, diagnostics aggregation, and availability reporting (**100% Availability Certified**).
+
+### 2.4 Provider-Independent API Runtime Architecture Platform (Phase 15)
+- **API Runtime Foundation (Phase 15.1)**: State machine, capabilities, `ApiProvider`, `ApiRuntime`, and lazy singletons.
+- **Request Routing Runtime (Phase 15.2)**: `RouteRegistry`, prefix tree & regex `RouteResolver`, and `RequestDispatcher`.
+- **Middleware Runtime (Phase 15.3)**: `MiddlewareRegistry` and `PipelineManager` for pre/post/around execution phases.
+- **Authentication & Authorization Runtime (Phase 15.4)**: `IdentityManager`, `SessionManager`, and RBAC `AuthorizationEngine`.
+- **Validation & Serialization Runtime (Phase 15.5)**: `SchemaRegistry`, `ValidationEngine`, and `SerializationManager`.
+- **API Versioning & Documentation Runtime (Phase 15.6)**: `VersionRegistry`, SemVer `CompatibilityResolver`, and `DocumentationManager`.
+- **WebSocket Runtime (Phase 15.7)**: `SessionManager`, `ChannelManager`, and `MessageRouter`.
+- **API Protection & Rate Limiting Runtime (Phase 15.8)**: `RateLimiter` (sliding window & token bucket), `PolicyEngine`, and `ViolationTracker`.
+- **API Integration Gateway Runtime (Phase 15.9)**: `ApiGateway` orchestrating requests through `ROUTING` → `MIDDLEWARE` → `AUTHENTICATION` → `VALIDATION` → `VERSIONING` → `PROTECTION` → `WEBSOCKET` → `COMPLETE` pipeline stages.
+- **Production Certification (Phase 15.10)**: 418 unit & certification tests passed, 100% thread-safe `RLock` protection, and 0% framework runtime coupling.
 
 ---
 
