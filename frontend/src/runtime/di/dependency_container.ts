@@ -1,8 +1,8 @@
 /**
- * Dependency Container Coordinator Implementation (Phase 16.2.4).
+ * Dependency Container Coordinator Implementation (Phase 16.2.5).
  *
  * Coordinates container lifecycle operations, child container scope management,
- * and delegates provider/collection operations.
+ * graph analysis, production certification, and delegates provider/collection operations.
  */
 
 import {
@@ -11,6 +11,9 @@ import {
   ContainerHealth,
   ContainerState,
   ContainerStatistics,
+  DependencyAnalysis,
+  DependencyCertification,
+  DependencyIssue,
 } from './models';
 import { IDependencyContainer, IServiceCollection, IServiceProvider } from './interfaces';
 import { ServiceProvider } from './service_provider';
@@ -21,7 +24,7 @@ export class DependencyContainer implements IDependencyContainer {
   private readonly _collection: IServiceCollection;
 
   constructor(provider?: IServiceProvider, collection?: IServiceCollection) {
-    this._collection = collection ?? provider?.configuration ? (provider as any)._collection : new ServiceCollection();
+    this._collection = collection ?? (provider?.configuration ? (provider as any)._collection : new ServiceCollection());
     this._provider = provider ?? new ServiceProvider(this._collection);
   }
 
@@ -92,5 +95,21 @@ export class DependencyContainer implements IDependencyContainer {
 
   public disposeScope(): void {
     this._provider.disposeScope();
+  }
+
+  public analyzeGraph(): DependencyAnalysis {
+    return this._provider.analyzeGraph();
+  }
+
+  public validateGraph(): ReadonlyArray<DependencyIssue> {
+    return this._provider.validateGraph();
+  }
+
+  public certify(): DependencyCertification {
+    return this._provider.certify();
+  }
+
+  public exportGraph(format: 'mermaid' | 'dot' | 'adjacency-list' | 'adjacency-map'): string {
+    return this._provider.exportGraph(format);
   }
 }

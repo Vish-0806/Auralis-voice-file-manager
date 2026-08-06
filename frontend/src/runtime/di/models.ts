@@ -1,9 +1,9 @@
 /**
- * Dependency Injection Domain Models (Phase 16.2.4).
+ * Dependency Injection Domain Models (Phase 16.2.5).
  *
  * Provides immutable state models, configuration objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, diagnostics telemetry,
- * and scoped container metadata for the Frontend Dependency Injection Container.
+ * scoped container metadata, and dependency graph analysis models for the Frontend Dependency Injection Container.
  */
 
 export enum ServiceLifetime {
@@ -51,6 +51,57 @@ export interface ScopedContainer {
   readonly createdAt: string;
   readonly active: boolean;
   readonly scopedServiceCount: number;
+}
+
+export interface DependencyGraphNode {
+  readonly serviceType: string;
+  readonly implementationType?: string;
+  readonly lifetime: ServiceLifetime;
+  readonly dependencies: ReadonlyArray<string>;
+  readonly aliases: ReadonlyArray<string>;
+  readonly tags: ReadonlyArray<string>;
+}
+
+export interface DependencyGraphEdge {
+  readonly source: string;
+  readonly target: string;
+}
+
+export interface DependencyGraph {
+  readonly nodes: ReadonlyArray<DependencyGraphNode>;
+  readonly edges: ReadonlyArray<DependencyGraphEdge>;
+}
+
+export interface DependencyIssue {
+  readonly severity: 'error' | 'warning' | 'info';
+  readonly message: string;
+  readonly service: string;
+}
+
+export interface GraphStatistics {
+  readonly nodeCount: number;
+  readonly edgeCount: number;
+  readonly rootServices: ReadonlyArray<string>;
+  readonly leafServices: ReadonlyArray<string>;
+  readonly orphanServices: ReadonlyArray<string>;
+  readonly circularDependencies: ReadonlyArray<ReadonlyArray<string>>;
+  readonly averageDepth: number;
+  readonly maxDepth: number;
+}
+
+export interface DependencyAnalysis {
+  readonly graph: DependencyGraph;
+  readonly statistics: GraphStatistics;
+  readonly issues: ReadonlyArray<DependencyIssue>;
+  readonly healthy: boolean;
+}
+
+export interface DependencyCertification {
+  readonly certified: boolean;
+  readonly productionReady: boolean;
+  readonly generatedAt: string;
+  readonly analysis: DependencyAnalysis;
+  readonly summary: string;
 }
 
 export interface ContainerCapabilities {
@@ -125,6 +176,8 @@ export interface ContainerDiagnostics {
   readonly failedResolutions: number;
   readonly circularDependencyCount: number;
   readonly metrics: Readonly<Record<string, unknown>>;
+  readonly graphSummary?: GraphStatistics;
+  readonly certification?: DependencyCertification;
   readonly timestamp: string;
 }
 
@@ -182,6 +235,87 @@ export function createScopedContainer(
     createdAt: params.createdAt ?? new Date().toISOString(),
     active: params.active ?? true,
     scopedServiceCount: params.scopedServiceCount ?? 0,
+  });
+}
+
+export function createDependencyGraphNode(
+  params: Partial<DependencyGraphNode> & { serviceType: string; lifetime: ServiceLifetime },
+): DependencyGraphNode {
+  return Object.freeze({
+    serviceType: params.serviceType,
+    implementationType: params.implementationType,
+    lifetime: params.lifetime,
+    dependencies: Object.freeze([...(params.dependencies ?? [])]),
+    aliases: Object.freeze([...(params.aliases ?? [])]),
+    tags: Object.freeze([...(params.tags ?? [])]),
+  });
+}
+
+export function createDependencyGraphEdge(
+  params: Partial<DependencyGraphEdge> & { source: string; target: string },
+): DependencyGraphEdge {
+  return Object.freeze({
+    source: params.source,
+    target: params.target,
+  });
+}
+
+export function createDependencyGraph(
+  params: Partial<DependencyGraph> = {},
+): DependencyGraph {
+  return Object.freeze({
+    nodes: Object.freeze([...(params.nodes ?? [])]),
+    edges: Object.freeze([...(params.edges ?? [])]),
+  });
+}
+
+export function createDependencyIssue(
+  params: Partial<DependencyIssue> & { message: string; service: string },
+): DependencyIssue {
+  return Object.freeze({
+    severity: params.severity ?? 'error',
+    message: params.message,
+    service: params.service,
+  });
+}
+
+export function createGraphStatistics(
+  params: Partial<GraphStatistics> = {},
+): GraphStatistics {
+  return Object.freeze({
+    nodeCount: params.nodeCount ?? 0,
+    edgeCount: params.edgeCount ?? 0,
+    rootServices: Object.freeze([...(params.rootServices ?? [])]),
+    leafServices: Object.freeze([...(params.leafServices ?? [])]),
+    orphanServices: Object.freeze([...(params.orphanServices ?? [])]),
+    circularDependencies: Object.freeze(
+      (params.circularDependencies ?? []).map((cycle) => Object.freeze([...cycle])),
+    ),
+    averageDepth: params.averageDepth ?? 0,
+    maxDepth: params.maxDepth ?? 0,
+  });
+}
+
+export function createDependencyAnalysis(
+  params: Partial<DependencyAnalysis> = {},
+): DependencyAnalysis {
+  return Object.freeze({
+    graph: params.graph ?? createDependencyGraph(),
+    statistics: params.statistics ?? createGraphStatistics(),
+    issues: Object.freeze([...(params.issues ?? [])]),
+    healthy: params.healthy ?? true,
+  });
+}
+
+export function createDependencyCertification(
+  params: Partial<DependencyCertification> = {},
+): DependencyCertification {
+  return Object.freeze({
+    certified: params.certified ?? false,
+    productionReady: params.productionReady ?? false,
+    generatedAt: params.generatedAt ?? new Date().toISOString(),
+    analysis: params.analysis ?? createDependencyAnalysis(),
+    summary: params.summary ?? 'Uncertified Container',
   });
 }
 
@@ -276,6 +410,8 @@ export function createContainerDiagnostics(
     failedResolutions: params.failedResolutions ?? 0,
     circularDependencyCount: params.circularDependencyCount ?? 0,
     metrics: Object.freeze({ ...(params.metrics ?? {}) }),
+    graphSummary: params.graphSummary,
+    certification: params.certification,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }

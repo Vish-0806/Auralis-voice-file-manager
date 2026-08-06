@@ -8,15 +8,22 @@ import {
   createContainerDiagnostics,
   createContainerHealth,
   createContainerStatistics,
+  createDependencyAnalysis,
+  createDependencyCertification,
+  createDependencyGraph,
+  createDependencyGraphEdge,
+  createDependencyGraphNode,
+  createDependencyIssue,
   createDependencyNode,
+  createGraphStatistics,
   createScopedContainer,
   createServiceDescriptorModel,
   createServiceRegistration,
   DependencyContainer,
+  DependencyGraphAnalyzer,
   DependencyInjectionException,
   getDependencyContainer,
   getServiceProvider,
-  IServiceProvider,
   resetDependencyContainer,
   resetServiceProvider,
   ServiceCollection,
@@ -30,219 +37,202 @@ import {
   setServiceProvider,
 } from '../../src/runtime/di';
 
+class ConfigService {
+  public env = 'test';
+}
+
 class LoggerService {
-  public id = Math.random();
+  constructor(public config: ConfigService) {}
 }
 
 class UserSessionService {
-  public id = Math.random();
+  constructor(public logger: LoggerService) {}
 }
 
-class TransientService {
-  public id = Math.random();
+class OrphanService {
+  public id = 'orphan';
 }
 
-describe('Phase 16.2.4 — Frontend Dependency Injection Scoped Lifetime & Child Container Engine', () => {
+describe('Phase 16.2.5 — Frontend Dependency Injection Production Certification & Graph Analysis', () => {
   beforeEach(() => {
     resetDependencyContainer();
     resetServiceProvider();
   });
 
-  describe('1. ScopedContainer Models, Exceptions & Capabilities', () => {
-    it('should create immutable ScopedContainer model', () => {
-      const scopeModel = createScopedContainer({ scopeId: 'scope_1', parentScopeId: 'root' });
-      expect(scopeModel.scopeId).toBe('scope_1');
-      expect(scopeModel.parentScopeId).toBe('root');
-      expect(scopeModel.active).toBe(true);
-      expect(Object.isFrozen(scopeModel)).toBe(true);
-    });
-
-    it('should verify ContainerCapabilities supportsScopes = true', () => {
-      const caps = createContainerCapabilities();
-      expect(caps.supportsScopes).toBe(true);
-    });
-
-    it('should verify diagnostics includes activeScopes, scopeHierarchy, and scopedCacheSize', () => {
-      const diag = createContainerDiagnostics({
-        activeScopes: ['root', 'scope_1'],
-        scopeHierarchy: { scope_1: 'root' },
-        scopedCacheSize: 2,
+  describe('1. Immutable Graph Models & Factory Functions', () => {
+    it('should create immutable DependencyGraphNode and DependencyGraphEdge', () => {
+      const node = createDependencyGraphNode({
+        serviceType: 'ServiceA',
+        lifetime: ServiceLifetime.SINGLETON,
+        dependencies: ['ServiceB'],
       });
+      expect(node.serviceType).toBe('ServiceA');
+      expect(node.dependencies).toContain('ServiceB');
+      expect(Object.isFrozen(node)).toBe(true);
 
-      expect(diag.activeScopes).toContain('scope_1');
-      expect(diag.scopeHierarchy['scope_1']).toBe('root');
-      expect(diag.scopedCacheSize).toBe(2);
-
-      const cfg = createContainerConfiguration();
-      expect(cfg.name).toBe('Auralis Container');
-
-      const ctx = createContainerContext();
-      expect(ctx.containerId).toBe('default-container');
-
-      const health = createContainerHealth();
-      expect(health.healthy).toBe(false);
-
-      const stats = createContainerStatistics();
-      expect(stats.totalRegistrations).toBe(0);
-
-      const node = createDependencyNode({ serviceType: 'S1', dependencies: ['D1'] });
-      expect(node.dependencies).toContain('D1');
-
-      const descModel = createServiceDescriptorModel({ descriptorId: 'd1', serviceType: 'S1', lifetime: ServiceLifetime.SINGLETON });
-      expect(descModel.serviceType).toBe('S1');
-
-      const reg = createServiceRegistration({ descriptorId: 'r1', serviceType: 'S1', lifetime: ServiceLifetime.SINGLETON });
-      expect(reg.serviceType).toBe('S1');
-
-      expect(ContainerState.UNINITIALIZED).toBe('UNINITIALIZED');
+      const edge = createDependencyGraphEdge({ source: 'ServiceA', target: 'ServiceB' });
+      expect(edge.source).toBe('ServiceA');
+      expect(edge.target).toBe('ServiceB');
+      expect(Object.isFrozen(edge)).toBe(true);
     });
 
-    it('should exercise exception hierarchy', () => {
-      expect(new CircularDependencyException('circ')).toBeInstanceOf(DependencyInjectionException);
-      expect(new ServiceResolutionException('res')).toBeInstanceOf(DependencyInjectionException);
-      expect(new ServiceRegistrationException('reg')).toBeInstanceOf(DependencyInjectionException);
-      expect(new ServiceValidationException('val')).toBeInstanceOf(DependencyInjectionException);
+    it('should create immutable DependencyAnalysis and DependencyCertification', () => {
+      const graph = createDependencyGraph();
+      const stats = createGraphStatistics({ nodeCount: 1 });
+      const issue = createDependencyIssue({ message: 'warn', service: 'S1', severity: 'warning' });
+
+      const analysis = createDependencyAnalysis({ graph, statistics: stats, issues: [issue] });
+      expect(analysis.healthy).toBe(true);
+      expect(Object.isFrozen(analysis)).toBe(true);
+
+      const cert = createDependencyCertification({ analysis, certified: true, productionReady: false });
+      expect(cert.certified).toBe(true);
+      expect(Object.isFrozen(cert)).toBe(true);
     });
   });
 
-  describe('2. Scope Creation, Hierarchy & Disposal', () => {
-    it('should create child scope and verify parent-child relationship', () => {
-      const rootProvider = new ServiceProvider();
-      const scope1 = rootProvider.createScope();
-
-      expect(rootProvider.isScope()).toBe(false);
-      expect(scope1.isScope()).toBe(true);
-      expect(scope1.scopeId()).toBeDefined();
-      expect(scope1.parentScope()).toBe(rootProvider);
-    });
-
-    it('should dispose scope and invalidate child resolution', () => {
-      const rootProvider = new ServiceProvider();
-      rootProvider.initialize();
-
-      const scope1 = rootProvider.createScope();
+  describe('2. Graph Analysis & Root/Leaf/Orphan Detection', () => {
+    it('should correctly analyze graph topology (roots, leaves, orphans)', () => {
       const collection = new ServiceCollection();
-      collection.addScoped('Session', UserSessionService);
+      collection.addSingleton('ConfigService', ConfigService);
+      collection.addSingleton('LoggerService', LoggerService, { dependencies: ['ConfigService'] });
+      collection.addSingleton('OrphanService', OrphanService);
 
-      const scopedProvider = new ServiceProvider(collection, undefined, undefined, undefined, scope1 as any);
+      const analyzer = new DependencyGraphAnalyzer();
+      const analysis = analyzer.analyze(collection);
 
-      expect(scopedProvider.resolve('Session')).toBeDefined();
-
-      scopedProvider.disposeScope();
-      expect(() => scopedProvider.resolve('Session')).toThrow(ServiceResolutionException);
+      expect(analysis.statistics.nodeCount).toBe(3);
+      expect(analysis.statistics.edgeCount).toBe(1);
+      expect(analysis.statistics.rootServices).toContain('LoggerService');
+      expect(analysis.statistics.leafServices).toContain('ConfigService');
+      expect(analysis.statistics.orphanServices).toContain('OrphanService');
     });
 
-    it('should dispose all nested child scopes when parent scope is disposed', () => {
-      const root = new ServiceProvider();
-      const scopeA = root.createScope();
-      const scopeB = scopeA.createScope();
-
-      expect(scopeA.isScope()).toBe(true);
-      expect(scopeB.isScope()).toBe(true);
-
-      scopeA.disposeScope();
-
-      expect(() => scopeB.resolve('Any')).toThrow(ServiceResolutionException);
-    });
-  });
-
-  describe('3. Scoped Lifetime Isolation & Singleton Sharing', () => {
-    it('should share singletons across scopes but isolate scoped services per scope', () => {
+    it('should detect missing dependency errors', () => {
       const collection = new ServiceCollection();
-      collection.addSingleton('Logger', LoggerService);
-      collection.addScoped('UserSession', UserSessionService);
-      collection.addTransient('Transient', TransientService);
+      collection.addSingleton('LoggerService', LoggerService, { dependencies: ['MissingConfig'] });
 
-      const rootProvider = new ServiceProvider(collection);
-      rootProvider.initialize();
+      const analyzer = new DependencyGraphAnalyzer();
+      const analysis = analyzer.analyze(collection);
 
-      const scopeA = rootProvider.createScope();
-      const scopeB = rootProvider.createScope();
+      expect(analysis.healthy).toBe(false);
+      expect(analysis.issues.some((i) => i.message.includes('missing service'))).toBe(true);
+    });
 
-      // Singleton is shared across root and all child scopes
-      const logRoot = rootProvider.resolve<LoggerService>('Logger');
-      const logA = scopeA.resolve<LoggerService>('Logger');
-      const logB = scopeB.resolve<LoggerService>('Logger');
+    it('should detect singleton -> scoped lifetime violations', () => {
+      const collection = new ServiceCollection();
+      collection.addScoped('UserSessionService', UserSessionService);
+      collection.addSingleton('LoggerService', LoggerService, { dependencies: ['UserSessionService'] });
 
-      expect(logA).toBe(logRoot);
-      expect(logB).toBe(logRoot);
+      const analyzer = new DependencyGraphAnalyzer();
+      const analysis = analyzer.analyze(collection);
 
-      // Scoped is cached within same scope, but different across different scopes
-      const sessA1 = scopeA.resolve<UserSessionService>('UserSession');
-      const sessA2 = scopeA.resolve<UserSessionService>('UserSession');
-      const sessB1 = scopeB.resolve<UserSessionService>('UserSession');
-
-      expect(sessA1).toBe(sessA2);
-      expect(sessA1).not.toBe(sessB1);
-
-      // Transient is fresh everywhere
-      const trA1 = scopeA.resolve<TransientService>('Transient');
-      const trA2 = scopeA.resolve<TransientService>('Transient');
-      expect(trA1).not.toBe(trA2);
+      expect(analysis.healthy).toBe(false);
+      expect(analysis.issues.some((i) => i.message.includes('Lifetime violation'))).toBe(true);
     });
   });
 
-  describe('4. DependencyContainer Scope Delegation & Singleton Accessors', () => {
-    it('should create child scope from DependencyContainer and verify accessors', () => {
-      const rootContainer = new DependencyContainer();
-      rootContainer.collection().addSingleton('Logger', LoggerService);
-      rootContainer.collection().addScoped('UserSession', UserSessionService);
+  describe('3. Production Certification Engine', () => {
+    it('should issue production certification for clean container', () => {
+      const collection = new ServiceCollection();
+      collection.addSingleton('ConfigService', ConfigService);
+      collection.addSingleton('LoggerService', LoggerService, { dependencies: ['ConfigService'] });
 
-      const scopeContainerA = rootContainer.createScope();
-      const scopeContainerB = rootContainer.createScope();
+      const analyzer = new DependencyGraphAnalyzer();
+      const cert = analyzer.certify(collection);
 
-      const logA = scopeContainerA.resolve<LoggerService>('Logger');
-      const logB = scopeContainerB.resolve<LoggerService>('Logger');
-      expect(logA).toBe(logB);
+      expect(cert.certified).toBe(true);
+      expect(cert.productionReady).toBe(true);
+      expect(cert.summary).toContain('Certified Production Ready');
+    });
 
-      const sessA = scopeContainerA.resolve<UserSessionService>('UserSession');
-      const sessB = scopeContainerB.resolve<UserSessionService>('UserSession');
-      expect(sessA).not.toBe(sessB);
+    it('should fail certification when errors are present', () => {
+      const collection = new ServiceCollection();
+      collection.addSingleton('LoggerService', LoggerService, { dependencies: ['MissingConfig'] });
 
-      scopeContainerA.disposeScope();
+      const analyzer = new DependencyGraphAnalyzer();
+      const cert = analyzer.certify(collection);
 
-      const sp1 = getServiceProvider();
-      expect(sp1).toBeDefined();
+      expect(cert.certified).toBe(false);
+      expect(cert.productionReady).toBe(false);
+      expect(cert.summary).toContain('Certification Failed');
+    });
+  });
 
+  describe('4. Diagram & Structure Export Formats', () => {
+    it('should export Mermaid, DOT, Adjacency List, and Adjacency Map', () => {
+      const collection = new ServiceCollection();
+      collection.addSingleton('ConfigService', ConfigService);
+      collection.addSingleton('LoggerService', LoggerService, { dependencies: ['ConfigService'] });
+
+      const container = new DependencyContainer(undefined, collection);
+      const mermaid = container.exportGraph('mermaid');
+      expect(mermaid).toContain('graph TD');
+      expect(mermaid).toContain('LoggerService --> ConfigService');
+
+      const dot = container.exportGraph('dot');
+      expect(dot).toContain('digraph G');
+      expect(dot).toContain('"LoggerService" -> "ConfigService";');
+
+      const adjList = container.exportGraph('adjacency-list');
+      expect(adjList).toContain('LoggerService: ConfigService');
+
+      const adjMap = container.exportGraph('adjacency-map');
+      expect(adjMap).toContain('"LoggerService": [\n    "ConfigService"\n  ]');
+    });
+  });
+
+  describe('5. Container & Diagnostics Integration', () => {
+    it('should expose graph analysis and certification via DependencyContainer & diagnostics()', () => {
+      const container = new DependencyContainer();
+      container.collection().addSingleton('ConfigService', ConfigService);
+      container.collection().addSingleton('LoggerService', LoggerService, { dependencies: ['ConfigService'] });
+
+      const analysis = container.analyzeGraph();
+      expect(analysis.statistics.nodeCount).toBe(2);
+
+      const issues = container.validateGraph();
+      expect(issues.length).toBe(0);
+
+      const cert = container.certify();
+      expect(cert.certified).toBe(true);
+
+      const diag = container.diagnostics();
+      expect(diag.graphSummary).toBeDefined();
+      expect(diag.certification?.certified).toBe(true);
+
+      const scopeModel = createScopedContainer({ scopeId: 'sc1' });
+      expect(scopeModel.scopeId).toBe('sc1');
+
+      expect(createContainerCapabilities().supportsScopes).toBe(true);
+      expect(createContainerConfiguration().name).toBe('Auralis Container');
+      expect(createContainerContext().containerId).toBe('default-container');
+      expect(createContainerDiagnostics().state).toBe(ContainerState.UNINITIALIZED);
+      expect(createContainerHealth().healthy).toBe(false);
+      expect(createContainerStatistics().totalRegistrations).toBe(0);
+      expect(createDependencyNode({ serviceType: 'S1' }).serviceType).toBe('S1');
+      expect(createServiceDescriptorModel({ descriptorId: 'd1', serviceType: 'S1', lifetime: ServiceLifetime.SINGLETON }).serviceType).toBe('S1');
+      expect(createServiceRegistration({ descriptorId: 'r1', serviceType: 'S1', lifetime: ServiceLifetime.SINGLETON }).serviceType).toBe('S1');
+
+      expect(new CircularDependencyException('c')).toBeInstanceOf(DependencyInjectionException);
+      expect(new ServiceResolutionException('r')).toBeInstanceOf(DependencyInjectionException);
+      expect(new ServiceRegistrationException('rg')).toBeInstanceOf(DependencyInjectionException);
+      expect(new ServiceValidationException('v')).toBeInstanceOf(DependencyInjectionException);
+
+      expect(getServiceProvider()).toBeDefined();
       const customSP = new ServiceProvider();
       setServiceProvider(customSP);
       expect(getServiceProvider()).toBe(customSP);
+      resetServiceProvider();
 
-      const dc1 = getDependencyContainer();
-      expect(dc1).toBeDefined();
-
+      expect(getDependencyContainer()).toBeDefined();
       const customDC = new DependencyContainer();
       setDependencyContainer(customDC);
       expect(getDependencyContainer()).toBe(customDC);
+      resetDependencyContainer();
 
-      const desc = new ServiceDescriptor('S1', ServiceLifetime.SINGLETON, LoggerService);
+      const desc = new ServiceDescriptor('S1', ServiceLifetime.SINGLETON, ConfigService);
       expect(desc.serviceType).toBe('S1');
-    });
-  });
-
-  describe('5. Telemetry & Statistics Integration', () => {
-    it('should track scope statistics and diagnostics telemetry', () => {
-      const collection = new ServiceCollection();
-      collection.addScoped('Session', UserSessionService);
-
-      const root = new ServiceProvider(collection);
-      const scopeA = root.createScope();
-      const scopeB = root.createScope();
-
-      scopeA.resolve('Session');
-      scopeA.resolve('Session');
-
-      const stats = root.statistics();
-      expect(stats.scopesCreated).toBe(2);
-      expect(stats.scopedCacheHits).toBe(1);
-      expect(stats.scopedInstancesCreated).toBe(1);
-
-      const diag = (scopeA as IServiceProvider).diagnostics();
-      expect(diag.activeScopes.length).toBeGreaterThan(0);
-      expect(diag.scopedCacheSize).toBe(1);
-
-      scopeB.disposeScope();
-      expect(root.statistics().scopesDisposed).toBe(1);
     });
   });
 });

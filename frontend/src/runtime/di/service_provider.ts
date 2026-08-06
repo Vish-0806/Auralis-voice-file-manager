@@ -1,9 +1,9 @@
 /**
- * Service Provider Foundation & Resolution Engine Implementation (Phase 16.2.4).
+ * Service Provider Foundation & Resolution Engine Implementation (Phase 16.2.5).
  *
  * Implements IServiceProvider owning container configuration, context, health,
- * telemetry, diagnostics, full resolution engine, and hierarchical child container scopes
- * with SCOPED lifetime support.
+ * telemetry, diagnostics, full resolution engine, hierarchical child container scopes,
+ * dependency graph analysis, and production certification.
  */
 
 import {
@@ -20,11 +20,15 @@ import {
   createContainerDiagnostics,
   createContainerHealth,
   createContainerStatistics,
+  DependencyAnalysis,
+  DependencyCertification,
+  DependencyIssue,
   ServiceLifetime,
 } from './models';
 import { IServiceCollection, IServiceDescriptor, IServiceProvider } from './interfaces';
 import { ServiceCollection } from './service_collection';
 import { CircularDependencyException, ServiceResolutionException } from './exceptions';
+import { DependencyGraphAnalyzer } from './dependency_graph_analyzer';
 
 let _scopeIdCounter = 0;
 
@@ -34,6 +38,7 @@ export class ServiceProvider implements IServiceProvider {
   private readonly _config: ContainerConfiguration;
   private readonly _capabilities: ContainerCapabilities;
   private readonly _context: ContainerContext;
+  private readonly _analyzer: DependencyGraphAnalyzer;
 
   private readonly _scopeId: string;
   private readonly _parentProvider?: ServiceProvider;
@@ -70,6 +75,7 @@ export class ServiceProvider implements IServiceProvider {
     this._config = config ?? parentProvider?._config ?? createContainerConfiguration();
     this._capabilities = capabilities ?? parentProvider?._capabilities ?? createContainerCapabilities();
     this._context = context ?? parentProvider?._context ?? createContainerContext();
+    this._analyzer = new DependencyGraphAnalyzer();
 
     this._parentProvider = parentProvider;
     this._singletonCache = sharedSingletonCache ?? parentProvider?._singletonCache ?? new Map<string, unknown>();
@@ -190,6 +196,8 @@ export class ServiceProvider implements IServiceProvider {
 
     this.buildScopeDiagnostics(scopeHierarchyMap, activeScopesList);
 
+    const cert = this.certify();
+
     return createContainerDiagnostics({
       state: this._state,
       health: this.health(),
@@ -211,6 +219,8 @@ export class ServiceProvider implements IServiceProvider {
             ? (this._singletonCacheHits + this._scopedCacheHits) / this._totalResolutions
             : 0,
       },
+      graphSummary: cert.analysis.statistics,
+      certification: cert,
       timestamp: new Date().toISOString(),
     });
   }
@@ -225,6 +235,23 @@ export class ServiceProvider implements IServiceProvider {
 
   public context(): ContainerContext {
     return this._context;
+  }
+
+  public analyzeGraph(): DependencyAnalysis {
+    return this._analyzer.analyze(this._collection);
+  }
+
+  public validateGraph(): ReadonlyArray<DependencyIssue> {
+    return this._analyzer.validate(this._collection);
+  }
+
+  public certify(): DependencyCertification {
+    return this._analyzer.certify(this._collection);
+  }
+
+  public exportGraph(format: 'mermaid' | 'dot' | 'adjacency-list' | 'adjacency-map'): string {
+    const analysis = this.analyzeGraph();
+    return this._analyzer.exportGraph(analysis, format);
   }
 
   public createScope(): IServiceProvider {

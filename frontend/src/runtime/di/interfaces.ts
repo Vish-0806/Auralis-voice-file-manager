@@ -1,8 +1,8 @@
 /**
- * Dependency Injection Interfaces (Phase 16.2.4).
+ * Dependency Injection Interfaces (Phase 16.2.5).
  *
  * Defines contracts for IServiceDescriptor, IServiceCollection, IServiceProvider,
- * and IDependencyContainer including Scoped Lifetimes & Child Container APIs.
+ * and IDependencyContainer including Graph Analysis and Certification APIs.
  */
 
 import {
@@ -13,6 +13,9 @@ import {
   ContainerHealth,
   ContainerState,
   ContainerStatistics,
+  DependencyAnalysis,
+  DependencyCertification,
+  DependencyIssue,
   ServiceDescriptorModel,
   ServiceLifetime,
 } from './models';
@@ -107,6 +110,11 @@ export interface IServiceProvider {
   isScope(): boolean;
   scopeId(): string;
   parentScope(): IServiceProvider | undefined;
+
+  analyzeGraph(): DependencyAnalysis;
+  validateGraph(): ReadonlyArray<DependencyIssue>;
+  certify(): DependencyCertification;
+  exportGraph(format: 'mermaid' | 'dot' | 'adjacency-list' | 'adjacency-map'): string;
 }
 
 export interface IDependencyContainer {
@@ -129,4 +137,9 @@ export interface IDependencyContainer {
 
   createScope(): IDependencyContainer;
   disposeScope(): void;
+
+  analyzeGraph(): DependencyAnalysis;
+  validateGraph(): ReadonlyArray<DependencyIssue>;
+  certify(): DependencyCertification;
+  exportGraph(format: 'mermaid' | 'dot' | 'adjacency-list' | 'adjacency-map'): string;
 }
