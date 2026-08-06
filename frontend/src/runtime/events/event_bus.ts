@@ -1,8 +1,8 @@
 /**
- * Event Bus Implementation (Phase 16.4.2).
+ * Event Bus Implementation (Phase 16.4.3).
  *
  * Implements IEventBus managing event publication, registration validation, sequence numbering,
- * bounded event history tracking, payload telemetry, and health reporting.
+ * bounded event history tracking, subscriber registration delegation, and publish-to-subscriber execution dispatch.
  */
 
 import {
@@ -15,13 +15,20 @@ import {
   EventBusStatistics,
   EventHistory,
   EventPriority,
+  EventSubscription,
+  FrontendEvent,
   PublishedEvent,
+  SubscriberRegistration,
 } from './models';
 import { EventValidationException } from './exceptions';
-import { IEventBus, IEventRegistry } from './interfaces';
+import { IEventBus, IEventRegistry, ISubscriberRegistry, ISubscriptionManager } from './interfaces';
+import { SubscriberRegistry } from './subscriber_registry';
+import { SubscriptionManager } from './subscription_manager';
 
 export class EventBus implements IEventBus {
   private readonly _registry: IEventRegistry;
+  private readonly _subscriberRegistry: ISubscriberRegistry;
+  private readonly _subscriptionManager: ISubscriptionManager;
   private readonly _maxHistorySize: number;
 
   private readonly _history: PublishedEvent[] = [];
@@ -31,8 +38,15 @@ export class EventBus implements IEventBus {
   private _failedPublishes = 0;
   private _totalPayloadBytes = 0;
 
-  constructor(registry: IEventRegistry, maxHistorySize = 1000) {
+  constructor(
+    registry: IEventRegistry,
+    subscriberRegistry?: ISubscriberRegistry,
+    subscriptionManager?: ISubscriptionManager,
+    maxHistorySize = 1000,
+  ) {
     this._registry = registry;
+    this._subscriberRegistry = subscriberRegistry ?? new SubscriberRegistry();
+    this._subscriptionManager = subscriptionManager ?? new SubscriptionManager();
     this._maxHistorySize = maxHistorySize;
   }
 
@@ -74,7 +88,41 @@ export class EventBus implements IEventBus {
 
     this._totalPayloadBytes += this.estimatePayloadSize(payload);
 
+    // PubSub Dispatch: Lookup subscribers and execute callbacks
+    const subscribers = this._subscriberRegistry.getSubscribers<T>(type);
+    if (subscribers.length > 0) {
+      this._subscriptionManager.executeSubscribers(published, subscribers);
+    }
+
     return published;
+  }
+
+  public subscribe<T = unknown>(
+    eventType: string,
+    handler: (event: FrontendEvent<T>) => void | Promise<void>,
+    priority?: EventPriority,
+  ): EventSubscription {
+    return this._subscriberRegistry.subscribe(eventType, handler, priority);
+  }
+
+  public unsubscribe(subscriptionId: string): boolean {
+    return this._subscriberRegistry.unsubscribe(subscriptionId);
+  }
+
+  public unsubscribeAll(eventType?: string): number {
+    return this._subscriberRegistry.unsubscribeAll(eventType);
+  }
+
+  public listSubscribers(eventType?: string): ReadonlyArray<SubscriberRegistration> {
+    return this._subscriberRegistry.listSubscribers(eventType);
+  }
+
+  public listSubscriptions(): ReadonlyArray<EventSubscription> {
+    return this._subscriberRegistry.listSubscriptions();
+  }
+
+  public subscriberCount(eventType?: string): number {
+    return this._subscriberRegistry.count(eventType);
   }
 
   public history(): EventHistory {
@@ -112,7 +160,7 @@ export class EventBus implements IEventBus {
     try {
       return JSON.stringify(payload).length;
     } catch {
-      return 100; // Fallback estimate
+      return 100;
     }
   }
 }

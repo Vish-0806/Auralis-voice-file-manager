@@ -1,10 +1,10 @@
 /**
- * Event & Messaging Runtime Domain Models (Phase 16.4.2).
+ * Event & Messaging Runtime Domain Models (Phase 16.4.3).
  *
  * Provides immutable state models, event objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, diagnostics
  * telemetry, priority enums, configuration objects, event registration definitions,
- * published event records, and event bus statistics for the Frontend Event Runtime.
+ * published event records, subscriber registrations, execution results, and subscriber health for the Frontend Event Runtime.
  */
 
 export enum EventRuntimeState {
@@ -70,6 +70,58 @@ export interface EventBusHealth {
   readonly totalPublishedEvents: number;
 }
 
+export interface EventSubscription {
+  readonly subscriptionId: string;
+  readonly eventType: string;
+  readonly priority: EventPriority;
+  readonly subscribedAt: string;
+  readonly active: boolean;
+}
+
+export interface SubscriberRegistration<T = unknown> {
+  readonly subscriptionId: string;
+  readonly eventType: string;
+  readonly handler: (event: FrontendEvent<T>) => void | Promise<void>;
+  readonly priority: EventPriority;
+  readonly subscribedAt: string;
+  readonly active: boolean;
+}
+
+export interface SubscriptionExecution {
+  readonly subscriptionId: string;
+  readonly eventId: string;
+  readonly eventType: string;
+  readonly success: boolean;
+  readonly durationMs: number;
+  readonly error?: string;
+  readonly executedAt: string;
+}
+
+export interface SubscriptionResult {
+  readonly publishedEvent: PublishedEvent;
+  readonly executions: ReadonlyArray<SubscriptionExecution>;
+  readonly totalExecutions: number;
+  readonly successfulExecutions: number;
+  readonly failedExecutions: number;
+  readonly executedAt: string;
+}
+
+export interface SubscriberStatistics {
+  readonly totalSubscriptions: number;
+  readonly activeSubscriptions: number;
+  readonly totalExecutions: number;
+  readonly successfulExecutions: number;
+  readonly failedExecutions: number;
+  readonly averageExecutionMs: number;
+}
+
+export interface SubscriberHealth {
+  readonly healthy: boolean;
+  readonly activeSubscriptionsCount: number;
+  readonly totalExecutionsCount: number;
+  readonly errorRate: number;
+}
+
 export interface EventContext {
   readonly runtimeId: string;
   readonly createdAt: string;
@@ -115,6 +167,10 @@ export interface EventDiagnostics {
   readonly publishedEvents?: number;
   readonly eventHistorySize?: number;
   readonly busStatistics?: EventBusStatistics;
+  readonly subscriberCount?: number;
+  readonly subscriptionCount?: number;
+  readonly subscriberStatistics?: SubscriberStatistics;
+  readonly subscriberHealth?: SubscriberHealth;
   readonly timestamp: string;
 }
 
@@ -186,6 +242,82 @@ export function createEventBusHealth(params: Partial<EventBusHealth> = {}): Even
   });
 }
 
+export function createEventSubscription(params: Partial<EventSubscription> & { eventType: string }): EventSubscription {
+  return Object.freeze({
+    subscriptionId: params.subscriptionId ?? `sub_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    eventType: params.eventType,
+    priority: params.priority ?? EventPriority.NORMAL,
+    subscribedAt: params.subscribedAt ?? new Date().toISOString(),
+    active: params.active ?? true,
+  });
+}
+
+export function createSubscriberRegistration<T = unknown>(
+  params: Partial<SubscriberRegistration<T>> & {
+    eventType: string;
+    handler: (event: FrontendEvent<T>) => void | Promise<void>;
+  },
+): SubscriberRegistration<T> {
+  return Object.freeze({
+    subscriptionId: params.subscriptionId ?? `sub_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    eventType: params.eventType,
+    handler: params.handler,
+    priority: params.priority ?? EventPriority.NORMAL,
+    subscribedAt: params.subscribedAt ?? new Date().toISOString(),
+    active: params.active ?? true,
+  });
+}
+
+export function createSubscriptionExecution(
+  params: Partial<SubscriptionExecution> & { subscriptionId: string; eventId: string; eventType: string },
+): SubscriptionExecution {
+  return Object.freeze({
+    subscriptionId: params.subscriptionId,
+    eventId: params.eventId,
+    eventType: params.eventType,
+    success: params.success ?? true,
+    durationMs: params.durationMs ?? 0,
+    error: params.error,
+    executedAt: params.executedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createSubscriptionResult(
+  params: Partial<SubscriptionResult> & { publishedEvent: PublishedEvent },
+): SubscriptionResult {
+  const executions = params.executions ?? [];
+  return Object.freeze({
+    publishedEvent: params.publishedEvent,
+    executions: Object.freeze([...executions]),
+    totalExecutions: params.totalExecutions ?? executions.length,
+    successfulExecutions:
+      params.successfulExecutions ?? executions.filter((e) => e.success).length,
+    failedExecutions:
+      params.failedExecutions ?? executions.filter((e) => !e.success).length,
+    executedAt: params.executedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createSubscriberStatistics(params: Partial<SubscriberStatistics> = {}): SubscriberStatistics {
+  return Object.freeze({
+    totalSubscriptions: params.totalSubscriptions ?? 0,
+    activeSubscriptions: params.activeSubscriptions ?? 0,
+    totalExecutions: params.totalExecutions ?? 0,
+    successfulExecutions: params.successfulExecutions ?? 0,
+    failedExecutions: params.failedExecutions ?? 0,
+    averageExecutionMs: params.averageExecutionMs ?? 0,
+  });
+}
+
+export function createSubscriberHealth(params: Partial<SubscriberHealth> = {}): SubscriberHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    activeSubscriptionsCount: params.activeSubscriptionsCount ?? 0,
+    totalExecutionsCount: params.totalExecutionsCount ?? 0,
+    errorRate: params.errorRate ?? 0,
+  });
+}
+
 export function createEventContext(params: Partial<EventContext> = {}): EventContext {
   return Object.freeze({
     runtimeId: params.runtimeId ?? `event_runtime_${Date.now()}`,
@@ -242,6 +374,10 @@ export function createEventDiagnostics(params: Partial<EventDiagnostics> = {}): 
     publishedEvents: params.publishedEvents,
     eventHistorySize: params.eventHistorySize,
     busStatistics: params.busStatistics,
+    subscriberCount: params.subscriberCount,
+    subscriptionCount: params.subscriptionCount,
+    subscriberStatistics: params.subscriberStatistics,
+    subscriberHealth: params.subscriberHealth,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }

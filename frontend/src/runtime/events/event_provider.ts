@@ -1,9 +1,9 @@
 /**
- * Event Provider Implementation (Phase 16.4.2).
+ * Event Provider Implementation (Phase 16.4.3).
  *
  * Implements IEventProvider owning runtime state transitions,
  * telemetry statistics, health evaluation, context metadata, capabilities reporting,
- * event registration management, event publishing, and diagnostics aggregation.
+ * event registration management, event publishing, subscriber management, and diagnostics aggregation.
  */
 
 import {
@@ -25,11 +25,16 @@ import {
   EventRuntimeState,
   EventState,
   EventStatistics,
+  EventSubscription,
+  FrontendEvent,
   PublishedEvent,
+  SubscriberRegistration,
 } from './models';
 import { IEventProvider } from './interfaces';
 import { EventRegistry } from './event_registry';
 import { EventBus } from './event_bus';
+import { SubscriberRegistry } from './subscriber_registry';
+import { SubscriptionManager } from './subscription_manager';
 
 export class EventProvider implements IEventProvider {
   private _runtimeState: EventRuntimeState = EventRuntimeState.UNINITIALIZED;
@@ -38,6 +43,8 @@ export class EventProvider implements IEventProvider {
   private readonly _context: EventContext;
 
   private readonly _registry: EventRegistry;
+  private readonly _subscriberRegistry: SubscriberRegistry;
+  private readonly _subscriptionManager: SubscriptionManager;
   private readonly _bus: EventBus;
 
   private _startedAt: string | null = null;
@@ -51,6 +58,8 @@ export class EventProvider implements IEventProvider {
     capabilities?: EventCapabilities,
     context?: EventContext,
     registry?: EventRegistry,
+    subscriberRegistry?: SubscriberRegistry,
+    subscriptionManager?: SubscriptionManager,
     bus?: EventBus,
   ) {
     this._config = config ?? createEventConfiguration();
@@ -58,7 +67,17 @@ export class EventProvider implements IEventProvider {
     this._context = context ?? createEventContext();
 
     this._registry = registry ?? new EventRegistry();
-    this._bus = bus ?? new EventBus(this._registry, this._config.maxQueueSize ?? 1000);
+    this._subscriberRegistry = subscriberRegistry ?? new SubscriberRegistry();
+    this._subscriptionManager = subscriptionManager ?? new SubscriptionManager();
+
+    this._bus =
+      bus ??
+      new EventBus(
+        this._registry,
+        this._subscriberRegistry,
+        this._subscriptionManager,
+        this._config.maxQueueSize ?? 1000,
+      );
   }
 
   public initialize(): EventHealth {
@@ -132,6 +151,8 @@ export class EventProvider implements IEventProvider {
     const registeredTypes = this._registry.list().map((r) => r.eventType);
     const busStats = this._bus.statistics();
     const history = this._bus.history();
+    const subStats = this._subscriptionManager.statistics();
+    const subHealth = this._subscriptionManager.health();
 
     return createEventDiagnostics({
       health: this.health(),
@@ -142,6 +163,10 @@ export class EventProvider implements IEventProvider {
       publishedEvents: busStats.publishCount,
       eventHistorySize: history.events.length,
       busStatistics: busStats,
+      subscriberCount: this._subscriberRegistry.count(),
+      subscriptionCount: this._subscriberRegistry.listSubscriptions().length,
+      subscriberStatistics: subStats,
+      subscriberHealth: subHealth,
       timestamp: new Date().toISOString(),
     });
   }
@@ -184,6 +209,34 @@ export class EventProvider implements IEventProvider {
     options?: { source?: string; correlationId?: string; priority?: EventPriority },
   ): PublishedEvent<T> {
     return this._bus.publish(eventType, payload, options);
+  }
+
+  public subscribe<T = unknown>(
+    eventType: string,
+    handler: (event: FrontendEvent<T>) => void | Promise<void>,
+    priority?: EventPriority,
+  ): EventSubscription {
+    return this._bus.subscribe(eventType, handler, priority);
+  }
+
+  public unsubscribe(subscriptionId: string): boolean {
+    return this._bus.unsubscribe(subscriptionId);
+  }
+
+  public unsubscribeAll(eventType?: string): number {
+    return this._bus.unsubscribeAll(eventType);
+  }
+
+  public listSubscribers(eventType?: string): ReadonlyArray<SubscriberRegistration> {
+    return this._bus.listSubscribers(eventType);
+  }
+
+  public listSubscriptions(): ReadonlyArray<EventSubscription> {
+    return this._bus.listSubscriptions();
+  }
+
+  public subscriberCount(eventType?: string): number {
+    return this._bus.subscriberCount(eventType);
   }
 
   public history(): EventHistory {

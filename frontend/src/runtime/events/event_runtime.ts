@@ -1,5 +1,5 @@
 /**
- * Event Runtime Coordinator Implementation (Phase 16.4.2).
+ * Event Runtime Coordinator Implementation (Phase 16.4.3).
  *
  * Implements IEventRuntime acting as central coordinator delegating to IEventProvider.
  */
@@ -13,7 +13,10 @@ import {
   EventRegistration,
   EventState,
   EventStatistics,
+  EventSubscription,
+  FrontendEvent,
   PublishedEvent,
+  SubscriberRegistration,
 } from './models';
 import { IEventProvider, IEventRuntime } from './interfaces';
 import { EventProvider } from './event_provider';
@@ -83,6 +86,34 @@ export class EventRuntime implements IEventRuntime {
     options?: { source?: string; correlationId?: string; priority?: EventPriority },
   ): PublishedEvent<T> {
     return this._provider.publish(eventType, payload, options);
+  }
+
+  public subscribe<T = unknown>(
+    eventType: string,
+    handler: (event: FrontendEvent<T>) => void | Promise<void>,
+    priority?: EventPriority,
+  ): EventSubscription {
+    return this._provider.subscribe(eventType, handler, priority);
+  }
+
+  public unsubscribe(subscriptionId: string): boolean {
+    return this._provider.unsubscribe(subscriptionId);
+  }
+
+  public unsubscribeAll(eventType?: string): number {
+    return this._provider.unsubscribeAll(eventType);
+  }
+
+  public listSubscribers(eventType?: string): ReadonlyArray<SubscriberRegistration> {
+    return this._provider.listSubscribers(eventType);
+  }
+
+  public listSubscriptions(): ReadonlyArray<EventSubscription> {
+    return this._provider.listSubscriptions();
+  }
+
+  public subscriberCount(eventType?: string): number {
+    return this._provider.subscriberCount(eventType);
   }
 
   public history(): EventHistory {
