@@ -1,9 +1,9 @@
 /**
- * Configuration Runtime Domain Models (Phase 16.3.1).
+ * Configuration Runtime Domain Models (Phase 16.3.2).
  *
  * Provides immutable state models, configuration objects, capabilities telemetry,
- * health evaluation snapshots, statistics metrics, context metadata, and diagnostics
- * telemetry for the Frontend Configuration Runtime.
+ * health evaluation snapshots, statistics metrics, context metadata, diagnostics
+ * telemetry, source priority enums, entry records, and snapshots for the Frontend Configuration Runtime.
  */
 
 export enum ConfigurationRuntimeState {
@@ -12,6 +12,15 @@ export enum ConfigurationRuntimeState {
   READY = 'READY',
   STOPPING = 'STOPPING',
   STOPPED = 'STOPPED',
+}
+
+export enum ConfigurationSourcePriority {
+  MEMORY = 500,
+  RUNTIME = 400,
+  ENVIRONMENT = 300,
+  LOCAL = 200,
+  SESSION = 100,
+  DEFAULT = 0,
 }
 
 export interface ConfigurationState {
@@ -55,11 +64,51 @@ export interface ConfigurationConfiguration {
   readonly strictMode: boolean;
 }
 
+export interface ConfigurationEntry {
+  readonly key: string;
+  readonly value: unknown;
+  readonly sourceName: string;
+  readonly priority: number;
+  readonly timestamp: string;
+}
+
+export interface ConfigurationSnapshot {
+  readonly entries: Readonly<Record<string, ConfigurationEntry>>;
+  readonly mergedValues: Readonly<Record<string, unknown>>;
+  readonly timestamp: string;
+  readonly sourceCount: number;
+}
+
+export interface ConfigurationSourceStatistics {
+  readonly reads: number;
+  readonly writes: number;
+  readonly deletes: number;
+  readonly hits: number;
+  readonly misses: number;
+  readonly itemCount: number;
+}
+
+export interface ConfigurationSourceHealth {
+  readonly healthy: boolean;
+  readonly sourceName: string;
+  readonly enabled: boolean;
+  readonly message: string;
+}
+
+export interface ConfigurationSourceRegistration {
+  readonly sourceName: string;
+  readonly priority: number;
+  readonly enabled: boolean;
+  readonly registeredAt: string;
+}
+
 export interface ConfigurationDiagnostics {
   readonly health: ConfigurationHealth;
   readonly statistics: ConfigurationStatistics;
   readonly capabilities: ConfigurationCapabilities;
   readonly context: ConfigurationContext;
+  readonly sources?: ReadonlyArray<ConfigurationSourceRegistration>;
+  readonly snapshot?: ConfigurationSnapshot;
   readonly timestamp: string;
 }
 
@@ -128,6 +177,64 @@ export function createConfigurationConfiguration(
   });
 }
 
+export function createConfigurationEntry(
+  params: Partial<ConfigurationEntry> & { key: string; value: unknown; sourceName: string },
+): ConfigurationEntry {
+  return Object.freeze({
+    key: params.key,
+    value: params.value,
+    sourceName: params.sourceName,
+    priority: params.priority ?? ConfigurationSourcePriority.DEFAULT,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createConfigurationSnapshot(
+  params: Partial<ConfigurationSnapshot> = {},
+): ConfigurationSnapshot {
+  return Object.freeze({
+    entries: Object.freeze({ ...(params.entries ?? {}) }),
+    mergedValues: Object.freeze({ ...(params.mergedValues ?? {}) }),
+    timestamp: params.timestamp ?? new Date().toISOString(),
+    sourceCount: params.sourceCount ?? 0,
+  });
+}
+
+export function createConfigurationSourceStatistics(
+  params: Partial<ConfigurationSourceStatistics> = {},
+): ConfigurationSourceStatistics {
+  return Object.freeze({
+    reads: params.reads ?? 0,
+    writes: params.writes ?? 0,
+    deletes: params.deletes ?? 0,
+    hits: params.hits ?? 0,
+    misses: params.misses ?? 0,
+    itemCount: params.itemCount ?? 0,
+  });
+}
+
+export function createConfigurationSourceHealth(
+  params: Partial<ConfigurationSourceHealth> & { sourceName: string },
+): ConfigurationSourceHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    sourceName: params.sourceName,
+    enabled: params.enabled ?? true,
+    message: params.message ?? `Source '${params.sourceName}' is operational.`,
+  });
+}
+
+export function createConfigurationSourceRegistration(
+  params: Partial<ConfigurationSourceRegistration> & { sourceName: string },
+): ConfigurationSourceRegistration {
+  return Object.freeze({
+    sourceName: params.sourceName,
+    priority: params.priority ?? ConfigurationSourcePriority.DEFAULT,
+    enabled: params.enabled ?? true,
+    registeredAt: params.registeredAt ?? new Date().toISOString(),
+  });
+}
+
 export function createConfigurationDiagnostics(
   params: Partial<ConfigurationDiagnostics> = {},
 ): ConfigurationDiagnostics {
@@ -136,6 +243,8 @@ export function createConfigurationDiagnostics(
     statistics: params.statistics ?? createConfigurationStatistics(),
     capabilities: params.capabilities ?? createConfigurationCapabilities(),
     context: params.context ?? createConfigurationContext(),
+    sources: params.sources ? Object.freeze([...params.sources]) : undefined,
+    snapshot: params.snapshot,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }

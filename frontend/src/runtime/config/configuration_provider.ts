@@ -1,8 +1,9 @@
 /**
- * Configuration Provider Implementation (Phase 16.3.1).
+ * Configuration Provider Implementation (Phase 16.3.2).
  *
  * Implements IConfigurationProvider owning configuration runtime state transitions,
- * telemetry statistics, health evaluation, context metadata, and capabilities reporting.
+ * telemetry statistics, health evaluation, context metadata, capabilities reporting,
+ * and source resolution delegation.
  */
 
 import {
@@ -10,8 +11,11 @@ import {
   ConfigurationConfiguration,
   ConfigurationContext,
   ConfigurationDiagnostics,
+  ConfigurationEntry,
   ConfigurationHealth,
   ConfigurationRuntimeState,
+  ConfigurationSnapshot,
+  ConfigurationSourceRegistration,
   ConfigurationState,
   ConfigurationStatistics,
   createConfigurationCapabilities,
@@ -19,16 +23,24 @@ import {
   createConfigurationContext,
   createConfigurationDiagnostics,
   createConfigurationHealth,
+  createConfigurationSourceRegistration,
   createConfigurationState,
   createConfigurationStatistics,
 } from './models';
-import { IConfigurationProvider } from './interfaces';
+import { IConfigurationProvider, IConfigurationSource } from './interfaces';
+import { SourceRegistry } from './source_registry';
+import { ConfigurationSourceManager } from './configuration_source_manager';
+import { MemoryConfigurationSource } from './memory_source';
 
 export class ConfigurationProvider implements IConfigurationProvider {
   private _runtimeState: ConfigurationRuntimeState = ConfigurationRuntimeState.UNINITIALIZED;
   private readonly _config: ConfigurationConfiguration;
   private readonly _capabilities: ConfigurationCapabilities;
   private readonly _context: ConfigurationContext;
+
+  private readonly _registry: SourceRegistry;
+  private readonly _sourceManager: ConfigurationSourceManager;
+  private readonly _defaultMemorySource: MemoryConfigurationSource;
 
   private _startedAt: string | null = null;
   private _initializations = 0;
@@ -40,10 +52,17 @@ export class ConfigurationProvider implements IConfigurationProvider {
     config?: ConfigurationConfiguration,
     capabilities?: ConfigurationCapabilities,
     context?: ConfigurationContext,
+    registry?: SourceRegistry,
   ) {
     this._config = config ?? createConfigurationConfiguration();
     this._capabilities = capabilities ?? createConfigurationCapabilities();
     this._context = context ?? createConfigurationContext();
+
+    this._registry = registry ?? new SourceRegistry();
+    this._sourceManager = new ConfigurationSourceManager(this._registry);
+
+    this._defaultMemorySource = new MemoryConfigurationSource();
+    this._registry.register(this._defaultMemorySource);
   }
 
   public initialize(): ConfigurationHealth {
@@ -114,11 +133,21 @@ export class ConfigurationProvider implements IConfigurationProvider {
   }
 
   public diagnostics(): ConfigurationDiagnostics {
+    const sourceRegs: ConfigurationSourceRegistration[] = this.listSources().map((s) =>
+      createConfigurationSourceRegistration({
+        sourceName: s.name,
+        priority: s.priority,
+        enabled: s.enabled,
+      }),
+    );
+
     return createConfigurationDiagnostics({
       health: this.health(),
       statistics: this.statistics(),
       capabilities: this.capabilities(),
       context: this._context,
+      sources: sourceRegs,
+      snapshot: this.createSnapshot(),
       timestamp: new Date().toISOString(),
     });
   }
@@ -137,5 +166,37 @@ export class ConfigurationProvider implements IConfigurationProvider {
 
   public context(): ConfigurationContext {
     return this._context;
+  }
+
+  public registerSource(source: IConfigurationSource): void {
+    this._registry.register(source);
+  }
+
+  public unregisterSource(sourceName: string): boolean {
+    return this._registry.unregister(sourceName);
+  }
+
+  public get<T = unknown>(key: string, defaultValue?: T): T | undefined {
+    return this._sourceManager.get<T>(key, defaultValue);
+  }
+
+  public has(key: string): boolean {
+    return this._sourceManager.has(key);
+  }
+
+  public getEntry(key: string): ConfigurationEntry | undefined {
+    return this._sourceManager.getEntry(key);
+  }
+
+  public getAll(): Readonly<Record<string, unknown>> {
+    return this._sourceManager.getAll();
+  }
+
+  public createSnapshot(): ConfigurationSnapshot {
+    return this._sourceManager.createSnapshot();
+  }
+
+  public listSources(): ReadonlyArray<IConfigurationSource> {
+    return this._registry.listSources();
   }
 }
