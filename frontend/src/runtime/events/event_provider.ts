@@ -1,14 +1,15 @@
 /**
- * Event Provider Implementation (Phase 16.4.5).
+ * Event Provider Implementation (Phase 16.4.6).
  *
  * Implements IEventProvider owning runtime state transitions,
  * telemetry statistics, health evaluation, context metadata, capabilities reporting,
  * event registration management, event publishing, subscriber management,
- * event routing, priority dispatch, event queueing, retries, replay, and reliability diagnostics aggregation.
+ * event routing, priority dispatch, event queueing, retries, replay, reliability diagnostics, and production certification.
  */
 
 import {
   Acknowledgement,
+  CertificationReport,
   createEventCapabilities,
   createEventConfiguration,
   createEventContext,
@@ -22,6 +23,7 @@ import {
   DispatchHealth,
   DispatchStatistics,
   EventCapabilities,
+  EventCertification,
   EventConfiguration,
   EventContext,
   EventDiagnostics,
@@ -51,6 +53,7 @@ import { DispatchManager } from './dispatch_manager';
 import { EventQueue } from './event_queue';
 import { RetryManager } from './retry_manager';
 import { ReplayManager } from './replay_manager';
+import { EventCertifier } from './event_certifier';
 
 export class EventProvider implements IEventProvider {
   private _runtimeState: EventRuntimeState = EventRuntimeState.UNINITIALIZED;
@@ -66,6 +69,7 @@ export class EventProvider implements IEventProvider {
   private readonly _queue: EventQueue;
   private readonly _retryManager: RetryManager;
   private readonly _replayManager: ReplayManager;
+  private readonly _certifier: EventCertifier;
   private readonly _bus: EventBus;
 
   private _startedAt: string | null = null;
@@ -86,6 +90,7 @@ export class EventProvider implements IEventProvider {
     queue?: EventQueue,
     retryManager?: RetryManager,
     replayManager?: ReplayManager,
+    certifier?: EventCertifier,
     bus?: EventBus,
   ) {
     this._config = config ?? createEventConfiguration();
@@ -101,6 +106,7 @@ export class EventProvider implements IEventProvider {
     this._queue = queue ?? new EventQueue();
     this._retryManager = retryManager ?? new RetryManager();
     this._replayManager = replayManager ?? new ReplayManager();
+    this._certifier = certifier ?? new EventCertifier();
 
     this._bus =
       bus ??
@@ -205,6 +211,8 @@ export class EventProvider implements IEventProvider {
       acknowledgementCount: busStats.publishCount,
     });
 
+    const cert = this._certifier.certify(this);
+
     return createEventDiagnostics({
       health: this.health(),
       statistics: this.statistics(),
@@ -228,6 +236,13 @@ export class EventProvider implements IEventProvider {
       replayStatistics: rplStats,
       reliabilityStatistics: reliabilityStats,
       deadLetterQueueSize: dspStats.deadLetterCount,
+      certification: cert,
+      certificationSummary: {
+        certified: cert.certified,
+        score: cert.score,
+        status: cert.certified ? 'PASSED' : 'FAILED',
+        certifiedAt: cert.certifiedAt,
+      },
       timestamp: new Date().toISOString(),
     });
   }
@@ -366,5 +381,17 @@ export class EventProvider implements IEventProvider {
 
   public clearDeadLetters(): void {
     this._bus.clearDeadLetters();
+  }
+
+  public certify(): EventCertification {
+    return this._certifier.certify(this);
+  }
+
+  public runCertification(): CertificationReport {
+    return this._certifier.runCertification(this);
+  }
+
+  public certificationReport(): CertificationReport {
+    return this._certifier.certificationReport(this);
   }
 }

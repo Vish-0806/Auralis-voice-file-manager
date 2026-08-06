@@ -1,12 +1,13 @@
 /**
- * Event & Messaging Runtime Interfaces (Phase 16.4.5).
+ * Event & Messaging Runtime Interfaces (Phase 16.4.6).
  *
  * Defines contracts for IEventRegistry, IEventBus, ISubscriberRegistry, ISubscriptionManager,
- * IEventRouter, IDispatchManager, IEventQueue, IRetryManager, IReplayManager, IEventProvider, and IEventRuntime.
+ * IEventRouter, IDispatchManager, IEventQueue, IRetryManager, IReplayManager, IEventCertifier, IEventProvider, and IEventRuntime.
  */
 
 import {
   Acknowledgement,
+  CertificationReport,
   DeadLetterRecord,
   DeliveryStatus,
   DispatchHealth,
@@ -15,6 +16,7 @@ import {
   EventBusHealth,
   EventBusStatistics,
   EventCapabilities,
+  EventCertification,
   EventConfiguration,
   EventContext,
   EventDiagnostics,
@@ -123,6 +125,12 @@ export interface IReplayManager {
   statistics(): ReplayStatistics;
 }
 
+export interface IEventCertifier {
+  certify(provider: IEventProvider): EventCertification;
+  runCertification(provider: IEventProvider): CertificationReport;
+  certificationReport(provider: IEventProvider): CertificationReport;
+}
+
 export interface IEventBus {
   publish<T = unknown>(
     eventType: string,
@@ -195,6 +203,10 @@ export interface IEventProvider {
   acknowledge(queueId: string, status?: DeliveryStatus): Acknowledgement;
   deadLetters(): ReadonlyArray<DeadLetterRecord>;
   clearDeadLetters(): void;
+
+  certify(): EventCertification;
+  runCertification(): CertificationReport;
+  certificationReport(): CertificationReport;
 }
 
 export interface IEventRuntime {
@@ -246,4 +258,8 @@ export interface IEventRuntime {
   acknowledge(queueId: string, status?: DeliveryStatus): Acknowledgement;
   deadLetters(): ReadonlyArray<DeadLetterRecord>;
   clearDeadLetters(): void;
+
+  certify(): EventCertification;
+  runCertification(): CertificationReport;
+  certificationReport(): CertificationReport;
 }

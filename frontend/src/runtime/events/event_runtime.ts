@@ -1,16 +1,18 @@
 /**
- * Event Runtime Coordinator Implementation (Phase 16.4.5).
+ * Event Runtime Coordinator Implementation (Phase 16.4.6).
  *
  * Implements IEventRuntime acting as central coordinator delegating to IEventProvider.
  */
 
 import {
   Acknowledgement,
+  CertificationReport,
   DeadLetterRecord,
   DeliveryStatus,
   DispatchHealth,
   DispatchStatistics,
   EventCapabilities,
+  EventCertification,
   EventDiagnostics,
   EventHealth,
   EventHistory,
@@ -191,5 +193,17 @@ export class EventRuntime implements IEventRuntime {
 
   public clearDeadLetters(): void {
     this._provider.clearDeadLetters();
+  }
+
+  public certify(): EventCertification {
+    return this._provider.certify();
+  }
+
+  public runCertification(): CertificationReport {
+    return this._provider.runCertification();
+  }
+
+  public certificationReport(): CertificationReport {
+    return this._provider.certificationReport();
   }
 }

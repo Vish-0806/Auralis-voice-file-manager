@@ -1,12 +1,13 @@
 /**
- * Event & Messaging Runtime Domain Models (Phase 16.4.5).
+ * Event & Messaging Runtime Domain Models (Phase 16.4.6).
  *
  * Provides immutable state models, event objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, diagnostics
  * telemetry, priority enums, configuration objects, event registration definitions,
  * published event records, subscriber registrations, execution results, subscriber health,
  * routing rules, routing decisions, dispatch policies, dispatch records, dead-letter telemetry,
- * queued events, queue statistics, retry policies, retry records, replay records, acknowledgements, and reliability health for the Frontend Event Runtime.
+ * queued events, queue statistics, retry policies, retry records, replay records, acknowledgements,
+ * reliability health, and certification models for the Frontend Event Runtime.
  */
 
 export enum EventRuntimeState {
@@ -274,6 +275,50 @@ export interface ReliabilityHealth {
   readonly retryErrorRate: number;
 }
 
+export interface CertificationIssue {
+  readonly issueId: string;
+  readonly severity: 'INFO' | 'WARNING' | 'CRITICAL';
+  readonly category: string;
+  readonly message: string;
+  readonly timestamp: string;
+}
+
+export interface EventCertification {
+  readonly certified: boolean;
+  readonly score: number;
+  readonly passedChecks: number;
+  readonly failedChecks: number;
+  readonly certifiedAt: string;
+}
+
+export interface EventCertificationSummary {
+  readonly certified: boolean;
+  readonly score: number;
+  readonly status: string;
+  readonly certifiedAt: string;
+}
+
+export interface CertificationStatistics {
+  readonly totalCertifications: number;
+  readonly passedCertifications: number;
+  readonly failedCertifications: number;
+  readonly averageScore: number;
+}
+
+export interface CertificationHealth {
+  readonly healthy: boolean;
+  readonly certified: boolean;
+  readonly score: number;
+}
+
+export interface CertificationReport {
+  readonly certification: EventCertification;
+  readonly summary: EventCertificationSummary;
+  readonly issues: ReadonlyArray<CertificationIssue>;
+  readonly diagnostics: EventDiagnostics;
+  readonly generatedAt: string;
+}
+
 export interface EventContext {
   readonly runtimeId: string;
   readonly createdAt: string;
@@ -333,6 +378,8 @@ export interface EventDiagnostics {
   readonly replayStatistics?: ReplayStatistics;
   readonly reliabilityStatistics?: ReliabilityStatistics;
   readonly deadLetterQueueSize?: number;
+  readonly certification?: EventCertification;
+  readonly certificationSummary?: EventCertificationSummary;
   readonly timestamp: string;
 }
 
@@ -678,6 +725,70 @@ export function createReliabilityHealth(params: Partial<ReliabilityHealth> = {})
   });
 }
 
+export function createCertificationIssue(
+  params: Partial<CertificationIssue> & { category: string; message: string },
+): CertificationIssue {
+  return Object.freeze({
+    issueId: params.issueId ?? `issue_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    severity: params.severity ?? 'INFO',
+    category: params.category,
+    message: params.message,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createEventCertification(params: Partial<EventCertification> = {}): EventCertification {
+  return Object.freeze({
+    certified: params.certified ?? true,
+    score: params.score ?? 100,
+    passedChecks: params.passedChecks ?? 10,
+    failedChecks: params.failedChecks ?? 0,
+    certifiedAt: params.certifiedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createEventCertificationSummary(params: Partial<EventCertificationSummary> = {}): EventCertificationSummary {
+  return Object.freeze({
+    certified: params.certified ?? true,
+    score: params.score ?? 100,
+    status: params.status ?? 'PASSED',
+    certifiedAt: params.certifiedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createCertificationStatistics(params: Partial<CertificationStatistics> = {}): CertificationStatistics {
+  return Object.freeze({
+    totalCertifications: params.totalCertifications ?? 0,
+    passedCertifications: params.passedCertifications ?? 0,
+    failedCertifications: params.failedCertifications ?? 0,
+    averageScore: params.averageScore ?? 100,
+  });
+}
+
+export function createCertificationHealth(params: Partial<CertificationHealth> = {}): CertificationHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    certified: params.certified ?? true,
+    score: params.score ?? 100,
+  });
+}
+
+export function createCertificationReport(
+  params: Partial<CertificationReport> & { diagnostics: EventDiagnostics },
+): CertificationReport {
+  const issues = params.issues ?? [];
+  const cert = params.certification ?? createEventCertification();
+  const summary = params.summary ?? createEventCertificationSummary({ certified: cert.certified, score: cert.score });
+
+  return Object.freeze({
+    certification: cert,
+    summary,
+    issues: Object.freeze([...issues]),
+    diagnostics: params.diagnostics,
+    generatedAt: params.generatedAt ?? new Date().toISOString(),
+  });
+}
+
 export function createEventContext(params: Partial<EventContext> = {}): EventContext {
   return Object.freeze({
     runtimeId: params.runtimeId ?? `event_runtime_${Date.now()}`,
@@ -748,6 +859,8 @@ export function createEventDiagnostics(params: Partial<EventDiagnostics> = {}): 
     replayStatistics: params.replayStatistics,
     reliabilityStatistics: params.reliabilityStatistics,
     deadLetterQueueSize: params.deadLetterQueueSize,
+    certification: params.certification,
+    certificationSummary: params.certificationSummary,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }
