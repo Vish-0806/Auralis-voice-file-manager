@@ -1,8 +1,8 @@
 /**
- * Configuration Runtime Interfaces (Phase 16.3.2).
+ * Configuration Runtime Interfaces (Phase 16.3.3).
  *
- * Defines contracts for IConfigurationSource, IConfigurationProvider,
- * and IConfigurationRuntime including Source Resolution APIs.
+ * Defines contracts for IConfigurationSource, IConfigurationValidator, IConfigurationProvider,
+ * and IConfigurationRuntime including Schema, Resolution, and Validation APIs.
  */
 
 import {
@@ -12,11 +12,13 @@ import {
   ConfigurationDiagnostics,
   ConfigurationEntry,
   ConfigurationHealth,
+  ConfigurationSchema,
   ConfigurationSnapshot,
   ConfigurationSourceHealth,
   ConfigurationSourceStatistics,
   ConfigurationState,
   ConfigurationStatistics,
+  ConfigurationValidationResult,
 } from './models';
 
 export interface IConfigurationSource {
@@ -34,6 +36,10 @@ export interface IConfigurationSource {
   items(): Readonly<Record<string, unknown>>;
   health(): ConfigurationSourceHealth;
   statistics(): ConfigurationSourceStatistics;
+}
+
+export interface IConfigurationValidator {
+  validate(values: Record<string, unknown>, schema: ConfigurationSchema): ConfigurationValidationResult;
 }
 
 export interface IConfigurationProvider {
@@ -56,6 +62,15 @@ export interface IConfigurationProvider {
   getAll(): Readonly<Record<string, unknown>>;
   createSnapshot(): ConfigurationSnapshot;
   listSources(): ReadonlyArray<IConfigurationSource>;
+
+  registerSchema(schema: ConfigurationSchema): void;
+  unregisterSchema(schemaName: string): boolean;
+  getSchema(schemaName: string): ConfigurationSchema | undefined;
+  listSchemas(): ReadonlyArray<ConfigurationSchema>;
+
+  resolve<T = unknown>(key: string, targetType?: string, defaultValue?: T): T;
+  resolveAll(): Readonly<Record<string, unknown>>;
+  validate(schemaName?: string): ConfigurationValidationResult;
 }
 
 export interface IConfigurationRuntime {
@@ -76,4 +91,13 @@ export interface IConfigurationRuntime {
   getAll(): Readonly<Record<string, unknown>>;
   createSnapshot(): ConfigurationSnapshot;
   listSources(): ReadonlyArray<IConfigurationSource>;
+
+  registerSchema(schema: ConfigurationSchema): void;
+  unregisterSchema(schemaName: string): boolean;
+  getSchema(schemaName: string): ConfigurationSchema | undefined;
+  listSchemas(): ReadonlyArray<ConfigurationSchema>;
+
+  resolve<T = unknown>(key: string, targetType?: string, defaultValue?: T): T;
+  resolveAll(): Readonly<Record<string, unknown>>;
+  validate(schemaName?: string): ConfigurationValidationResult;
 }

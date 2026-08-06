@@ -1,9 +1,10 @@
 /**
- * Configuration Runtime Domain Models (Phase 16.3.2).
+ * Configuration Runtime Domain Models (Phase 16.3.3).
  *
  * Provides immutable state models, configuration objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, diagnostics
- * telemetry, source priority enums, entry records, and snapshots for the Frontend Configuration Runtime.
+ * telemetry, source priority enums, entry records, snapshots, schemas, validation results,
+ * and resolution results for the Frontend Configuration Runtime.
  */
 
 export enum ConfigurationRuntimeState {
@@ -102,6 +103,71 @@ export interface ConfigurationSourceRegistration {
   readonly registeredAt: string;
 }
 
+export interface ConfigurationConstraint {
+  readonly minValue?: number;
+  readonly maxValue?: number;
+  readonly minLength?: number;
+  readonly maxLength?: number;
+  readonly regexPattern?: string;
+  readonly allowedValues?: ReadonlyArray<unknown>;
+}
+
+export interface ConfigurationDefinition {
+  readonly key: string;
+  readonly expectedType: string;
+  readonly defaultValue?: unknown;
+  readonly required: boolean;
+  readonly constraint?: ConfigurationConstraint;
+  readonly description?: string;
+}
+
+export interface ConfigurationSchema {
+  readonly schemaName: string;
+  readonly definitions: Readonly<Record<string, ConfigurationDefinition>>;
+}
+
+export interface ConfigurationError {
+  readonly key: string;
+  readonly message: string;
+  readonly code: string;
+}
+
+export interface ConfigurationWarning {
+  readonly key: string;
+  readonly message: string;
+  readonly code: string;
+}
+
+export interface ConfigurationValidationResult {
+  readonly valid: boolean;
+  readonly errors: ReadonlyArray<ConfigurationError>;
+  readonly warnings: ReadonlyArray<ConfigurationWarning>;
+  readonly timestamp: string;
+}
+
+export interface ConfigurationResolutionResult<T = unknown> {
+  readonly key: string;
+  readonly value: T;
+  readonly converted: boolean;
+  readonly sourceName?: string;
+  readonly timestamp: string;
+}
+
+export interface ValidationStatistics {
+  readonly validations: number;
+  readonly passedValidations: number;
+  readonly failedValidations: number;
+  readonly totalErrors: number;
+  readonly totalWarnings: number;
+}
+
+export interface ResolutionStatistics {
+  readonly resolutions: number;
+  readonly conversions: number;
+  readonly defaultFallbacks: number;
+  readonly failedResolutions: number;
+}
+
 export interface ConfigurationDiagnostics {
   readonly health: ConfigurationHealth;
   readonly statistics: ConfigurationStatistics;
@@ -109,6 +175,9 @@ export interface ConfigurationDiagnostics {
   readonly context: ConfigurationContext;
   readonly sources?: ReadonlyArray<ConfigurationSourceRegistration>;
   readonly snapshot?: ConfigurationSnapshot;
+  readonly schemas?: ReadonlyArray<string>;
+  readonly validationStats?: ValidationStatistics;
+  readonly resolutionStats?: ResolutionStatistics;
   readonly timestamp: string;
 }
 
@@ -235,6 +304,107 @@ export function createConfigurationSourceRegistration(
   });
 }
 
+export function createConfigurationConstraint(
+  params: Partial<ConfigurationConstraint> = {},
+): ConfigurationConstraint {
+  return Object.freeze({
+    minValue: params.minValue,
+    maxValue: params.maxValue,
+    minLength: params.minLength,
+    maxLength: params.maxLength,
+    regexPattern: params.regexPattern,
+    allowedValues: params.allowedValues ? Object.freeze([...params.allowedValues]) : undefined,
+  });
+}
+
+export function createConfigurationDefinition(
+  params: Partial<ConfigurationDefinition> & { key: string; expectedType: string },
+): ConfigurationDefinition {
+  return Object.freeze({
+    key: params.key,
+    expectedType: params.expectedType,
+    defaultValue: params.defaultValue,
+    required: params.required ?? false,
+    constraint: params.constraint ? createConfigurationConstraint(params.constraint) : undefined,
+    description: params.description,
+  });
+}
+
+export function createConfigurationSchema(
+  params: Partial<ConfigurationSchema> & { schemaName: string },
+): ConfigurationSchema {
+  return Object.freeze({
+    schemaName: params.schemaName,
+    definitions: Object.freeze({ ...(params.definitions ?? {}) }),
+  });
+}
+
+export function createConfigurationError(
+  params: Partial<ConfigurationError> & { key: string; message: string },
+): ConfigurationError {
+  return Object.freeze({
+    key: params.key,
+    message: params.message,
+    code: params.code ?? 'VALIDATION_ERROR',
+  });
+}
+
+export function createConfigurationWarning(
+  params: Partial<ConfigurationWarning> & { key: string; message: string },
+): ConfigurationWarning {
+  return Object.freeze({
+    key: params.key,
+    message: params.message,
+    code: params.code ?? 'VALIDATION_WARNING',
+  });
+}
+
+export function createConfigurationValidationResult(
+  params: Partial<ConfigurationValidationResult> = {},
+): ConfigurationValidationResult {
+  return Object.freeze({
+    valid: params.valid ?? true,
+    errors: Object.freeze([...(params.errors ?? [])]),
+    warnings: Object.freeze([...(params.warnings ?? [])]),
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createConfigurationResolutionResult<T = unknown>(
+  params: Partial<ConfigurationResolutionResult<T>> & { key: string; value: T },
+): ConfigurationResolutionResult<T> {
+  return Object.freeze({
+    key: params.key,
+    value: params.value,
+    converted: params.converted ?? false,
+    sourceName: params.sourceName,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createValidationStatistics(
+  params: Partial<ValidationStatistics> = {},
+): ValidationStatistics {
+  return Object.freeze({
+    validations: params.validations ?? 0,
+    passedValidations: params.passedValidations ?? 0,
+    failedValidations: params.failedValidations ?? 0,
+    totalErrors: params.totalErrors ?? 0,
+    totalWarnings: params.totalWarnings ?? 0,
+  });
+}
+
+export function createResolutionStatistics(
+  params: Partial<ResolutionStatistics> = {},
+): ResolutionStatistics {
+  return Object.freeze({
+    resolutions: params.resolutions ?? 0,
+    conversions: params.conversions ?? 0,
+    defaultFallbacks: params.defaultFallbacks ?? 0,
+    failedResolutions: params.failedResolutions ?? 0,
+  });
+}
+
 export function createConfigurationDiagnostics(
   params: Partial<ConfigurationDiagnostics> = {},
 ): ConfigurationDiagnostics {
@@ -245,6 +415,9 @@ export function createConfigurationDiagnostics(
     context: params.context ?? createConfigurationContext(),
     sources: params.sources ? Object.freeze([...params.sources]) : undefined,
     snapshot: params.snapshot,
+    schemas: params.schemas ? Object.freeze([...params.schemas]) : undefined,
+    validationStats: params.validationStats,
+    resolutionStats: params.resolutionStats,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }

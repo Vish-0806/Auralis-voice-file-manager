@@ -1,17 +1,19 @@
 /**
- * Configuration Runtime Coordinator Implementation (Phase 16.3.2).
+ * Configuration Runtime Coordinator Implementation (Phase 16.3.3).
  *
- * Implements IConfigurationRuntime acting as central coordinator for configuration lifecycle
- * and source resolution operations, delegating directly to IConfigurationProvider.
+ * Implements IConfigurationRuntime acting as central coordinator for configuration lifecycle,
+ * source resolution, schema registration, type conversion, and constraint validation operations.
  */
 
 import {
   ConfigurationDiagnostics,
   ConfigurationEntry,
   ConfigurationHealth,
+  ConfigurationSchema,
   ConfigurationSnapshot,
   ConfigurationState,
   ConfigurationStatistics,
+  ConfigurationValidationResult,
 } from './models';
 import { IConfigurationProvider, IConfigurationRuntime, IConfigurationSource } from './interfaces';
 import { ConfigurationProvider } from './configuration_provider';
@@ -85,5 +87,33 @@ export class ConfigurationRuntime implements IConfigurationRuntime {
 
   public listSources(): ReadonlyArray<IConfigurationSource> {
     return this._provider.listSources();
+  }
+
+  public registerSchema(schema: ConfigurationSchema): void {
+    this._provider.registerSchema(schema);
+  }
+
+  public unregisterSchema(schemaName: string): boolean {
+    return this._provider.unregisterSchema(schemaName);
+  }
+
+  public getSchema(schemaName: string): ConfigurationSchema | undefined {
+    return this._provider.getSchema(schemaName);
+  }
+
+  public listSchemas(): ReadonlyArray<ConfigurationSchema> {
+    return this._provider.listSchemas();
+  }
+
+  public resolve<T = unknown>(key: string, targetType?: string, defaultValue?: T): T {
+    return this._provider.resolve<T>(key, targetType, defaultValue);
+  }
+
+  public resolveAll(): Readonly<Record<string, unknown>> {
+    return this._provider.resolveAll();
+  }
+
+  public validate(schemaName?: string): ConfigurationValidationResult {
+    return this._provider.validate(schemaName);
   }
 }

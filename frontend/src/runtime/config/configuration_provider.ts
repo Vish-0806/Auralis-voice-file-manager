@@ -1,9 +1,9 @@
 /**
- * Configuration Provider Implementation (Phase 16.3.2).
+ * Configuration Provider Implementation (Phase 16.3.3).
  *
  * Implements IConfigurationProvider owning configuration runtime state transitions,
  * telemetry statistics, health evaluation, context metadata, capabilities reporting,
- * and source resolution delegation.
+ * source resolution delegation, schema management, type conversion, and constraint validation.
  */
 
 import {
@@ -14,10 +14,12 @@ import {
   ConfigurationEntry,
   ConfigurationHealth,
   ConfigurationRuntimeState,
+  ConfigurationSchema,
   ConfigurationSnapshot,
   ConfigurationSourceRegistration,
   ConfigurationState,
   ConfigurationStatistics,
+  ConfigurationValidationResult,
   createConfigurationCapabilities,
   createConfigurationConfiguration,
   createConfigurationContext,
@@ -26,11 +28,15 @@ import {
   createConfigurationSourceRegistration,
   createConfigurationState,
   createConfigurationStatistics,
+  createConfigurationValidationResult,
 } from './models';
 import { IConfigurationProvider, IConfigurationSource } from './interfaces';
 import { SourceRegistry } from './source_registry';
 import { ConfigurationSourceManager } from './configuration_source_manager';
 import { MemoryConfigurationSource } from './memory_source';
+import { ConfigurationSchemaManager } from './configuration_schema';
+import { ConfigurationResolver } from './configuration_resolver';
+import { ConfigurationValidator } from './configuration_validator';
 
 export class ConfigurationProvider implements IConfigurationProvider {
   private _runtimeState: ConfigurationRuntimeState = ConfigurationRuntimeState.UNINITIALIZED;
@@ -41,6 +47,10 @@ export class ConfigurationProvider implements IConfigurationProvider {
   private readonly _registry: SourceRegistry;
   private readonly _sourceManager: ConfigurationSourceManager;
   private readonly _defaultMemorySource: MemoryConfigurationSource;
+
+  private readonly _schemaManager: ConfigurationSchemaManager;
+  private readonly _resolver: ConfigurationResolver;
+  private readonly _validator: ConfigurationValidator;
 
   private _startedAt: string | null = null;
   private _initializations = 0;
@@ -53,6 +63,7 @@ export class ConfigurationProvider implements IConfigurationProvider {
     capabilities?: ConfigurationCapabilities,
     context?: ConfigurationContext,
     registry?: SourceRegistry,
+    schemaManager?: ConfigurationSchemaManager,
   ) {
     this._config = config ?? createConfigurationConfiguration();
     this._capabilities = capabilities ?? createConfigurationCapabilities();
@@ -63,6 +74,10 @@ export class ConfigurationProvider implements IConfigurationProvider {
 
     this._defaultMemorySource = new MemoryConfigurationSource();
     this._registry.register(this._defaultMemorySource);
+
+    this._schemaManager = schemaManager ?? new ConfigurationSchemaManager();
+    this._resolver = new ConfigurationResolver(this._sourceManager, this._schemaManager);
+    this._validator = new ConfigurationValidator();
   }
 
   public initialize(): ConfigurationHealth {
@@ -141,6 +156,8 @@ export class ConfigurationProvider implements IConfigurationProvider {
       }),
     );
 
+    const schemaNames = this.listSchemas().map((s) => s.schemaName);
+
     return createConfigurationDiagnostics({
       health: this.health(),
       statistics: this.statistics(),
@@ -148,6 +165,9 @@ export class ConfigurationProvider implements IConfigurationProvider {
       context: this._context,
       sources: sourceRegs,
       snapshot: this.createSnapshot(),
+      schemas: schemaNames,
+      validationStats: this._validator.statistics(),
+      resolutionStats: this._resolver.statistics(),
       timestamp: new Date().toISOString(),
     });
   }
@@ -198,5 +218,60 @@ export class ConfigurationProvider implements IConfigurationProvider {
 
   public listSources(): ReadonlyArray<IConfigurationSource> {
     return this._registry.listSources();
+  }
+
+  public registerSchema(schema: ConfigurationSchema): void {
+    this._schemaManager.registerSchema(schema);
+  }
+
+  public unregisterSchema(schemaName: string): boolean {
+    return this._schemaManager.unregisterSchema(schemaName);
+  }
+
+  public getSchema(schemaName: string): ConfigurationSchema | undefined {
+    return this._schemaManager.getSchema(schemaName);
+  }
+
+  public listSchemas(): ReadonlyArray<ConfigurationSchema> {
+    return this._schemaManager.listSchemas();
+  }
+
+  public resolve<T = unknown>(key: string, targetType?: string, defaultValue?: T): T {
+    return this._resolver.resolve<T>(key, targetType, defaultValue);
+  }
+
+  public resolveAll(): Readonly<Record<string, unknown>> {
+    return this._resolver.resolveAll();
+  }
+
+  public validate(schemaName?: string): ConfigurationValidationResult {
+    const values = this.getAll();
+
+    if (schemaName) {
+      const schema = this._schemaManager.getSchema(schemaName);
+      if (!schema) {
+        return createConfigurationValidationResult({ valid: true });
+      }
+      return this._validator.validate(values, schema);
+    }
+
+    const schemas = this._schemaManager.listSchemas();
+    let combinedValid = true;
+    const combinedErrors: any[] = [];
+    const combinedWarnings: any[] = [];
+
+    for (const s of schemas) {
+      const res = this._validator.validate(values, s);
+      if (!res.valid) combinedValid = false;
+      combinedErrors.push(...res.errors);
+      combinedWarnings.push(...res.warnings);
+    }
+
+    return createConfigurationValidationResult({
+      valid: combinedValid,
+      errors: combinedErrors,
+      warnings: combinedWarnings,
+      timestamp: new Date().toISOString(),
+    });
   }
 }

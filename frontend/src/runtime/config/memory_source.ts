@@ -16,7 +16,7 @@ export class MemoryConfigurationSource extends ConfigurationSource {
 
   constructor(
     name = 'MemorySource',
-    priority = ConfigurationSourcePriority.MEMORY,
+    priority: number = ConfigurationSourcePriority.MEMORY,
     initialValues?: Record<string, unknown>,
   ) {
     super();
