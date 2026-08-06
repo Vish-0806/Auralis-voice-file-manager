@@ -1,9 +1,9 @@
 /**
- * Event Provider Implementation (Phase 16.4.1).
+ * Event Provider Implementation (Phase 16.4.2).
  *
  * Implements IEventProvider owning runtime state transitions,
  * telemetry statistics, health evaluation, context metadata, capabilities reporting,
- * and diagnostics aggregation for the Frontend Event Runtime.
+ * event registration management, event publishing, and diagnostics aggregation.
  */
 
 import {
@@ -19,17 +19,26 @@ import {
   EventContext,
   EventDiagnostics,
   EventHealth,
+  EventHistory,
+  EventPriority,
+  EventRegistration,
   EventRuntimeState,
   EventState,
   EventStatistics,
+  PublishedEvent,
 } from './models';
 import { IEventProvider } from './interfaces';
+import { EventRegistry } from './event_registry';
+import { EventBus } from './event_bus';
 
 export class EventProvider implements IEventProvider {
   private _runtimeState: EventRuntimeState = EventRuntimeState.UNINITIALIZED;
   private readonly _config: EventConfiguration;
   private readonly _capabilities: EventCapabilities;
   private readonly _context: EventContext;
+
+  private readonly _registry: EventRegistry;
+  private readonly _bus: EventBus;
 
   private _startedAt: string | null = null;
   private _initializations = 0;
@@ -41,10 +50,15 @@ export class EventProvider implements IEventProvider {
     config?: EventConfiguration,
     capabilities?: EventCapabilities,
     context?: EventContext,
+    registry?: EventRegistry,
+    bus?: EventBus,
   ) {
     this._config = config ?? createEventConfiguration();
     this._capabilities = capabilities ?? createEventCapabilities();
     this._context = context ?? createEventContext();
+
+    this._registry = registry ?? new EventRegistry();
+    this._bus = bus ?? new EventBus(this._registry, this._config.maxQueueSize ?? 1000);
   }
 
   public initialize(): EventHealth {
@@ -115,11 +129,19 @@ export class EventProvider implements IEventProvider {
   }
 
   public diagnostics(): EventDiagnostics {
+    const registeredTypes = this._registry.list().map((r) => r.eventType);
+    const busStats = this._bus.statistics();
+    const history = this._bus.history();
+
     return createEventDiagnostics({
       health: this.health(),
       statistics: this.statistics(),
       capabilities: this.capabilities(),
       context: this._context,
+      registeredEvents: registeredTypes,
+      publishedEvents: busStats.publishCount,
+      eventHistorySize: history.events.length,
+      busStatistics: busStats,
       timestamp: new Date().toISOString(),
     });
   }
@@ -138,5 +160,37 @@ export class EventProvider implements IEventProvider {
 
   public context(): EventContext {
     return this._context;
+  }
+
+  public registerEvent(registration: EventRegistration): void {
+    this._registry.register(registration);
+  }
+
+  public unregisterEvent(eventType: string): boolean {
+    return this._registry.unregister(eventType);
+  }
+
+  public containsEvent(eventType: string): boolean {
+    return this._registry.contains(eventType);
+  }
+
+  public listEvents(): ReadonlyArray<EventRegistration> {
+    return this._registry.list();
+  }
+
+  public publish<T = unknown>(
+    eventType: string,
+    payload: T,
+    options?: { source?: string; correlationId?: string; priority?: EventPriority },
+  ): PublishedEvent<T> {
+    return this._bus.publish(eventType, payload, options);
+  }
+
+  public history(): EventHistory {
+    return this._bus.history();
+  }
+
+  public clearHistory(): void {
+    this._bus.clearHistory();
   }
 }

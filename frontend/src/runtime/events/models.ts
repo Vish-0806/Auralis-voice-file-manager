@@ -1,9 +1,10 @@
 /**
- * Event & Messaging Runtime Domain Models (Phase 16.4.1).
+ * Event & Messaging Runtime Domain Models (Phase 16.4.2).
  *
  * Provides immutable state models, event objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, diagnostics
- * telemetry, priority enums, and configuration objects for the Frontend Event Runtime.
+ * telemetry, priority enums, configuration objects, event registration definitions,
+ * published event records, and event bus statistics for the Frontend Event Runtime.
  */
 
 export enum EventRuntimeState {
@@ -35,6 +36,38 @@ export interface FrontendEvent<T = unknown> {
   readonly timestamp: string;
   readonly source?: string;
   readonly correlationId?: string;
+}
+
+export interface EventRegistration {
+  readonly eventType: string;
+  readonly description?: string;
+  readonly priority: EventPriority;
+  readonly registeredAt: string;
+}
+
+export interface PublishedEvent<T = unknown> {
+  readonly event: FrontendEvent<T>;
+  readonly publishedAt: string;
+  readonly sequenceNumber: number;
+}
+
+export interface EventHistory {
+  readonly events: ReadonlyArray<PublishedEvent>;
+  readonly totalPublished: number;
+  readonly timestamp: string;
+}
+
+export interface EventBusStatistics {
+  readonly publishCount: number;
+  readonly historyCount: number;
+  readonly failedPublishes: number;
+  readonly averagePayloadSize: number;
+}
+
+export interface EventBusHealth {
+  readonly healthy: boolean;
+  readonly registeredEventTypes: number;
+  readonly totalPublishedEvents: number;
 }
 
 export interface EventContext {
@@ -78,6 +111,10 @@ export interface EventDiagnostics {
   readonly statistics: EventStatistics;
   readonly capabilities: EventCapabilities;
   readonly context: EventContext;
+  readonly registeredEvents?: ReadonlyArray<string>;
+  readonly publishedEvents?: number;
+  readonly eventHistorySize?: number;
+  readonly busStatistics?: EventBusStatistics;
   readonly timestamp: string;
 }
 
@@ -100,6 +137,52 @@ export function createFrontendEvent<T = unknown>(
     timestamp: params.timestamp ?? new Date().toISOString(),
     source: params.source,
     correlationId: params.correlationId,
+  });
+}
+
+export function createEventRegistration(
+  params: Partial<EventRegistration> & { eventType: string },
+): EventRegistration {
+  return Object.freeze({
+    eventType: params.eventType,
+    description: params.description,
+    priority: params.priority ?? EventPriority.NORMAL,
+    registeredAt: params.registeredAt ?? new Date().toISOString(),
+  });
+}
+
+export function createPublishedEvent<T = unknown>(
+  params: Partial<PublishedEvent<T>> & { event: FrontendEvent<T>; sequenceNumber: number },
+): PublishedEvent<T> {
+  return Object.freeze({
+    event: params.event,
+    publishedAt: params.publishedAt ?? new Date().toISOString(),
+    sequenceNumber: params.sequenceNumber,
+  });
+}
+
+export function createEventHistory(params: Partial<EventHistory> = {}): EventHistory {
+  return Object.freeze({
+    events: Object.freeze([...(params.events ?? [])]),
+    totalPublished: params.totalPublished ?? (params.events ? params.events.length : 0),
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createEventBusStatistics(params: Partial<EventBusStatistics> = {}): EventBusStatistics {
+  return Object.freeze({
+    publishCount: params.publishCount ?? 0,
+    historyCount: params.historyCount ?? 0,
+    failedPublishes: params.failedPublishes ?? 0,
+    averagePayloadSize: params.averagePayloadSize ?? 0,
+  });
+}
+
+export function createEventBusHealth(params: Partial<EventBusHealth> = {}): EventBusHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    registeredEventTypes: params.registeredEventTypes ?? 0,
+    totalPublishedEvents: params.totalPublishedEvents ?? 0,
   });
 }
 
@@ -155,6 +238,10 @@ export function createEventDiagnostics(params: Partial<EventDiagnostics> = {}): 
     statistics: params.statistics ?? createEventStatistics(),
     capabilities: params.capabilities ?? createEventCapabilities(),
     context: params.context ?? createEventContext(),
+    registeredEvents: params.registeredEvents ? Object.freeze([...params.registeredEvents]) : undefined,
+    publishedEvents: params.publishedEvents,
+    eventHistorySize: params.eventHistorySize,
+    busStatistics: params.busStatistics,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }
