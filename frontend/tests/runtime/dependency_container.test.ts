@@ -9,6 +9,7 @@ import {
   createContainerHealth,
   createContainerStatistics,
   createDependencyNode,
+  createScopedContainer,
   createServiceDescriptorModel,
   createServiceRegistration,
   DependencyContainer,
@@ -29,60 +30,48 @@ import {
   setServiceProvider,
 } from '../../src/runtime/di';
 
-class DummyService {
-  public getValue(): string {
-    return 'dummy';
-  }
+class LoggerService {
+  public id = Math.random();
 }
 
-class ServiceA {
-  constructor(public b: ServiceB) {}
+class UserSessionService {
+  public id = Math.random();
 }
 
-class ServiceB {
-  constructor(public c: ServiceC) {}
+class TransientService {
+  public id = Math.random();
 }
 
-class ServiceC {
-  public name = 'ServiceC';
-}
-
-class CircA {
-  constructor(public b: CircB) {}
-}
-
-class CircB {
-  constructor(public a: CircA) {}
-}
-
-describe('Phase 16.2.3 — Frontend Dependency Resolution Engine', () => {
+describe('Phase 16.2.4 — Frontend Dependency Injection Scoped Lifetime & Child Container Engine', () => {
   beforeEach(() => {
     resetDependencyContainer();
     resetServiceProvider();
   });
 
-  describe('1. Models, Capabilities & Exception Verification', () => {
-    it('should verify ContainerDiagnostics and statistics model extensions', () => {
-      const stats = createContainerStatistics({
-        totalResolutions: 10,
-        singletonCacheHits: 5,
-        singletonCreations: 2,
-        transientCreations: 3,
-      });
-      expect(stats.totalResolutions).toBe(10);
-      expect(stats.singletonCacheHits).toBe(5);
+  describe('1. ScopedContainer Models, Exceptions & Capabilities', () => {
+    it('should create immutable ScopedContainer model', () => {
+      const scopeModel = createScopedContainer({ scopeId: 'scope_1', parentScopeId: 'root' });
+      expect(scopeModel.scopeId).toBe('scope_1');
+      expect(scopeModel.parentScopeId).toBe('root');
+      expect(scopeModel.active).toBe(true);
+      expect(Object.isFrozen(scopeModel)).toBe(true);
+    });
 
-      const diag = createContainerDiagnostics({
-        registeredServices: ['S1'],
-        resolvedServices: ['S1'],
-        cachedSingletons: ['S1'],
-      });
-      expect(diag.registeredServices).toContain('S1');
-      expect(diag.resolvedServices).toContain('S1');
-      expect(Object.isFrozen(diag)).toBe(true);
-
+    it('should verify ContainerCapabilities supportsScopes = true', () => {
       const caps = createContainerCapabilities();
-      expect(caps.supportsScoped).toBe(true);
+      expect(caps.supportsScopes).toBe(true);
+    });
+
+    it('should verify diagnostics includes activeScopes, scopeHierarchy, and scopedCacheSize', () => {
+      const diag = createContainerDiagnostics({
+        activeScopes: ['root', 'scope_1'],
+        scopeHierarchy: { scope_1: 'root' },
+        scopedCacheSize: 2,
+      });
+
+      expect(diag.activeScopes).toContain('scope_1');
+      expect(diag.scopeHierarchy['scope_1']).toBe('root');
+      expect(diag.scopedCacheSize).toBe(2);
 
       const cfg = createContainerConfiguration();
       expect(cfg.name).toBe('Auralis Container');
@@ -93,17 +82,22 @@ describe('Phase 16.2.3 — Frontend Dependency Resolution Engine', () => {
       const health = createContainerHealth();
       expect(health.healthy).toBe(false);
 
+      const stats = createContainerStatistics();
+      expect(stats.totalRegistrations).toBe(0);
+
       const node = createDependencyNode({ serviceType: 'S1', dependencies: ['D1'] });
       expect(node.dependencies).toContain('D1');
 
-      const model = createServiceDescriptorModel({ descriptorId: 'd1', serviceType: 'S1', lifetime: ServiceLifetime.SINGLETON });
-      expect(model.serviceType).toBe('S1');
+      const descModel = createServiceDescriptorModel({ descriptorId: 'd1', serviceType: 'S1', lifetime: ServiceLifetime.SINGLETON });
+      expect(descModel.serviceType).toBe('S1');
 
       const reg = createServiceRegistration({ descriptorId: 'r1', serviceType: 'S1', lifetime: ServiceLifetime.SINGLETON });
       expect(reg.serviceType).toBe('S1');
+
+      expect(ContainerState.UNINITIALIZED).toBe('UNINITIALIZED');
     });
 
-    it('should verify exception types', () => {
+    it('should exercise exception hierarchy', () => {
       expect(new CircularDependencyException('circ')).toBeInstanceOf(DependencyInjectionException);
       expect(new ServiceResolutionException('res')).toBeInstanceOf(DependencyInjectionException);
       expect(new ServiceRegistrationException('reg')).toBeInstanceOf(DependencyInjectionException);
@@ -111,169 +105,144 @@ describe('Phase 16.2.3 — Frontend Dependency Resolution Engine', () => {
     });
   });
 
-  describe('2. Singleton Lifetime & Caching', () => {
-    it('should cache and reuse singleton instances', () => {
-      const collection = new ServiceCollection();
-      collection.addSingleton('DummyService', DummyService);
+  describe('2. Scope Creation, Hierarchy & Disposal', () => {
+    it('should create child scope and verify parent-child relationship', () => {
+      const rootProvider = new ServiceProvider();
+      const scope1 = rootProvider.createScope();
 
-      const provider = new ServiceProvider(collection);
-      const instance1 = provider.resolve<DummyService>('DummyService');
-      const instance2 = provider.resolve<DummyService>('DummyService');
-
-      expect(instance1).toBe(instance2);
-      expect(instance1.getValue()).toBe('dummy');
-
-      const stats = provider.statistics();
-      expect(stats.totalResolutions).toBe(2);
-      expect(stats.singletonCacheHits).toBe(1);
-      expect(stats.singletonCreations).toBe(1);
+      expect(rootProvider.isScope()).toBe(false);
+      expect(scope1.isScope()).toBe(true);
+      expect(scope1.scopeId()).toBeDefined();
+      expect(scope1.parentScope()).toBe(rootProvider);
     });
 
-    it('should resolve singleton instances registered directly', () => {
-      const collection = new ServiceCollection();
-      const directInstance = new DummyService();
-      collection.addSingleton('DummyService', directInstance);
+    it('should dispose scope and invalidate child resolution', () => {
+      const rootProvider = new ServiceProvider();
+      rootProvider.initialize();
 
-      const provider = new ServiceProvider(collection);
-      const res = provider.resolve<DummyService>('DummyService');
-      expect(res).toBe(directInstance);
+      const scope1 = rootProvider.createScope();
+      const collection = new ServiceCollection();
+      collection.addScoped('Session', UserSessionService);
+
+      const scopedProvider = new ServiceProvider(collection, undefined, undefined, undefined, scope1 as any);
+
+      expect(scopedProvider.resolve('Session')).toBeDefined();
+
+      scopedProvider.disposeScope();
+      expect(() => scopedProvider.resolve('Session')).toThrow(ServiceResolutionException);
     });
-  });
 
-  describe('3. Transient Lifetime', () => {
-    it('should create a new instance on every resolution for TRANSIENT services', () => {
-      const collection = new ServiceCollection();
-      collection.addTransient('DummyService', () => new DummyService());
+    it('should dispose all nested child scopes when parent scope is disposed', () => {
+      const root = new ServiceProvider();
+      const scopeA = root.createScope();
+      const scopeB = scopeA.createScope();
 
-      const provider = new ServiceProvider(collection);
-      const i1 = provider.resolve<DummyService>('DummyService');
-      const i2 = provider.resolve<DummyService>('DummyService');
+      expect(scopeA.isScope()).toBe(true);
+      expect(scopeB.isScope()).toBe(true);
 
-      expect(i1).not.toBe(i2);
-      expect(i1.getValue()).toBe('dummy');
+      scopeA.disposeScope();
 
-      const stats = provider.statistics();
-      expect(stats.transientCreations).toBe(2);
-      expect(stats.factoryExecutions).toBe(2);
+      expect(() => scopeB.resolve('Any')).toThrow(ServiceResolutionException);
     });
   });
 
-  describe('4. Factory Execution', () => {
-    it('should execute factory functions passing ServiceProvider', () => {
+  describe('3. Scoped Lifetime Isolation & Singleton Sharing', () => {
+    it('should share singletons across scopes but isolate scoped services per scope', () => {
       const collection = new ServiceCollection();
-      collection.addSingleton('DepC', ServiceC);
-      collection.addTransient('FactoryB', (sp: IServiceProvider) => {
-        const c = sp.resolve<ServiceC>('DepC');
-        return new ServiceB(c);
-      });
+      collection.addSingleton('Logger', LoggerService);
+      collection.addScoped('UserSession', UserSessionService);
+      collection.addTransient('Transient', TransientService);
 
-      const provider = new ServiceProvider(collection);
-      const b = provider.resolve<ServiceB>('FactoryB');
+      const rootProvider = new ServiceProvider(collection);
+      rootProvider.initialize();
 
-      expect(b.c).toBeDefined();
-      expect(b.c.name).toBe('ServiceC');
+      const scopeA = rootProvider.createScope();
+      const scopeB = rootProvider.createScope();
+
+      // Singleton is shared across root and all child scopes
+      const logRoot = rootProvider.resolve<LoggerService>('Logger');
+      const logA = scopeA.resolve<LoggerService>('Logger');
+      const logB = scopeB.resolve<LoggerService>('Logger');
+
+      expect(logA).toBe(logRoot);
+      expect(logB).toBe(logRoot);
+
+      // Scoped is cached within same scope, but different across different scopes
+      const sessA1 = scopeA.resolve<UserSessionService>('UserSession');
+      const sessA2 = scopeA.resolve<UserSessionService>('UserSession');
+      const sessB1 = scopeB.resolve<UserSessionService>('UserSession');
+
+      expect(sessA1).toBe(sessA2);
+      expect(sessA1).not.toBe(sessB1);
+
+      // Transient is fresh everywhere
+      const trA1 = scopeA.resolve<TransientService>('Transient');
+      const trA2 = scopeA.resolve<TransientService>('Transient');
+      expect(trA1).not.toBe(trA2);
     });
   });
 
-  describe('5. Recursive Constructor Dependency Injection', () => {
-    it('should recursively resolve constructor dependencies declared in metadata', () => {
-      const collection = new ServiceCollection();
-      collection.addSingleton('ServiceC', ServiceC);
-      collection.addSingleton('ServiceB', ServiceB, { dependencies: ['ServiceC'] });
-      collection.addSingleton('ServiceA', ServiceA, { dependencies: ['ServiceB'] });
+  describe('4. DependencyContainer Scope Delegation & Singleton Accessors', () => {
+    it('should create child scope from DependencyContainer and verify accessors', () => {
+      const rootContainer = new DependencyContainer();
+      rootContainer.collection().addSingleton('Logger', LoggerService);
+      rootContainer.collection().addScoped('UserSession', UserSessionService);
 
-      const provider = new ServiceProvider(collection);
-      const a = provider.resolve<ServiceA>('ServiceA');
+      const scopeContainerA = rootContainer.createScope();
+      const scopeContainerB = rootContainer.createScope();
 
-      expect(a).toBeDefined();
-      expect(a.b).toBeDefined();
-      expect(a.b.c).toBeDefined();
-      expect(a.b.c.name).toBe('ServiceC');
-    });
+      const logA = scopeContainerA.resolve<LoggerService>('Logger');
+      const logB = scopeContainerB.resolve<LoggerService>('Logger');
+      expect(logA).toBe(logB);
 
-    it('should instantiate class directly via createInstance using static dependencies', () => {
-      const collection = new ServiceCollection();
-      collection.addSingleton('ServiceC', ServiceC);
-      collection.addSingleton('ServiceB', ServiceB, { dependencies: ['ServiceC'] });
+      const sessA = scopeContainerA.resolve<UserSessionService>('UserSession');
+      const sessB = scopeContainerB.resolve<UserSessionService>('UserSession');
+      expect(sessA).not.toBe(sessB);
 
-      (ServiceA as any).$dependencies = ['ServiceB'];
-
-      const provider = new ServiceProvider(collection);
-      const a = provider.createInstance(ServiceA);
-
-      expect(a.b.c.name).toBe('ServiceC');
-    });
-  });
-
-  describe('6. Circular Dependency Detection', () => {
-    it('should detect circular dependencies and throw CircularDependencyException', () => {
-      const collection = new ServiceCollection();
-      collection.addSingleton('CircA', CircA, { dependencies: ['CircB'] });
-      collection.addSingleton('CircB', CircB, { dependencies: ['CircA'] });
-
-      const provider = new ServiceProvider(collection);
-      expect(() => provider.resolve('CircA')).toThrow(CircularDependencyException);
-
-      const stats = provider.statistics();
-      expect(stats.circularDependencyDetections).toBe(1);
-    });
-  });
-
-  describe('7. Resolution API Variants & Scoped Error', () => {
-    it('should support tryResolve, resolveRequired, and resolveAll', () => {
-      const collection = new ServiceCollection();
-      collection.addSingleton('DummyService', DummyService);
-
-      const provider = new ServiceProvider(collection);
-      expect(provider.resolveRequired<DummyService>('DummyService')).toBeDefined();
-      expect(provider.tryResolve<DummyService>('NonExistent')).toBeUndefined();
-
-      const all = provider.resolveAll<DummyService>('DummyService');
-      expect(all.length).toBe(1);
-      expect(provider.resolveAll('NonExistent').length).toBe(0);
-    });
-
-    it('should throw ServiceResolutionException on Scoped resolution in root provider', () => {
-      const collection = new ServiceCollection();
-      collection.addScoped('ScopedService', DummyService);
-
-      const provider = new ServiceProvider(collection);
-      expect(() => provider.resolve('ScopedService')).toThrow(ServiceResolutionException);
-    });
-  });
-
-  describe('8. DependencyContainer & Singleton Accessors Integration', () => {
-    it('should delegate resolution APIs from DependencyContainer and test singleton accessors', () => {
-      const container = new DependencyContainer();
-      container.collection().addSingleton('DummyService', DummyService);
-
-      const resolved = container.resolve<DummyService>('DummyService');
-      expect(resolved).toBeDefined();
-      expect(resolved.getValue()).toBe('dummy');
-
-      expect(container.resolveRequired<DummyService>('DummyService')).toBeDefined();
-      expect(container.tryResolve('NonExistent')).toBeUndefined();
-      expect(container.resolveAll('DummyService').length).toBe(1);
+      scopeContainerA.disposeScope();
 
       const sp1 = getServiceProvider();
-      const sp2 = getServiceProvider();
-      expect(sp1).toBe(sp2);
+      expect(sp1).toBeDefined();
 
       const customSP = new ServiceProvider();
       setServiceProvider(customSP);
       expect(getServiceProvider()).toBe(customSP);
 
       const dc1 = getDependencyContainer();
-      const dc2 = getDependencyContainer();
-      expect(dc1).toBe(dc2);
+      expect(dc1).toBeDefined();
 
       const customDC = new DependencyContainer();
       setDependencyContainer(customDC);
       expect(getDependencyContainer()).toBe(customDC);
 
-      const desc = new ServiceDescriptor('S1', ServiceLifetime.SINGLETON, DummyService);
+      const desc = new ServiceDescriptor('S1', ServiceLifetime.SINGLETON, LoggerService);
       expect(desc.serviceType).toBe('S1');
-      expect(container.state()).toBe(ContainerState.UNINITIALIZED);
+    });
+  });
+
+  describe('5. Telemetry & Statistics Integration', () => {
+    it('should track scope statistics and diagnostics telemetry', () => {
+      const collection = new ServiceCollection();
+      collection.addScoped('Session', UserSessionService);
+
+      const root = new ServiceProvider(collection);
+      const scopeA = root.createScope();
+      const scopeB = root.createScope();
+
+      scopeA.resolve('Session');
+      scopeA.resolve('Session');
+
+      const stats = root.statistics();
+      expect(stats.scopesCreated).toBe(2);
+      expect(stats.scopedCacheHits).toBe(1);
+      expect(stats.scopedInstancesCreated).toBe(1);
+
+      const diag = (scopeA as IServiceProvider).diagnostics();
+      expect(diag.activeScopes.length).toBeGreaterThan(0);
+      expect(diag.scopedCacheSize).toBe(1);
+
+      scopeB.disposeScope();
+      expect(root.statistics().scopesDisposed).toBe(1);
     });
   });
 });

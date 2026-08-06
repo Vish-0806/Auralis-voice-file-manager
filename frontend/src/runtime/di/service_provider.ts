@@ -1,9 +1,9 @@
 /**
- * Service Provider Resolution Engine Implementation (Phase 16.2.3).
+ * Service Provider Foundation & Resolution Engine Implementation (Phase 16.2.4).
  *
  * Implements IServiceProvider owning container configuration, context, health,
- * telemetry, diagnostics, and full dependency resolution (Singletons, Transients, Factories,
- * Recursive Constructor DI, Circular Dependency Detection).
+ * telemetry, diagnostics, full resolution engine, and hierarchical child container scopes
+ * with SCOPED lifetime support.
  */
 
 import {
@@ -26,6 +26,8 @@ import { IServiceCollection, IServiceDescriptor, IServiceProvider } from './inte
 import { ServiceCollection } from './service_collection';
 import { CircularDependencyException, ServiceResolutionException } from './exceptions';
 
+let _scopeIdCounter = 0;
+
 export class ServiceProvider implements IServiceProvider {
   private _state: ContainerState = ContainerState.UNINITIALIZED;
   private readonly _collection: IServiceCollection;
@@ -33,7 +35,13 @@ export class ServiceProvider implements IServiceProvider {
   private readonly _capabilities: ContainerCapabilities;
   private readonly _context: ContainerContext;
 
-  private readonly _singletonCache = new Map<string, unknown>();
+  private readonly _scopeId: string;
+  private readonly _parentProvider?: ServiceProvider;
+  private readonly _singletonCache: Map<string, unknown>;
+  private readonly _scopedCache = new Map<string, unknown>();
+  private readonly _childScopes = new Map<string, ServiceProvider>();
+  private _active = true;
+
   private readonly _resolutionStack: string[] = [];
   private readonly _resolvedServicesSet = new Set<string>();
 
@@ -45,16 +53,34 @@ export class ServiceProvider implements IServiceProvider {
   private _failedResolutions = 0;
   private _circularDependencyCount = 0;
 
+  private _scopesCreated = 0;
+  private _scopesDisposed = 0;
+  private _scopedInstancesCreated = 0;
+  private _scopedCacheHits = 0;
+
   constructor(
     collection?: IServiceCollection,
     config?: ContainerConfiguration,
     capabilities?: ContainerCapabilities,
     context?: ContainerContext,
+    parentProvider?: ServiceProvider,
+    sharedSingletonCache?: Map<string, unknown>,
   ) {
-    this._collection = collection ?? new ServiceCollection();
-    this._config = config ?? createContainerConfiguration();
-    this._capabilities = capabilities ?? createContainerCapabilities();
-    this._context = context ?? createContainerContext();
+    this._collection = collection ?? parentProvider?._collection ?? new ServiceCollection();
+    this._config = config ?? parentProvider?._config ?? createContainerConfiguration();
+    this._capabilities = capabilities ?? parentProvider?._capabilities ?? createContainerCapabilities();
+    this._context = context ?? parentProvider?._context ?? createContainerContext();
+
+    this._parentProvider = parentProvider;
+    this._singletonCache = sharedSingletonCache ?? parentProvider?._singletonCache ?? new Map<string, unknown>();
+
+    if (parentProvider) {
+      _scopeIdCounter++;
+      this._scopeId = `scope_${Date.now()}_${_scopeIdCounter}`;
+      this._state = parentProvider._state;
+    } else {
+      this._scopeId = 'root';
+    }
   }
 
   public initialize(): ContainerHealth {
@@ -75,6 +101,7 @@ export class ServiceProvider implements IServiceProvider {
       return this.health();
     }
 
+    this.disposeScope();
     this._state = ContainerState.STOPPING;
     this._state = ContainerState.STOPPED;
     this._singletonCache.clear();
@@ -83,19 +110,25 @@ export class ServiceProvider implements IServiceProvider {
 
   public restart(): ContainerHealth {
     this.shutdown();
+    this._active = true;
     this.initialize();
     return this.health();
   }
 
   public health(): ContainerHealth {
-    const healthy = this._state === ContainerState.READY;
+    const healthy = this._state === ContainerState.READY && this._active;
     return createContainerHealth({
       healthy,
       state: this._state,
       details: {
         containerName: this._config.name,
+        scopeId: this._scopeId,
+        isScope: this.isScope(),
+        active: this._active,
         totalRegistrations: this._collection.count(),
         cachedSingletons: this._singletonCache.size,
+        scopedCacheSize: this._scopedCache.size,
+        activeChildScopes: this._childScopes.size,
       },
       timestamp: new Date().toISOString(),
     });
@@ -103,6 +136,24 @@ export class ServiceProvider implements IServiceProvider {
 
   public statistics(): ContainerStatistics {
     const collStats = this._collection.statistics();
+
+    let aggregatedScopesCreated = this._scopesCreated;
+    let aggregatedScopesDisposed = this._scopesDisposed;
+    let aggregatedScopedInstancesCreated = this._scopedInstancesCreated;
+    let aggregatedScopedCacheHits = this._scopedCacheHits;
+    let aggregatedTotalResolutions = this._totalResolutions;
+    let aggregatedSingletonHits = this._singletonCacheHits;
+
+    for (const child of Array.from(this._childScopes.values())) {
+      const childStats = child.statistics();
+      aggregatedScopesCreated += childStats.scopesCreated;
+      aggregatedScopesDisposed += childStats.scopesDisposed;
+      aggregatedScopedInstancesCreated += childStats.scopedInstancesCreated;
+      aggregatedScopedCacheHits += childStats.scopedCacheHits;
+      aggregatedTotalResolutions += childStats.totalResolutions;
+      aggregatedSingletonHits += childStats.singletonCacheHits;
+    }
+
     return createContainerStatistics({
       totalRegistrations: collStats.totalRegistrations,
       singletonCount: collStats.singletonCount,
@@ -112,14 +163,19 @@ export class ServiceProvider implements IServiceProvider {
       removalsCount: collStats.removalsCount,
       rejectedRegistrationsCount: collStats.rejectedRegistrationsCount,
       aliasCount: collStats.aliasCount,
-      totalResolutions: this._totalResolutions,
-      singletonCacheHits: this._singletonCacheHits,
+      totalResolutions: aggregatedTotalResolutions,
+      singletonCacheHits: aggregatedSingletonHits,
       singletonCreations: this._singletonCreations,
       transientCreations: this._transientCreations,
       factoryExecutions: this._factoryExecutions,
       failedResolutions: this._failedResolutions,
       circularDependencyDetections: this._circularDependencyCount,
-      cacheHits: this._singletonCacheHits,
+      cacheHits: aggregatedSingletonHits + aggregatedScopedCacheHits,
+      scopesCreated: aggregatedScopesCreated,
+      scopesDisposed: aggregatedScopesDisposed,
+      activeScopes: this.calculateActiveScopesCount(),
+      scopedInstancesCreated: aggregatedScopedInstancesCreated,
+      scopedCacheHits: aggregatedScopedCacheHits,
     });
   }
 
@@ -129,6 +185,11 @@ export class ServiceProvider implements IServiceProvider {
 
   public diagnostics(): ContainerDiagnostics {
     const registered = this._collection.listServices().map((s) => s.serviceType);
+    const scopeHierarchyMap: Record<string, string | null> = {};
+    const activeScopesList: string[] = [this._scopeId];
+
+    this.buildScopeDiagnostics(scopeHierarchyMap, activeScopesList);
+
     return createContainerDiagnostics({
       state: this._state,
       health: this.health(),
@@ -139,11 +200,16 @@ export class ServiceProvider implements IServiceProvider {
       resolvedServices: Array.from(this._resolvedServicesSet),
       cachedSingletons: Array.from(this._singletonCache.keys()),
       activeResolutionStack: [...this._resolutionStack],
+      activeScopes: activeScopesList,
+      scopeHierarchy: scopeHierarchyMap,
+      scopedCacheSize: this._scopedCache.size,
       failedResolutions: this._failedResolutions,
       circularDependencyCount: this._circularDependencyCount,
       metrics: {
         cacheHitRatio:
-          this._totalResolutions > 0 ? this._singletonCacheHits / this._totalResolutions : 0,
+          this._totalResolutions > 0
+            ? (this._singletonCacheHits + this._scopedCacheHits) / this._totalResolutions
+            : 0,
       },
       timestamp: new Date().toISOString(),
     });
@@ -161,11 +227,61 @@ export class ServiceProvider implements IServiceProvider {
     return this._context;
   }
 
+  public createScope(): IServiceProvider {
+    if (!this._active) {
+      throw new ServiceResolutionException('Cannot create child scope from a disposed scope.');
+    }
+    const child = new ServiceProvider(
+      this._collection,
+      this._config,
+      this._capabilities,
+      this._context,
+      this,
+      this._singletonCache,
+    );
+    this._childScopes.set(child.scopeId(), child);
+    this._scopesCreated++;
+    return child;
+  }
+
+  public disposeScope(): void {
+    if (!this._active) return;
+
+    for (const child of Array.from(this._childScopes.values())) {
+      child.disposeScope();
+    }
+    this._childScopes.clear();
+    this._scopedCache.clear();
+    this._active = false;
+    this._scopesDisposed++;
+
+    if (this._parentProvider) {
+      this._parentProvider._scopesDisposed++;
+      this._parentProvider._childScopes.delete(this._scopeId);
+    }
+  }
+
+  public isScope(): boolean {
+    return this._parentProvider !== undefined;
+  }
+
+  public scopeId(): string {
+    return this._scopeId;
+  }
+
+  public parentScope(): IServiceProvider | undefined {
+    return this._parentProvider;
+  }
+
   public resolve<T>(serviceType: string): T {
+    if (!this._active) {
+      throw new ServiceResolutionException(`Cannot resolve service '${serviceType}' from a disposed scope.`);
+    }
+
     this._totalResolutions++;
     const key = serviceType.trim();
 
-    const descriptor = this._collection.getDescriptor(key);
+    const descriptor = this.getDescriptorRecursive(key);
     if (!descriptor) {
       this._failedResolutions++;
       throw new ServiceResolutionException(`Service '${serviceType}' is not registered.`);
@@ -173,7 +289,6 @@ export class ServiceProvider implements IServiceProvider {
 
     const primaryKey = descriptor.serviceType;
 
-    // Circular Dependency Detection
     if (this._config.enableCircularCheck && this._resolutionStack.includes(primaryKey)) {
       this._circularDependencyCount++;
       this._failedResolutions++;
@@ -214,13 +329,16 @@ export class ServiceProvider implements IServiceProvider {
 
   public resolveAll<T>(serviceType: string): ReadonlyArray<T> {
     const key = serviceType.trim();
-    if (!this._collection.contains(key)) {
+    if (!this.getDescriptorRecursive(key)) {
       return Object.freeze([]);
     }
     return Object.freeze([this.resolve<T>(key)]);
   }
 
   public createInstance<T>(constructorFn: new (...args: any[]) => T): T {
+    if (!this._active) {
+      throw new ServiceResolutionException('Cannot create instance from a disposed scope.');
+    }
     if (!constructorFn) {
       throw new ServiceResolutionException('Constructor function cannot be null or undefined.');
     }
@@ -229,15 +347,41 @@ export class ServiceProvider implements IServiceProvider {
     return new constructorFn(...resolvedDeps);
   }
 
+  private getDescriptorRecursive(key: string): IServiceDescriptor | undefined {
+    const descriptor = this._collection.getDescriptor(key);
+    if (descriptor) return descriptor;
+    if (this._parentProvider) {
+      return this._parentProvider.getDescriptorRecursive(key);
+    }
+    return undefined;
+  }
+
   private resolveDescriptor<T>(descriptor: IServiceDescriptor): T {
     const key = descriptor.serviceType;
 
+    // SCOPED Lifetime
     if (descriptor.lifetime === ServiceLifetime.SCOPED) {
-      throw new ServiceResolutionException(
-        `Scoped lifetime resolution for '${key}' is not supported in root provider. Use a child scope (scheduled for Phase 16.2.4).`,
-      );
+      if (this._scopedCache.has(key)) {
+        this._scopedCacheHits++;
+        return this._scopedCache.get(key) as T;
+      }
+
+      let instance: T;
+      if (descriptor.factory) {
+        this._factoryExecutions++;
+        instance = descriptor.factory(this) as T;
+      } else if (descriptor.implementation) {
+        instance = this.instantiateClass<T>(descriptor.implementation, descriptor.metadata);
+      } else {
+        throw new ServiceResolutionException(`No implementation or factory defined for scoped service '${key}'.`);
+      }
+
+      this._scopedInstancesCreated++;
+      this._scopedCache.set(key, instance);
+      return instance;
     }
 
+    // SINGLETON Lifetime
     if (descriptor.lifetime === ServiceLifetime.SINGLETON) {
       if (this._singletonCache.has(key)) {
         this._singletonCacheHits++;
@@ -295,5 +439,21 @@ export class ServiceProvider implements IServiceProvider {
     }
 
     return new implementation(...resolvedArgs);
+  }
+
+  private calculateActiveScopesCount(): number {
+    let count = this._active ? 1 : 0;
+    for (const child of Array.from(this._childScopes.values())) {
+      count += child.calculateActiveScopesCount();
+    }
+    return count;
+  }
+
+  private buildScopeDiagnostics(hierarchy: Record<string, string | null>, activeList: string[]): void {
+    hierarchy[this._scopeId] = this._parentProvider ? this._parentProvider._scopeId : null;
+    for (const [childId, child] of Array.from(this._childScopes.entries())) {
+      activeList.push(childId);
+      child.buildScopeDiagnostics(hierarchy, activeList);
+    }
   }
 }

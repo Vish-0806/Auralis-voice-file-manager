@@ -1,7 +1,8 @@
 /**
- * Dependency Container Coordinator Implementation (Phase 16.2.3).
+ * Dependency Container Coordinator Implementation (Phase 16.2.4).
  *
- * Coordinates container lifecycle operations and delegates provider/collection operations.
+ * Coordinates container lifecycle operations, child container scope management,
+ * and delegates provider/collection operations.
  */
 
 import {
@@ -20,7 +21,7 @@ export class DependencyContainer implements IDependencyContainer {
   private readonly _collection: IServiceCollection;
 
   constructor(provider?: IServiceProvider, collection?: IServiceCollection) {
-    this._collection = collection ?? new ServiceCollection();
+    this._collection = collection ?? provider?.configuration ? (provider as any)._collection : new ServiceCollection();
     this._provider = provider ?? new ServiceProvider(this._collection);
   }
 
@@ -82,5 +83,14 @@ export class DependencyContainer implements IDependencyContainer {
 
   public createInstance<T>(constructorFn: new (...args: any[]) => T): T {
     return this._provider.createInstance<T>(constructorFn);
+  }
+
+  public createScope(): IDependencyContainer {
+    const childProvider = this._provider.createScope();
+    return new DependencyContainer(childProvider, this._collection);
+  }
+
+  public disposeScope(): void {
+    this._provider.disposeScope();
   }
 }

@@ -1,8 +1,8 @@
 /**
- * Dependency Injection Interfaces (Phase 16.2.3).
+ * Dependency Injection Interfaces (Phase 16.2.4).
  *
  * Defines contracts for IServiceDescriptor, IServiceCollection, IServiceProvider,
- * and IDependencyContainer including Resolution Engine methods.
+ * and IDependencyContainer including Scoped Lifetimes & Child Container APIs.
  */
 
 import {
@@ -101,6 +101,12 @@ export interface IServiceProvider {
   tryResolve<T>(serviceType: string): T | undefined;
   resolveAll<T>(serviceType: string): ReadonlyArray<T>;
   createInstance<T>(constructorFn: new (...args: any[]) => T): T;
+
+  createScope(): IServiceProvider;
+  disposeScope(): void;
+  isScope(): boolean;
+  scopeId(): string;
+  parentScope(): IServiceProvider | undefined;
 }
 
 export interface IDependencyContainer {
@@ -120,4 +126,7 @@ export interface IDependencyContainer {
   tryResolve<T>(serviceType: string): T | undefined;
   resolveAll<T>(serviceType: string): ReadonlyArray<T>;
   createInstance<T>(constructorFn: new (...args: any[]) => T): T;
+
+  createScope(): IDependencyContainer;
+  disposeScope(): void;
 }

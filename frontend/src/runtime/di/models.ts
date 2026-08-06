@@ -1,9 +1,9 @@
 /**
- * Dependency Injection Domain Models (Phase 16.2.3).
+ * Dependency Injection Domain Models (Phase 16.2.4).
  *
  * Provides immutable state models, configuration objects, capabilities telemetry,
- * health evaluation snapshots, statistics metrics, context metadata, and diagnostics telemetry
- * for the Frontend Dependency Injection Container and Resolution Engine.
+ * health evaluation snapshots, statistics metrics, context metadata, diagnostics telemetry,
+ * and scoped container metadata for the Frontend Dependency Injection Container.
  */
 
 export enum ServiceLifetime {
@@ -45,6 +45,14 @@ export interface DependencyNode {
   readonly dependencies: ReadonlyArray<string>;
 }
 
+export interface ScopedContainer {
+  readonly scopeId: string;
+  readonly parentScopeId: string | null;
+  readonly createdAt: string;
+  readonly active: boolean;
+  readonly scopedServiceCount: number;
+}
+
 export interface ContainerCapabilities {
   readonly supportsScoped: boolean;
   readonly supportsFactories: boolean;
@@ -53,6 +61,7 @@ export interface ContainerCapabilities {
   readonly supportsAliases: boolean;
   readonly supportsTags: boolean;
   readonly supportsReplacement: boolean;
+  readonly supportsScopes: boolean;
   readonly maxDepth: number;
 }
 
@@ -73,6 +82,11 @@ export interface ContainerStatistics {
   readonly failedResolutions: number;
   readonly circularDependencyDetections: number;
   readonly cacheHits: number;
+  readonly scopesCreated: number;
+  readonly scopesDisposed: number;
+  readonly activeScopes: number;
+  readonly scopedInstancesCreated: number;
+  readonly scopedCacheHits: number;
 }
 
 export interface ContainerHealth {
@@ -105,6 +119,9 @@ export interface ContainerDiagnostics {
   readonly resolvedServices: ReadonlyArray<string>;
   readonly cachedSingletons: ReadonlyArray<string>;
   readonly activeResolutionStack: ReadonlyArray<string>;
+  readonly activeScopes: ReadonlyArray<string>;
+  readonly scopeHierarchy: Readonly<Record<string, string | null>>;
+  readonly scopedCacheSize: number;
   readonly failedResolutions: number;
   readonly circularDependencyCount: number;
   readonly metrics: Readonly<Record<string, unknown>>;
@@ -156,6 +173,18 @@ export function createDependencyNode(
   });
 }
 
+export function createScopedContainer(
+  params: Partial<ScopedContainer> & { scopeId: string },
+): ScopedContainer {
+  return Object.freeze({
+    scopeId: params.scopeId,
+    parentScopeId: params.parentScopeId ?? null,
+    createdAt: params.createdAt ?? new Date().toISOString(),
+    active: params.active ?? true,
+    scopedServiceCount: params.scopedServiceCount ?? 0,
+  });
+}
+
 export function createContainerCapabilities(
   params: Partial<ContainerCapabilities> = {},
 ): ContainerCapabilities {
@@ -167,6 +196,7 @@ export function createContainerCapabilities(
     supportsAliases: params.supportsAliases ?? true,
     supportsTags: params.supportsTags ?? true,
     supportsReplacement: params.supportsReplacement ?? true,
+    supportsScopes: params.supportsScopes ?? true,
     maxDepth: params.maxDepth ?? 32,
   });
 }
@@ -191,6 +221,11 @@ export function createContainerStatistics(
     failedResolutions: params.failedResolutions ?? 0,
     circularDependencyDetections: params.circularDependencyDetections ?? 0,
     cacheHits: params.cacheHits ?? params.singletonCacheHits ?? 0,
+    scopesCreated: params.scopesCreated ?? 0,
+    scopesDisposed: params.scopesDisposed ?? 0,
+    activeScopes: params.activeScopes ?? 0,
+    scopedInstancesCreated: params.scopedInstancesCreated ?? 0,
+    scopedCacheHits: params.scopedCacheHits ?? 0,
   });
 }
 
@@ -235,6 +270,9 @@ export function createContainerDiagnostics(
     resolvedServices: Object.freeze([...(params.resolvedServices ?? [])]),
     cachedSingletons: Object.freeze([...(params.cachedSingletons ?? [])]),
     activeResolutionStack: Object.freeze([...(params.activeResolutionStack ?? [])]),
+    activeScopes: Object.freeze([...(params.activeScopes ?? [])]),
+    scopeHierarchy: Object.freeze({ ...(params.scopeHierarchy ?? {}) }),
+    scopedCacheSize: params.scopedCacheSize ?? 0,
     failedResolutions: params.failedResolutions ?? 0,
     circularDependencyCount: params.circularDependencyCount ?? 0,
     metrics: Object.freeze({ ...(params.metrics ?? {}) }),
