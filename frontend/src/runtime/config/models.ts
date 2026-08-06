@@ -1,11 +1,11 @@
 /**
- * Configuration Runtime Domain Models (Phase 16.3.5).
+ * Configuration Runtime Domain Models (Phase 16.3.6).
  *
  * Provides immutable state models, configuration objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, diagnostics
  * telemetry, source priority enums, entry records, snapshots, schemas, validation results,
  * resolution results, configuration profile definitions, feature flag evaluation models,
- * and sensitive value configuration management models for the Frontend Configuration Runtime.
+ * sensitive value configuration management models, and production certification models for the Frontend Configuration Runtime.
  */
 
 export enum ConfigurationRuntimeState {
@@ -292,6 +292,51 @@ export interface SensitiveHealth {
   readonly totalValues: number;
 }
 
+export interface CertificationIssue {
+  readonly severity: 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
+  readonly component: string;
+  readonly message: string;
+  readonly remediation?: string;
+}
+
+export interface ConfigurationCertification {
+  readonly certified: boolean;
+  readonly score: number;
+  readonly environment: string;
+  readonly issues: ReadonlyArray<CertificationIssue>;
+  readonly certifiedAt: string;
+}
+
+export interface ConfigurationCertificationSummary {
+  readonly certified: boolean;
+  readonly score: number;
+  readonly totalChecks: number;
+  readonly passedChecks: number;
+  readonly failedChecks: number;
+  readonly warningChecks: number;
+}
+
+export interface CertificationStatistics {
+  readonly certificationsRun: number;
+  readonly passedCertifications: number;
+  readonly failedCertifications: number;
+  readonly averageScore: number;
+}
+
+export interface CertificationHealth {
+  readonly healthy: boolean;
+  readonly lastCertificationScore: number;
+  readonly statusMessage: string;
+}
+
+export interface CertificationReport {
+  readonly certification: ConfigurationCertification;
+  readonly summary: ConfigurationCertificationSummary;
+  readonly diagnostics: ConfigurationDiagnostics;
+  readonly benchmarkMs: number;
+  readonly generatedAt: string;
+}
+
 export interface ConfigurationDiagnostics {
   readonly health: ConfigurationHealth;
   readonly statistics: ConfigurationStatistics;
@@ -310,6 +355,8 @@ export interface ConfigurationDiagnostics {
   readonly sensitiveSnapshot?: SensitiveConfigurationSnapshot;
   readonly sensitiveStats?: SensitiveStatistics;
   readonly sensitiveHealth?: SensitiveHealth;
+  readonly certification?: ConfigurationCertification;
+  readonly certificationSummary?: ConfigurationCertificationSummary;
   readonly timestamp: string;
 }
 
@@ -712,6 +759,79 @@ export function createSensitiveHealth(
   });
 }
 
+export function createCertificationIssue(
+  params: Partial<CertificationIssue> & { component: string; message: string },
+): CertificationIssue {
+  return Object.freeze({
+    severity: params.severity ?? 'INFO',
+    component: params.component,
+    message: params.message,
+    remediation: params.remediation,
+  });
+}
+
+export function createConfigurationCertification(
+  params: Partial<ConfigurationCertification> = {},
+): ConfigurationCertification {
+  return Object.freeze({
+    certified: params.certified ?? true,
+    score: params.score ?? 100,
+    environment: params.environment ?? 'production',
+    issues: Object.freeze([...(params.issues ?? [])]),
+    certifiedAt: params.certifiedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createConfigurationCertificationSummary(
+  params: Partial<ConfigurationCertificationSummary> = {},
+): ConfigurationCertificationSummary {
+  return Object.freeze({
+    certified: params.certified ?? true,
+    score: params.score ?? 100,
+    totalChecks: params.totalChecks ?? 0,
+    passedChecks: params.passedChecks ?? 0,
+    failedChecks: params.failedChecks ?? 0,
+    warningChecks: params.warningChecks ?? 0,
+  });
+}
+
+export function createCertificationStatistics(
+  params: Partial<CertificationStatistics> = {},
+): CertificationStatistics {
+  return Object.freeze({
+    certificationsRun: params.certificationsRun ?? 0,
+    passedCertifications: params.passedCertifications ?? 0,
+    failedCertifications: params.failedCertifications ?? 0,
+    averageScore: params.averageScore ?? 100,
+  });
+}
+
+export function createCertificationHealth(
+  params: Partial<CertificationHealth> = {},
+): CertificationHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    lastCertificationScore: params.lastCertificationScore ?? 100,
+    statusMessage: params.statusMessage ?? 'Configuration runtime is certified and operational.',
+  });
+}
+
+export function createCertificationReport(
+  params: Partial<CertificationReport> & {
+    certification: ConfigurationCertification;
+    summary: ConfigurationCertificationSummary;
+    diagnostics: ConfigurationDiagnostics;
+  },
+): CertificationReport {
+  return Object.freeze({
+    certification: params.certification,
+    summary: params.summary,
+    diagnostics: params.diagnostics,
+    benchmarkMs: params.benchmarkMs ?? 0,
+    generatedAt: params.generatedAt ?? new Date().toISOString(),
+  });
+}
+
 export function createConfigurationDiagnostics(
   params: Partial<ConfigurationDiagnostics> = {},
 ): ConfigurationDiagnostics {
@@ -733,6 +853,8 @@ export function createConfigurationDiagnostics(
     sensitiveSnapshot: params.sensitiveSnapshot,
     sensitiveStats: params.sensitiveStats,
     sensitiveHealth: params.sensitiveHealth,
+    certification: params.certification,
+    certificationSummary: params.certificationSummary,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }

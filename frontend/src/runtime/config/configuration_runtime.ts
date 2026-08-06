@@ -1,12 +1,14 @@
 /**
- * Configuration Runtime Coordinator Implementation (Phase 16.3.5).
+ * Configuration Runtime Coordinator Implementation (Phase 16.3.6).
  *
  * Implements IConfigurationRuntime acting as central coordinator for configuration lifecycle,
  * source resolution, schema management, type conversion, constraint validation, profile management,
- * feature flag evaluations, and sensitive data management.
+ * feature flag evaluations, sensitive data management, and production certification.
  */
 
 import {
+  CertificationReport,
+  ConfigurationCertification,
   ConfigurationDiagnostics,
   ConfigurationEntry,
   ConfigurationHealth,
@@ -219,5 +221,17 @@ export class ConfigurationRuntime implements IConfigurationRuntime {
 
   public sensitiveHealth(): SensitiveHealth {
     return this._provider.sensitiveHealth();
+  }
+
+  public certify(): ConfigurationCertification {
+    return this._provider.certify();
+  }
+
+  public runCertification(): CertificationReport {
+    return this._provider.runCertification();
+  }
+
+  public certificationReport(): CertificationReport | undefined {
+    return this._provider.certificationReport();
   }
 }

@@ -1,12 +1,14 @@
 /**
- * Configuration Runtime Interfaces (Phase 16.3.5).
+ * Configuration Runtime Interfaces (Phase 16.3.6).
  *
  * Defines contracts for IConfigurationSource, IConfigurationValidator, IConfigurationProvider,
- * and IConfigurationRuntime including Profiles, Feature Flags, and Sensitive Configuration APIs.
+ * and IConfigurationRuntime including Profiles, Feature Flags, Sensitive Configuration, and Certification APIs.
  */
 
 import {
+  CertificationReport,
   ConfigurationCapabilities,
+  ConfigurationCertification,
   ConfigurationConfiguration,
   ConfigurationContext,
   ConfigurationDiagnostics,
@@ -114,6 +116,10 @@ export interface IConfigurationProvider {
   createSensitiveSnapshot(): SensitiveConfigurationSnapshot;
   sensitiveStatistics(): SensitiveStatistics;
   sensitiveHealth(): SensitiveHealth;
+
+  certify(): ConfigurationCertification;
+  runCertification(): CertificationReport;
+  certificationReport(): CertificationReport | undefined;
 }
 
 export interface IConfigurationRuntime {
@@ -175,4 +181,8 @@ export interface IConfigurationRuntime {
   createSensitiveSnapshot(): SensitiveConfigurationSnapshot;
   sensitiveStatistics(): SensitiveStatistics;
   sensitiveHealth(): SensitiveHealth;
+
+  certify(): ConfigurationCertification;
+  runCertification(): CertificationReport;
+  certificationReport(): CertificationReport | undefined;
 }

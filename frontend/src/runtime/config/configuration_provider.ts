@@ -1,14 +1,16 @@
 /**
- * Configuration Provider Implementation (Phase 16.3.5).
+ * Configuration Provider Implementation (Phase 16.3.6).
  *
  * Implements IConfigurationProvider owning configuration runtime state transitions,
  * telemetry statistics, health evaluation, context metadata, capabilities reporting,
  * source resolution delegation, schema management, type conversion, constraint validation,
- * profile management, feature flag evaluations, and sensitive data management.
+ * profile management, feature flag evaluations, sensitive data management, and production certification.
  */
 
 import {
+  CertificationReport,
   ConfigurationCapabilities,
+  ConfigurationCertification,
   ConfigurationConfiguration,
   ConfigurationContext,
   ConfigurationDiagnostics,
@@ -52,6 +54,7 @@ import { ConfigurationValidator } from './configuration_validator';
 import { ProfileManager } from './profile_manager';
 import { FeatureFlagManager } from './feature_flag_manager';
 import { SecureConfigurationManager } from './secure_configuration_manager';
+import { ConfigurationCertifier } from './configuration_certifier';
 
 export class ConfigurationProvider implements IConfigurationProvider {
   private _runtimeState: ConfigurationRuntimeState = ConfigurationRuntimeState.UNINITIALIZED;
@@ -70,6 +73,7 @@ export class ConfigurationProvider implements IConfigurationProvider {
   private readonly _schemaManager: ConfigurationSchemaManager;
   private readonly _resolver: ConfigurationResolver;
   private readonly _validator: ConfigurationValidator;
+  private readonly _certifier: ConfigurationCertifier;
 
   private _startedAt: string | null = null;
   private _initializations = 0;
@@ -108,6 +112,7 @@ export class ConfigurationProvider implements IConfigurationProvider {
     this._schemaManager = schemaManager ?? new ConfigurationSchemaManager();
     this._resolver = new ConfigurationResolver(this._sourceManager, this._schemaManager);
     this._validator = new ConfigurationValidator();
+    this._certifier = new ConfigurationCertifier(this);
   }
 
   public initialize(): ConfigurationHealth {
@@ -188,6 +193,7 @@ export class ConfigurationProvider implements IConfigurationProvider {
 
     const schemaNames = this.listSchemas().map((s) => s.schemaName);
     const activeProf = this.getActiveProfile();
+    const lastReport = this._certifier.certificationReport();
 
     return createConfigurationDiagnostics({
       health: this.health(),
@@ -207,6 +213,8 @@ export class ConfigurationProvider implements IConfigurationProvider {
       sensitiveSnapshot: this.createSensitiveSnapshot(),
       sensitiveStats: this.sensitiveStatistics(),
       sensitiveHealth: this.sensitiveHealth(),
+      certification: lastReport?.certification,
+      certificationSummary: lastReport?.summary,
       timestamp: new Date().toISOString(),
     });
   }
@@ -410,5 +418,17 @@ export class ConfigurationProvider implements IConfigurationProvider {
 
   public sensitiveHealth(): SensitiveHealth {
     return this._secureManager.health();
+  }
+
+  public certify(): ConfigurationCertification {
+    return this._certifier.certify();
+  }
+
+  public runCertification(): CertificationReport {
+    return this._certifier.runCertification();
+  }
+
+  public certificationReport(): CertificationReport | undefined {
+    return this._certifier.certificationReport();
   }
 }
