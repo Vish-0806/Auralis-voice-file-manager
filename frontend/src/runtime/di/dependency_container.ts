@@ -1,5 +1,5 @@
 /**
- * Dependency Container Coordinator Implementation (Phase 16.2.1).
+ * Dependency Container Coordinator Implementation (Phase 16.2.3).
  *
  * Coordinates container lifecycle operations and delegates provider/collection operations.
  */
@@ -62,5 +62,25 @@ export class DependencyContainer implements IDependencyContainer {
 
   public collection(): IServiceCollection {
     return this._collection;
+  }
+
+  public resolve<T>(serviceType: string): T {
+    return this._provider.resolve<T>(serviceType);
+  }
+
+  public resolveRequired<T>(serviceType: string): T {
+    return this._provider.resolveRequired<T>(serviceType);
+  }
+
+  public tryResolve<T>(serviceType: string): T | undefined {
+    return this._provider.tryResolve<T>(serviceType);
+  }
+
+  public resolveAll<T>(serviceType: string): ReadonlyArray<T> {
+    return this._provider.resolveAll<T>(serviceType);
+  }
+
+  public createInstance<T>(constructorFn: new (...args: any[]) => T): T {
+    return this._provider.createInstance<T>(constructorFn);
   }
 }

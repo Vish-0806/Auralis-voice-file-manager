@@ -1,9 +1,9 @@
 /**
- * Dependency Injection Domain Models (Phase 16.2.2).
+ * Dependency Injection Domain Models (Phase 16.2.3).
  *
  * Provides immutable state models, configuration objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, and diagnostics telemetry
- * for the Frontend Dependency Injection Container and Service Registration Engine.
+ * for the Frontend Dependency Injection Container and Resolution Engine.
  */
 
 export enum ServiceLifetime {
@@ -66,7 +66,13 @@ export interface ContainerStatistics {
   readonly rejectedRegistrationsCount: number;
   readonly aliasCount: number;
   readonly totalResolutions: number;
+  readonly singletonCacheHits: number;
+  readonly singletonCreations: number;
+  readonly transientCreations: number;
+  readonly factoryExecutions: number;
   readonly failedResolutions: number;
+  readonly circularDependencyDetections: number;
+  readonly cacheHits: number;
 }
 
 export interface ContainerHealth {
@@ -95,6 +101,13 @@ export interface ContainerDiagnostics {
   readonly statistics: ContainerStatistics;
   readonly capabilities: ContainerCapabilities;
   readonly context: ContainerContext;
+  readonly registeredServices: ReadonlyArray<string>;
+  readonly resolvedServices: ReadonlyArray<string>;
+  readonly cachedSingletons: ReadonlyArray<string>;
+  readonly activeResolutionStack: ReadonlyArray<string>;
+  readonly failedResolutions: number;
+  readonly circularDependencyCount: number;
+  readonly metrics: Readonly<Record<string, unknown>>;
   readonly timestamp: string;
 }
 
@@ -171,7 +184,13 @@ export function createContainerStatistics(
     rejectedRegistrationsCount: params.rejectedRegistrationsCount ?? 0,
     aliasCount: params.aliasCount ?? 0,
     totalResolutions: params.totalResolutions ?? 0,
+    singletonCacheHits: params.singletonCacheHits ?? 0,
+    singletonCreations: params.singletonCreations ?? 0,
+    transientCreations: params.transientCreations ?? 0,
+    factoryExecutions: params.factoryExecutions ?? 0,
     failedResolutions: params.failedResolutions ?? 0,
+    circularDependencyDetections: params.circularDependencyDetections ?? 0,
+    cacheHits: params.cacheHits ?? params.singletonCacheHits ?? 0,
   });
 }
 
@@ -212,6 +231,13 @@ export function createContainerDiagnostics(
     statistics: params.statistics ?? createContainerStatistics(),
     capabilities: params.capabilities ?? createContainerCapabilities(),
     context: params.context ?? createContainerContext(),
+    registeredServices: Object.freeze([...(params.registeredServices ?? [])]),
+    resolvedServices: Object.freeze([...(params.resolvedServices ?? [])]),
+    cachedSingletons: Object.freeze([...(params.cachedSingletons ?? [])]),
+    activeResolutionStack: Object.freeze([...(params.activeResolutionStack ?? [])]),
+    failedResolutions: params.failedResolutions ?? 0,
+    circularDependencyCount: params.circularDependencyCount ?? 0,
+    metrics: Object.freeze({ ...(params.metrics ?? {}) }),
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }
