@@ -1,6 +1,6 @@
 # Auralis Backend API Service
 
-This is the FastAPI backend application for **Auralis**, coordinating local-first natural language intent parsing, operating system adaptations, document intelligence processing, tiered memory context retrieval, provider-independent execution runtimes, application container & dependency injection infrastructure, certified configuration management, and modular voice integration pipelines.
+This is the FastAPI backend application for **Auralis**, coordinating local-first natural language intent parsing, operating system adaptations, document intelligence processing, tiered memory context retrieval, provider-independent execution runtimes, application container & dependency injection infrastructure, certified configuration management, API pipeline gateway platforms, and modular voice integration pipelines.
 
 ---
 
@@ -11,7 +11,16 @@ The backend codebase is divided into independent packages matching specific boun
 ```
 backend/
 ├── api/               # API Router endpoints (routes.py, voice_routes.py, assistant_routes.py, etc.)
-├── application/       # Application Container & Infrastructure (Phase 14)
+├── application/       # Application Container & Infrastructure (Phases 14 & 15)
+│   ├── api/           # API Runtime Architecture Platform (Phase 15)
+│   │   ├── routing/   # Request Routing Runtime (Phase 15.2)
+│   │   ├── middleware/# Middleware Runtime (Phase 15.3)
+│   │   ├── auth/      # Authentication & Authorization Runtime (Phase 15.4)
+│   │   ├── validation/# Validation & Serialization Runtime (Phase 15.5)
+│   │   ├── versioning/# API Versioning & Documentation Runtime (Phase 15.6)
+│   │   ├── websocket/ # WebSocket Runtime (Phase 15.7)
+│   │   ├── protection/# API Protection & Rate Limiting Runtime (Phase 15.8)
+│   │   └── integration/# API Integration Gateway Runtime (Phase 15.9)
 │   ├── config/        # Certified Configuration Runtime Subsystem (Phase 14.3)
 │   └── di/            # Dependency Injection Subsystem (Phase 14.2)
 ├── core/              # Assistant boundary, intent schemas, planner, and dispatcher
@@ -20,31 +29,14 @@ backend/
 ├── events/            # Centralized event schema interfaces
 ├── brain/             # AI Brain Orchestration & Execution Architecture
 │   ├── assistant/     # Assistant Architecture Platform (Phase 13)
-│   │   ├── conversation/  # Conversation Runtime (Phase 13.2)
-│   │   ├── dialogue/      # Dialogue Management Runtime (Phase 13.3)
-│   │   ├── reasoning/     # Decision & Reasoning Coordinator (Phase 13.4)
-│   │   ├── memory/        # Assistant Memory Runtime (Phase 13.5)
-│   │   ├── response/      # Response Generation & Streaming (Phase 13.6)
-│   │   ├── voice/         # Voice Orchestration Runtime (Phase 13.7)
-│   │   ├── proactive/     # Proactive Assistant & Notifications (Phase 13.8)
-│   │   └── integration/   # Assistant Runtime Integration Layer (Phase 13.9)
 │   ├── ai/            # Provider-Independent AI Architecture & Runtime (Phase 10)
 │   ├── execution/     # Provider-Independent Execution Architecture Platform (Phase 12)
-│   │   ├── intent/       # Intent Resolution Engine (Phase 12.2)
-│   │   ├── orchestrator/ # Command Execution Orchestrator (Phase 12.3)
-│   │   ├── workflow/     # Workflow Execution Engine (Phase 12.4)
-│   │   ├── task/         # Task Management Runtime (Phase 12.5)
-│   │   ├── automation/   # Automation & Scheduling Runtime (Phase 12.6)
-│   │   ├── analytics/    # Execution Analytics & Observability (Phase 12.7)
-│   │   ├── recovery/     # Execution Recovery & State Management (Phase 12.8)
-│   │   └── integration/  # Execution Runtime Integration (Phase 12.9)
 │   ├── goal/          # Goal Interpreter
 │   ├── reasoning/     # Reasoning Engine
-│   ├── planning/      # Dynamic Task Planner & ReferenceResolver
-│   └── conversation_intelligence/ # Multi-Turn Dialog, Entity Linking, & Ambiguity Resolver
+│   └── planning/      # Dynamic Task Planner & ReferenceResolver
 ├── memory/            # Tiered Memory Subsystem
 ├── voice/             # Modular Voice Engine subsystems
-├── tests/             # Pytest suite verifying core, capabilities, brain, memory, voice, execution, assistant, and application (2,487 tests)
+├── tests/             # Pytest suite verifying core, capabilities, brain, memory, voice, execution, assistant, application, and api (2,905 tests across 162 modules)
 ├── main.py            # API service initialization endpoint
 └── requirements.txt   # Python dependency packages
 ```
@@ -104,38 +96,41 @@ backend/
 
 ### 2.9 Provider-Independent Execution Architecture & Runtime Platform (Phase 12)
 * **Brain Execution Engine (Phase 12.1)**: Core request analyzer, execution pipeline, decision engine router, and `ExecutionRuntime` singleton lifecycle manager.
-* **Intent Resolution Engine (Phase 12.2)**: Provider-independent intent recognizer (`backend/brain/execution/intent/`), filler word remover, entity extractor (paths, apps, dates, devices), scoring engine, and ambiguity resolver.
-* **Command Execution Orchestrator (Phase 12.3)**: Coordinates execution between Intent Resolution, Brain Engine, Planning Runtime, AI Engine, Security Runtime, and OS Integration Runtime (`backend/brain/execution/orchestrator/`).
-* **Workflow Execution Engine (Phase 12.4)**: Multi-step DAG workflow builder (`backend/brain/execution/workflow/`), cycle detection, topological step scheduler, and step execution.
-* **Task Management Runtime (Phase 12.5)**: Observable long-running task manager (`backend/brain/execution/task/`), priority queuing, state persistence, progress monitoring, and pause/resume/cancel controls.
-* **Automation & Scheduling Runtime (Phase 12.6)**: Provider-independent automation engine (`backend/brain/execution/automation/`), time/event/manual triggers, cron-style scheduling, and run history store.
-* **Execution Analytics & Observability Runtime (Phase 12.7)**: Metrics collection (`backend/brain/execution/analytics/`), distributed tracing with correlation IDs and nested span trees, and immutable audit logger.
-* **Execution Recovery & State Management Runtime (Phase 12.8)**: Execution checkpoint manager (`backend/brain/execution/recovery/`), state snapshot store, recovery strategy planner (`RETRY_STEP`, `RESUME_CHECKPOINT`, `ROLLBACK_STAGE`, `FAILOVER`), and step rollback manager.
-* **Execution Runtime Integration (Phase 12.9)**: Top-level integration provider (`backend/brain/execution/integration/`), capability registry, execution router, and multi-stage pipeline orchestrator.
-* **End-to-End Production Certification (Phase 12.10)**: Complete architectural dependency audit, end-to-end pipeline test suite (`test_execution_pipeline.py`), 100% test pass rate across **2,121 backend unit tests**, and Production Ready certification.
+* **Intent Resolution Engine (Phase 12.2)**: Provider-independent intent recognizer, filler word remover, entity extractor (paths, apps, dates, devices), scoring engine, and ambiguity resolver.
+* **Command Execution Orchestrator (Phase 12.3)**: Coordinates execution between Intent Resolution, Brain Engine, Planning Runtime, AI Engine, Security Runtime, and OS Integration Runtime.
+* **Workflow Execution Engine (Phase 12.4)**: Multi-step DAG workflow builder, cycle detection, topological step scheduler, and step execution.
+* **Task Management Runtime (Phase 12.5)**: Observable long-running task manager, priority queuing, state persistence, progress monitoring, and pause/resume/cancel controls.
+* **Automation & Scheduling Runtime (Phase 12.6)**: Provider-independent automation engine, time/event/manual triggers, cron-style scheduling, and run history store.
+* **Execution Analytics & Observability Runtime (Phase 12.7)**: Metrics collection, distributed tracing with correlation IDs and nested span trees, and immutable audit logger.
+* **Execution Recovery & State Management Runtime (Phase 12.8)**: Execution checkpoint manager, state snapshot store, recovery strategy planner, and step rollback manager.
+* **Execution Runtime Integration (Phase 12.9)**: Top-level integration provider, capability registry, execution router, and multi-stage pipeline orchestrator.
 
 ### 2.10 Provider-Independent Assistant Architecture Platform (Phase 13)
-* **Assistant Runtime Foundation (Phase 13.1)**: Base assistant controller, provider abstraction, capabilities specification, diagnostic health models, and `AssistantRuntime` singleton (`backend/brain/assistant/`).
-* **Conversation Runtime (Phase 13.2)**: Immutable conversation session models, message history tracking, context variable store, pagination, and `ConversationRuntime` (`backend/brain/assistant/conversation/`).
-* **Dialogue Management Runtime (Phase 13.3)**: State machine turn manager (`IDLE` → `PROCESSING` → `RESPONDING`), clarification/confirmation triggers, policy evaluator, and `DialogueRuntime` (`backend/brain/assistant/dialogue/`).
-* **Decision & Reasoning Coordinator (Phase 13.4)**: Provider-independent decision engine routing request candidates, policy score calculations, and `DecisionRuntime` (`backend/brain/assistant/reasoning/`).
-* **Assistant Memory & Context Integration Runtime (Phase 13.5)**: Context merging engine across AI memory, conversation history, dialogue state, and execution history with priority sorting and token budget enforcement (`backend/brain/assistant/memory/`).
-* **Assistant Response Generation & Streaming Runtime (Phase 13.6)**: Response assembly engine, Markdown/Plain Text/JSON formatters, chunk stream partitioner, and `ResponseRuntime` (`backend/brain/assistant/response/`).
-* **Voice Orchestration Runtime (Phase 13.7)**: Top-level voice session manager, wake-word routing, speech pipeline coordinator, and `VoiceRuntime` (`backend/brain/assistant/voice/`).
-* **Proactive Assistant & Notification Runtime (Phase 13.8)**: Proactive suggestion engine, recommendation ranking, duplicate suppression, cooldown period enforcement, and assistant-level notification manager (`backend/brain/assistant/proactive/`).
-* **Assistant Runtime Integration Layer (Phase 13.9)**: Single integration gateway (`backend/brain/assistant/integration/`), runtime registry, 8-stage pipeline coordinator (`Conversation` → `Dialogue` → `Decision` → `Memory` → `Execution` → `Response` → `Voice` → `Proactive`), and 12-subsystem health aggregator.
-* **End-to-End Production Certification (Phase 13.10)**: End-to-end integration test suite (`test_assistant_end_to_end.py`), zero circular imports audit, multi-threaded safety certification, and 100% test pass rate across **2,172 backend unit tests**.
+* **Assistant Runtime Foundation (Phase 13.1)**: Base assistant controller, provider abstraction, capabilities specification, diagnostic health models, and `AssistantRuntime` singleton.
+* **Conversation Runtime (Phase 13.2)**: Immutable conversation session models, message history tracking, context variable store, pagination, and `ConversationRuntime`.
+* **Dialogue Management Runtime (Phase 13.3)**: State machine turn manager (`IDLE` → `PROCESSING` → `RESPONDING`), clarification/confirmation triggers, policy evaluator, and `DialogueRuntime`.
+* **Decision & Reasoning Coordinator (Phase 13.4)**: Provider-independent decision engine routing request candidates, policy score calculations, and `DecisionRuntime`.
+* **Assistant Memory & Context Integration Runtime (Phase 13.5)**: Context merging engine across AI memory, conversation history, dialogue state, and execution history with priority sorting and token budget enforcement.
+* **Assistant Response Generation & Streaming Runtime (Phase 13.6)**: Response assembly engine, Markdown/Plain Text/JSON formatters, chunk stream partitioner, and `ResponseRuntime`.
+* **Voice Orchestration Runtime (Phase 13.7)**: Top-level voice session manager, wake-word routing, speech pipeline coordinator, and `VoiceRuntime`.
+* **Proactive Assistant & Notification Runtime (Phase 13.8)**: Proactive suggestion engine, recommendation ranking, duplicate suppression, cooldown period enforcement, and assistant-level notification manager.
+* **Assistant Runtime Integration Layer (Phase 13.9)**: Single integration gateway, runtime registry, 8-stage pipeline coordinator, and 12-subsystem health aggregator.
 
 ### 2.11 Application Container & Infrastructure Subsystems (Phase 14)
-* **Production Application Runtime (Phase 14.1)**: `RuntimeRegistry`, `BootstrapManager`, `StartupValidator`, `InitializationManager`, `ApplicationProvider`, `ApplicationRuntime`, and `Runtime` (`backend/application/`).
-* **Dependency Injection Subsystem (Phase 14.2)**: `ServiceCollection`, `ServiceDescriptor`, `ServiceLifetime` (`SINGLETON`, `TRANSIENT`, `SCOPED`), `ServiceRegistry`, `DependencyContainer`, `ContainerScope`, and `DependencyGraphAnalyzer` with cycle detection (`backend/application/di/`).
-* **Certified Configuration Runtime Subsystem (Phase 14.3)**:
-  - **Configuration Runtime Foundation (14.3.1)**: Provider-independent state machine, capabilities declaration, and ABC interfaces (`backend/application/config/`).
-  - **Configuration Source Management (14.3.2)**: Multi-source priority resolver (`Memory (500) > Environment (400) > DotEnv (300) > Defaults (0)`).
-  - **Configuration Resolution & Validation (14.3.3)**: `ConfigurationSchemaManager`, `ConfigurationResolver` (automatic type casting), and `ConfigurationValidator` (constraint verification).
-  - **Configuration Profiles & Feature Flags (14.3.4)**: Profile inheritance (`development`, `testing`, `production`), active profile switching, feature flags, dependency checks, and deterministic MD5 rollout percentages.
-  - **Secrets & Sensitive Configuration (14.3.5)**: In-memory thread-safe `SecretStore`, `SecretManager`, access policy enforcement (`allow_read`, `allow_write`, `allow_export`), value redaction algorithms (`redact()`), and audit access logging.
-  - **End-to-End Production Certification (14.3.6)**: Aggregate diagnostics, health checks, dependency audits, certified readiness, and end-to-end integration suite (`test_configuration_end_to_end.py`).
+* **Production Application Runtime (Phase 14.1)**: `RuntimeRegistry`, `BootstrapManager`, `StartupValidator`, `InitializationManager`, `ApplicationProvider`, `ApplicationRuntime`, and `Runtime`.
+* **Dependency Injection Subsystem (Phase 14.2)**: `ServiceCollection`, `ServiceDescriptor`, `ServiceLifetime` (`SINGLETON`, `TRANSIENT`, `SCOPED`), `ServiceRegistry`, `DependencyContainer`, `ContainerScope`, and `DependencyGraphAnalyzer` with cycle detection.
+* **Certified Configuration Runtime Subsystem (Phase 14.3)**: Multi-source priority resolver (`Memory > Environment > DotEnv > Defaults`), automatic type converter, constraint validator, profiles engine, feature flags, secret store with redaction, and end-to-end certification.
+
+### 2.12 Provider-Independent API Runtime Architecture Platform (Phase 15)
+* **API Runtime Foundation (Phase 15.1)**: Provider-independent state machine, capabilities declaration, `ApiProvider`, `ApiRuntime`, and lazy singletons.
+* **Request Routing Runtime (Phase 15.2)**: `RouteRegistry`, prefix tree / regex `RouteResolver`, and `RequestDispatcher`.
+* **Middleware Runtime (Phase 15.3)**: `MiddlewareRegistry` and `PipelineManager` supporting pre/post/around execution phases.
+* **Authentication & Authorization Runtime (Phase 15.4)**: `IdentityManager`, `SessionManager`, and RBAC `AuthorizationEngine`.
+* **Validation & Serialization Runtime (Phase 15.5)**: `SchemaRegistry`, `ValidationEngine`, and `SerializationManager`.
+* **API Versioning & Documentation Runtime (Phase 15.6)**: `VersionRegistry`, SemVer `CompatibilityResolver`, and `DocumentationManager`.
+* **WebSocket Runtime (Phase 15.7)**: `SessionManager`, `ChannelManager`, and `MessageRouter`.
+* **API Protection & Rate Limiting Runtime (Phase 15.8)**: `RateLimiter` (sliding window & token bucket algorithms), `PolicyEngine`, and `ViolationTracker`.
+* **API Integration Gateway Runtime (Phase 15.9)**: `ApiGateway` orchestrating requests through `ROUTING` → `MIDDLEWARE` → `AUTHENTICATION` → `VALIDATION` → `VERSIONING` → `PROTECTION` → `WEBSOCKET` → `COMPLETE` pipeline stages.
 
 ---
 
@@ -153,10 +148,6 @@ backend/
    ```bash
    pip install -r requirements.txt
    ```
-4. For Windows users, run the automated audio configuration:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File ..\scripts\setup_audio_windows.ps1
-   ```
 
 ### Running Server
 Start the development ASGI server:
@@ -170,4 +161,4 @@ Execute the entire Pytest suite:
 ```bash
 pytest backend/tests
 ```
-Currently, the backend contains **2,487 unit and integration tests across 135+ test modules** with a **100% pass rate**, verifying core flows, file operations, state transitions, speech, memory retrieval, brain orchestration, memory ranking, context windows, reference resolution, workspace intelligence, autonomous routines, proactive assistant, conversational intelligence, long-running tasks, background job scheduler, recurring triggers, persistence hooks, provider-independent AI architecture, prompt intelligence, tool execution, memory-aware AI, multi-step planning, runtime resilience, intent resolution, command orchestration, workflow engines, task management, automation scheduling, execution analytics, recovery state management, execution integration, assistant runtime foundation, conversation runtime, dialogue management, decision reasoning coordinator, assistant memory context, response generation streaming, voice orchestration, proactive notifications, assistant integration gateway, application runtime platform, dependency injection container, priority configuration source management, configuration profiles, feature flags, secret management, and end-to-end configuration runtime certification.
+Currently, the backend contains **2,905 unit and integration tests across 162 test modules** with a **100% pass rate**, verifying all core, execution, assistant, application, and API subsystems.

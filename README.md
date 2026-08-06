@@ -10,10 +10,11 @@
 
 <p align="center">
   <a href="https://github.com/Vish-0806/Auralis-voice-file-manager"><img src="https://img.shields.io/badge/status-active-brightgreen?style=flat-square" alt="Status"></a>
-  <a href="https://github.com/Vish-0806/Auralis-voice-file-manager/releases"><img src="https://img.shields.io/badge/version-1.9.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/Vish-0806/Auralis-voice-file-manager/releases"><img src="https://img.shields.io/badge/version-2.0.0-blue?style=flat-square" alt="Version"></a>
   <a href="file:///d:/Auralis-voice-file-manager/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/python-3.13-blue?style=flat-square" alt="Python"></a>
   <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-0.136.1-red?style=flat-square" alt="FastAPI"></a>
+  <a href="https://typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-5.5-blue?style=flat-square" alt="TypeScript"></a>
   <a href="#architecture"><img src="https://img.shields.io/badge/AI-brain-purple?style=flat-square" alt="AI"></a>
   <a href="#repository-certification"><img src="https://img.shields.io/badge/Health-100.0%2F100-brightgreen?style=flat-square" alt="Health"></a>
 </p>
@@ -40,6 +41,7 @@ Auralis offers a broad set of capabilities designed for productivity and ease of
 | **Assistant Architecture** | 8-Stage Integration Gateway | Provider-independent Assistant Runtime Platform coordinating Conversation, Dialogue, Decision, Memory, Response, Voice, Proactive, and System runtimes. |
 | **Application Infrastructure** | DI & Config Platform (Phase 14) | Enterprise-grade Application Runtime, thread-safe Dependency Injection Container, and Certified Configuration Subsystem. |
 | **API Runtime Platform** | 8-Stage Pipeline Gateway (Phase 15) | Certified Provider-Independent API Runtime Platform orchestrating Routing, Middleware, Authentication, Validation, Versioning, Protection, WebSocket, and Gateway Coordination. |
+| **Frontend Runtime Platform** | 5 Subsystem Architecture (Phase 16) | Provider-Independent Frontend Runtime orchestrating Dependency Injection, Application Lifecycle & Plugins, Certified Configuration, Event Runtime, and State Management. |
 | **AI Conversation** | Contextual Intent Parsing | Recognizes natural language, resolving fuzzy commands, relative dates, and implied locations. |
 | **Dialogue Management** | State Machine & Turn Tracking | Manages dialogue sessions, turn transitions (`IDLE` → `PROCESSING` → `RESPONDING`), clarification prompts, and user confirmation loops. |
 | **Decision & Reasoning** | Deterministic Candidate Routing | Evaluates request candidates, confidence thresholds, and priority scoring without LLM overhead. |
@@ -110,40 +112,26 @@ Auralis Version 1.7.0 implements the complete **Provider-Independent Assistant A
 
 ## Application Container & Infrastructure Platform (v1.8.0 / Phase 14)
 
-Auralis Version 1.8.0 implements the complete **Application Container & Infrastructure Platform** (`backend/application/`), providing enterprise-grade application lifecycle execution, thread-safe dependency injection, and certified configuration management across 3 core subsystems:
-
-1. **Production Application Runtime (Phase 14.1)**: `RuntimeRegistry`, `BootstrapManager`, `StartupValidator`, `InitializationManager`, `ApplicationProvider`, `ApplicationRuntime`, and `Runtime` (`backend/application/`).
-2. **Dependency Injection Subsystem (Phase 14.2)**: Service registration engine (`SINGLETON`, `TRANSIENT`, `SCOPED`), resolution engine, scoped lifetime container manager, and dependency graph analyzer with cycle detection (`backend/application/di/`).
-3. **Certified Configuration Runtime Subsystem (Phase 14.3)**: Multi-source priority resolver (`Memory > Environment > DotEnv > Defaults`), type converter, property constraint validator, profiles engine, feature flags, secret store with redaction, and end-to-end certification.
+Auralis Version 1.8.0 implements the complete **Application Container & Infrastructure Platform** (`backend/application/`), providing enterprise-grade application lifecycle execution, thread-safe dependency injection, and certified configuration management across 3 core subsystems.
 
 ---
 
 ## Provider-Independent API Runtime Architecture Platform (v1.9.0 / Phase 15)
 
-Auralis Version 1.9.0 implements the complete **Provider-Independent API Runtime Architecture Platform** (`backend/application/api/`), providing a framework-decoupled, thread-safe, high-performance API pipeline gateway across 9 sub-runtimes:
-
-1. **API Runtime Foundation (Phase 15.1)**: Provider-independent state machine, capabilities declaration, `ApiProvider`, `ApiRuntime`, and lazy singletons (`backend/application/api/`).
-2. **Request Routing Runtime (Phase 15.2)**: `RouteRegistry`, prefix tree / regex `RouteResolver`, and `RequestDispatcher` (`backend/application/api/routing/`).
-3. **Middleware Runtime (Phase 15.3)**: `MiddlewareRegistry` and `PipelineManager` supporting pre/post/around execution phases (`backend/application/api/middleware/`).
-4. **Authentication & Authorization Runtime (Phase 15.4)**: `IdentityManager`, `SessionManager`, and RBAC `AuthorizationEngine` (`backend/application/api/auth/`).
-5. **Validation & Serialization Runtime (Phase 15.5)**: `SchemaRegistry`, `ValidationEngine`, and `SerializationManager` (`backend/application/api/validation/`).
-6. **API Versioning & Documentation Runtime (Phase 15.6)**: `VersionRegistry`, SemVer `CompatibilityResolver`, and `DocumentationManager` (`backend/application/api/versioning/`).
-7. **WebSocket Runtime (Phase 15.7)**: `SessionManager`, `ChannelManager`, and `MessageRouter` (`backend/application/api/websocket/`).
-8. **API Protection & Rate Limiting Runtime (Phase 15.8)**: `RateLimiter` (sliding window & token bucket algorithms), `PolicyEngine`, and `ViolationTracker` (`backend/application/api/protection/`).
-9. **API Integration Gateway Runtime (Phase 15.9)**: `ApiGateway` orchestrating requests through `ROUTING` → `MIDDLEWARE` → `AUTHENTICATION` → `VALIDATION` → `VERSIONING` → `PROTECTION` → `WEBSOCKET` → `COMPLETE` pipeline stages (`backend/application/api/integration/`).
-10. **Production Certification & Verification (Phase 15.10)**: 418 unit & certification tests passed, 100% thread-safe `RLock` protection, $7.82\text{ ms}$ 9-runtime startup latency, and zero framework coupling.
+Auralis Version 1.9.0 implements the complete **Provider-Independent API Runtime Architecture Platform** (`backend/application/api/`), providing a framework-decoupled, thread-safe, high-performance API pipeline gateway across 9 sub-runtimes.
 
 ---
 
-## Provider-Independent AI Architecture & Runtime Subsystem (Phase 10)
+## Provider-Independent Frontend Architecture & Runtime Platform (v2.0.0 / Phase 16)
 
-Auralis implements a complete **Provider-Independent AI Architecture & Runtime Subsystem** (`backend/brain/ai/`), unifying LLM providers, prompt intelligence, tool execution, memory retrieval, multi-step planning, and runtime resilience.
+Auralis Version 2.0.0 implements the complete **Provider-Independent Frontend Architecture & Runtime Platform** (`frontend/src/runtime/`), establishing an enterprise-grade, framework-decoupled runtime layer across 5 sub-runtimes:
 
----
-
-## Provider-Independent Execution Architecture & Runtime Platform (Phase 12)
-
-Auralis implements a complete **Provider-Independent Execution Architecture & Runtime Platform** (`backend/brain/execution/`), orchestrating request analysis, intent resolution, command execution, multi-step workflow graphs, long-running background tasks, rule-based automations, distributed tracing, recovery checkpoints, and unified execution integration.
+1. **Frontend Dependency Injection Runtime (Phase 16.1)**: Pure TypeScript IoC Container supporting `SINGLETON`, `TRANSIENT`, `SCOPED` lifetimes, service descriptors, resolution engine, and graph cycle detection (`frontend/src/runtime/di/`).
+2. **Frontend Application Lifecycle & Plugin Runtime (Phase 16.2)**: `RuntimeRegistry`, `BootstrapManager`, `StartupValidator`, `InitializationManager`, plugin registration engine, and `ApplicationRuntime` (`frontend/src/runtime/app/`).
+3. **Frontend Certified Configuration Runtime (Phase 16.3)**: Multi-source priority resolver (`Memory > Environment > DotEnv > Defaults`), type converter, property validator, profiles engine, feature flags, secret store with redaction algorithms, and production certifier (`frontend/src/runtime/config/`).
+4. **Frontend Event Runtime Architecture Platform (Phase 16.4)**: Event Bus, Event Registry, Subscriber Registry, Topic Wildcard Resolver (`*`, `**` / `#`), Priority Dispatcher (`CRITICAL > HIGH > NORMAL > LOW`), Event Queue with `DROP_OLDEST` strategy, Retry Manager, Replay Manager, Dead-Letter Generator, and Production Certifier (`frontend/src/runtime/events/`).
+5. **Frontend State Management Runtime Platform (Phase 16.5)**: Multiple named State Containers with deep immutability (`Object.freeze()`), Action Dispatcher, Pure Reducer Engine with exception isolation, Middleware Pipeline (`BEFORE`, `AFTER`, `ERROR`), Memoized Selector Engine, Undo/Redo History with time travel, Abstract Persistence, State Synchronizer, and Production Certifier (`frontend/src/runtime/state/`).
+6. **End-to-End Production Certification & Verification**: 456 Vitest unit tests passed across 17 test suites, 100% pure TypeScript (zero DOM/React coupling in runtime engines), $4.19\text{ s}$ production build execution, and Grade A certification.
 
 ---
 
@@ -151,34 +139,36 @@ Auralis implements a complete **Provider-Independent Execution Architecture & Ru
 
 ```mermaid
 graph TD
-    User([User]) -->|Voice / Text Command| Gateway[Assistant Integration Gateway]
+    User([User]) -->|Spoken / Typed Command| FrontendRuntime[Frontend Runtime Platform]
     
-    subgraph Application Infrastructure Platform (Phase 14)
-        AppRuntime[Application Runtime & Container] --> AppConfig[Configuration Runtime Platform]
-        AppRuntime --> AppDI[Dependency Injection Container]
+    subgraph Frontend Runtime Architecture Platform (Phase 16)
+        FrontendRuntime --> FrontDI[1. Dependency Injection Container]
+        FrontendRuntime --> FrontApp[2. Application & Plugin Runtime]
+        FrontendRuntime --> FrontConfig[3. Configuration Runtime Subsystem]
+        FrontendRuntime --> FrontEvents[4. Event Runtime Platform]
+        FrontendRuntime --> FrontState[5. State Management Runtime Platform]
     end
 
-    subgraph Provider-Independent Assistant Architecture Platform (Phase 13)
-        Gateway --> ConvRuntime[1. Conversation Runtime]
-        Gateway --> DialRuntime[2. Dialogue Runtime]
-        Gateway --> DecRuntime[3. Decision Runtime]
-        Gateway --> MemRuntime[4. Assistant Memory Runtime]
-        Gateway --> ExecRuntimeRef[5. Execution Runtime]
-        Gateway --> RespRuntime[6. Response Runtime]
-        Gateway --> VoiceRuntime[7. Voice Orchestration Runtime]
-        Gateway --> ProRuntime[8. Proactive Notification Runtime]
+    FrontEvents -->|API Request| Gateway[API Integration Gateway (Phase 15)]
+
+    subgraph API & Backend Infrastructure Platform (Phases 14 & 15)
+        Gateway --> ApiRouting[Request Routing & Auth Runtime]
+        Gateway --> AppRuntime[Application Runtime & DI Container]
+        Gateway --> AppConfig[Configuration Subsystem]
     end
 
-    subgraph Core Brain & Execution Engines
-        DecRuntime --> GoalInterpreter[Goal Interpreter]
-        GoalInterpreter --> TaskPlanner[Dynamic Task Planner]
-        TaskPlanner --> ExecutionIntegration[Execution Runtime Integration]
+    subgraph Assistant Architecture Platform (Phase 13)
+        ApiRouting --> ConvRuntime[Conversation & Dialogue Runtime]
+        ApiRouting --> DecRuntime[Decision & Reasoning Coordinator]
+        ApiRouting --> MemRuntime[Assistant Memory Runtime]
+        ApiRouting --> ExecRuntimeRef[Execution Runtime]
+        ApiRouting --> VoiceRuntime[Voice Orchestration Runtime]
     end
 
     subgraph Capabilities & OS Abstraction
-        ExecutionIntegration --> FileIntel[File Intelligence]
-        ExecutionIntegration --> DesktopControl[Desktop Control]
-        ExecutionIntegration --> DevAssistant[Developer Assistant]
+        ExecRuntimeRef --> FileIntel[File Intelligence]
+        ExecRuntimeRef --> DesktopControl[Desktop Control]
+        ExecRuntimeRef --> DevAssistant[Developer Assistant]
         FileIntel --> OS[Operating System]
         DesktopControl --> OS
         DevAssistant --> OS
@@ -194,8 +184,10 @@ The project utilizes modern libraries and frameworks across both frontend and ba
 ### Frontend
 | Technology | Version | Purpose |
 | :--- | :--- | :--- |
-| **Vite** | Latest | Next-generation build tool and dev server. |
+| **Vite** | 5.4.21 | Next-generation build tool and dev server. |
 | **React** | 18.x | Component-based UI library. |
+| **TypeScript** | 5.5 | Strongly-typed JavaScript superset for pure runtime architecture. |
+| **Vitest** | 4.1.10 | High-performance unit testing framework for runtime certification. |
 | **Vanilla CSS** | Modern | Sleek glassmorphic theme, layout structure, and animation system. |
 | **Lucide Icons** | Latest | Premium vector icons for application status and file types. |
 
@@ -222,41 +214,31 @@ Auralis/
 │   ├── api/                   # Router declarations and API endpoints
 │   ├── application/           # Application Container & Infrastructure (Phase 14 & 15)
 │   │   ├── api/               # API Runtime Architecture Platform (Phase 15)
-│   │   │   ├── routing/       # Request Routing Runtime (Phase 15.2)
-│   │   │   ├── middleware/    # Middleware Runtime (Phase 15.3)
-│   │   │   ├── auth/          # Authentication & Authorization Runtime (Phase 15.4)
-│   │   │   ├── validation/    # Validation & Serialization Runtime (Phase 15.5)
-│   │   │   ├── versioning/    # API Versioning & Documentation Runtime (Phase 15.6)
-│   │   │   ├── websocket/     # WebSocket Runtime (Phase 15.7)
-│   │   │   ├── protection/    # API Protection & Rate Limiting Runtime (Phase 15.8)
-│   │   │   └── integration/   # API Integration Gateway Runtime (Phase 15.9)
 │   │   ├── config/            # Certified Configuration Runtime Subsystem (Phase 14.3)
 │   │   └── di/                # Dependency Injection Subsystem (Phase 14.2)
 │   ├── brain/                 # AI Brain Orchestration
 │   │   ├── assistant/         # Assistant Architecture Platform (Phase 13)
-│   │   │   ├── conversation/  # Conversation Runtime (Phase 13.2)
-│   │   │   ├── dialogue/      # Dialogue Management Runtime (Phase 13.3)
-│   │   │   ├── reasoning/     # Decision & Reasoning Coordinator (Phase 13.4)
-│   │   │   ├── memory/        # Assistant Memory Runtime (Phase 13.5)
-│   │   │   ├── response/      # Response Generation & Streaming (Phase 13.6)
-│   │   │   ├── voice/         # Voice Orchestration Runtime (Phase 13.7)
-│   │   │   ├── proactive/     # Proactive Assistant & Notifications (Phase 13.8)
-│   │   │   └── integration/   # Assistant Runtime Integration Layer (Phase 13.9)
 │   │   ├── ai/                # AI Architecture & Runtime Platform (Phase 10)
 │   │   ├── execution/         # Execution Architecture Platform (Phase 12)
 │   │   ├── goal/              # Goal Interpreter
 │   │   ├── reasoning/         # Reasoning Engine
-│   │   ├── planning/          # Dynamic Task Planner & ReferenceResolver
-│   │   └── conversation_intelligence/ # Multi-Turn Dialog & Entity Linking
+│   │   └── planning/          # Dynamic Task Planner & ReferenceResolver
 │   ├── capabilities/          # OS capabilities (files, desktop, automation, developer)
 │   ├── core/                  # Assistant boundary, intent schemas, planner, and dispatcher
 │   ├── memory/                # Tiered Memory System
 │   ├── voice/                 # Modular Voice Engine subsystems
-│   ├── tests/                 # 2,487 unit & integration tests across 135+ test modules
-│   ├── main.py                # Backend entry point
-│   └── requirements.txt       # Python package dependencies
-├── frontend/                  # Vite + React Client App
-└── docs/                      # Technical documentation and guides
+│   └── tests/                 # 2,905 unit & integration tests across 162 test modules
+├── frontend/                  # Vite + React + Pure TS Runtime Client App
+│   ├── src/
+│   │   └── runtime/           # Provider-Independent Frontend Runtime Platform (Phase 16)
+│   │       ├── di/            # Dependency Injection Runtime (Phase 16.1)
+│   │       ├── app/           # Application Lifecycle & Plugin Runtime (Phase 16.2)
+│   │       ├── config/        # Certified Configuration Runtime (Phase 16.3)
+│   │       ├── events/        # Event Runtime Architecture Platform (Phase 16.4)
+│   │       └── state/         # State Management Runtime Platform (Phase 16.5)
+│   └── tests/
+│       └── runtime/           # 456 Vitest unit tests across 17 test suites
+└── docs/                      # Technical documentation and architecture specifications
 ```
 
 ---
@@ -282,8 +264,9 @@ Track the development stages of Auralis:
 * [x] **Provider-Independent Assistant Architecture Platform (Phases 13.1 to 13.10):** Assistant Runtime Foundation, Conversation Runtime, Dialogue Management, Decision Coordinator, Assistant Memory Runtime, Response Streaming, Voice Orchestration, Proactive Notifications, Integration Gateway, and End-to-End Production Certification (2,172 tests passed).
 * [x] **Application Container & Infrastructure Platform (Phases 14.1 to 14.3.6):** Application Runtime Platform, Dependency Injection Subsystem, Priority Configuration Source Management, Resolution & Validation Engine, Configuration Profiles & Feature Flags, Secrets & Sensitive Configuration Management, and End-to-End Production Certification (2,487 tests passed).
 * [x] **Provider-Independent API Runtime Architecture Platform (Phases 15.1 to 15.10):** API Runtime Foundation, Request Routing Runtime, Middleware Runtime, Authentication Runtime, Validation Runtime, API Versioning Runtime, WebSocket Runtime, API Protection & Rate Limiting Runtime, API Integration Gateway Runtime, and End-to-End Production Certification (2,905 tests passed).
+* [x] **Provider-Independent Frontend Architecture & Runtime Platform (Phases 16.1 to 16.5):** Frontend Dependency Injection Container, Application Lifecycle & Plugin Runtime, Certified Configuration Subsystem, Provider-Independent Event Runtime Architecture, State Management Runtime Platform, and End-to-End Production Certification (3,361 total tests passed).
 * [ ] **Future Objectives:**
-  * [ ] Operating System Integration (Phase 11).
+  * [ ] Operating System Desktop Packaging (Phase 11 / Electron & Tauri integration).
   * [ ] Document intelligence parser using local PyMuPDF extraction.
   * [ ] Plugin Marketplace for community extensions.
   * [ ] Drag-and-drop workflow visual builder.
@@ -293,19 +276,17 @@ Track the development stages of Auralis:
 ## Installation & Testing
 
 ```bash
-# Setup backend virtual environment
+# Backend Setup & Test Suite (2,905 Pytest tests)
 python -m venv venv
 .\venv\Scripts\activate
-
-# Install dependencies
 pip install -r backend/requirements.txt
-
-# Run complete test suite (2,487 tests across 135+ test modules)
 pytest backend/tests
 
-# Launch backend server
-cd backend
-uvicorn main:app --reload
+# Frontend Setup, Test Suite & Build (456 Vitest tests)
+cd frontend
+npm install
+npm test
+npm run build
 ```
 
 ---
