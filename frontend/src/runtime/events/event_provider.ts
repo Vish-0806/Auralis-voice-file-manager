@@ -1,13 +1,14 @@
 /**
- * Event Provider Implementation (Phase 16.4.4).
+ * Event Provider Implementation (Phase 16.4.5).
  *
  * Implements IEventProvider owning runtime state transitions,
  * telemetry statistics, health evaluation, context metadata, capabilities reporting,
  * event registration management, event publishing, subscriber management,
- * event routing, priority dispatch, and diagnostics aggregation.
+ * event routing, priority dispatch, event queueing, retries, replay, and reliability diagnostics aggregation.
  */
 
 import {
+  Acknowledgement,
   createEventCapabilities,
   createEventConfiguration,
   createEventContext,
@@ -15,6 +16,9 @@ import {
   createEventHealth,
   createEventState,
   createEventStatistics,
+  createReliabilityStatistics,
+  DeadLetterRecord,
+  DeliveryStatus,
   DispatchHealth,
   DispatchStatistics,
   EventCapabilities,
@@ -31,6 +35,8 @@ import {
   EventSubscription,
   FrontendEvent,
   PublishedEvent,
+  QueuedEvent,
+  ReplayRecord,
   RoutingDecision,
   RoutingRule,
   SubscriberRegistration,
@@ -42,6 +48,9 @@ import { SubscriberRegistry } from './subscriber_registry';
 import { SubscriptionManager } from './subscription_manager';
 import { EventRouter } from './event_router';
 import { DispatchManager } from './dispatch_manager';
+import { EventQueue } from './event_queue';
+import { RetryManager } from './retry_manager';
+import { ReplayManager } from './replay_manager';
 
 export class EventProvider implements IEventProvider {
   private _runtimeState: EventRuntimeState = EventRuntimeState.UNINITIALIZED;
@@ -54,6 +63,9 @@ export class EventProvider implements IEventProvider {
   private readonly _subscriptionManager: SubscriptionManager;
   private readonly _router: EventRouter;
   private readonly _dispatchManager: DispatchManager;
+  private readonly _queue: EventQueue;
+  private readonly _retryManager: RetryManager;
+  private readonly _replayManager: ReplayManager;
   private readonly _bus: EventBus;
 
   private _startedAt: string | null = null;
@@ -71,6 +83,9 @@ export class EventProvider implements IEventProvider {
     subscriptionManager?: SubscriptionManager,
     router?: EventRouter,
     dispatchManager?: DispatchManager,
+    queue?: EventQueue,
+    retryManager?: RetryManager,
+    replayManager?: ReplayManager,
     bus?: EventBus,
   ) {
     this._config = config ?? createEventConfiguration();
@@ -83,6 +98,9 @@ export class EventProvider implements IEventProvider {
     this._router = router ?? new EventRouter();
     this._dispatchManager =
       dispatchManager ?? new DispatchManager(this._subscriptionManager);
+    this._queue = queue ?? new EventQueue();
+    this._retryManager = retryManager ?? new RetryManager();
+    this._replayManager = replayManager ?? new ReplayManager();
 
     this._bus =
       bus ??
@@ -92,6 +110,9 @@ export class EventProvider implements IEventProvider {
         this._subscriptionManager,
         this._router,
         this._dispatchManager,
+        this._queue,
+        this._retryManager,
+        this._replayManager,
         this._config.maxQueueSize ?? 1000,
       );
   }
@@ -173,6 +194,16 @@ export class EventProvider implements IEventProvider {
     const dspStats = this._dispatchManager.statistics();
     const dspHealth = this._dispatchManager.health();
     const routerTelem = this._router.telemetry();
+    const qStats = this._queue.statistics();
+    const retStats = this._retryManager.statistics();
+    const rplStats = this._replayManager.statistics();
+
+    const reliabilityStats = createReliabilityStatistics({
+      queueStats: qStats,
+      retryStats: retStats,
+      replayStats: rplStats,
+      acknowledgementCount: busStats.publishCount,
+    });
 
     return createEventDiagnostics({
       health: this.health(),
@@ -192,6 +223,11 @@ export class EventProvider implements IEventProvider {
       dispatchHealth: dspHealth,
       deadLetterCount: dspStats.deadLetterCount,
       routingEvaluations: routerTelem.evaluations,
+      queueDepth: qStats.currentDepth,
+      retryStatistics: retStats,
+      replayStatistics: rplStats,
+      reliabilityStatistics: reliabilityStats,
+      deadLetterQueueSize: dspStats.deadLetterCount,
       timestamp: new Date().toISOString(),
     });
   }
@@ -294,5 +330,41 @@ export class EventProvider implements IEventProvider {
 
   public dispatchHealth(): DispatchHealth {
     return this._dispatchManager.health();
+  }
+
+  public enqueue<T = unknown>(event: FrontendEvent<T>): QueuedEvent<T> {
+    return this._bus.enqueue(event);
+  }
+
+  public dequeue<T = unknown>(): QueuedEvent<T> | undefined {
+    return this._bus.dequeue<T>();
+  }
+
+  public peek<T = unknown>(): QueuedEvent<T> | undefined {
+    return this._bus.peek<T>();
+  }
+
+  public queueSize(): number {
+    return this._bus.queueSize();
+  }
+
+  public retry(queueId: string): boolean {
+    return this._bus.retry(queueId);
+  }
+
+  public replay(filter?: (evt: PublishedEvent) => boolean): ReadonlyArray<ReplayRecord> {
+    return this._bus.replay(filter);
+  }
+
+  public acknowledge(queueId: string, status = DeliveryStatus.DELIVERED): Acknowledgement {
+    return this._bus.acknowledge(queueId, status);
+  }
+
+  public deadLetters(): ReadonlyArray<DeadLetterRecord> {
+    return this._bus.deadLetters();
+  }
+
+  public clearDeadLetters(): void {
+    this._bus.clearDeadLetters();
   }
 }

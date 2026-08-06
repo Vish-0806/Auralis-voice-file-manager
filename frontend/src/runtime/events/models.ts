@@ -1,11 +1,12 @@
 /**
- * Event & Messaging Runtime Domain Models (Phase 16.4.4).
+ * Event & Messaging Runtime Domain Models (Phase 16.4.5).
  *
  * Provides immutable state models, event objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, diagnostics
  * telemetry, priority enums, configuration objects, event registration definitions,
  * published event records, subscriber registrations, execution results, subscriber health,
- * routing rules, routing decisions, dispatch policies, dispatch records, and dead-letter telemetry for the Frontend Event Runtime.
+ * routing rules, routing decisions, dispatch policies, dispatch records, dead-letter telemetry,
+ * queued events, queue statistics, retry policies, retry records, replay records, acknowledgements, and reliability health for the Frontend Event Runtime.
  */
 
 export enum EventRuntimeState {
@@ -21,6 +22,14 @@ export enum EventPriority {
   NORMAL = 100,
   HIGH = 200,
   CRITICAL = 300,
+}
+
+export enum DeliveryStatus {
+  PENDING = 'PENDING',
+  DELIVERED = 'DELIVERED',
+  FAILED = 'FAILED',
+  RETRIED = 'RETRIED',
+  DEAD_LETTERED = 'DEAD_LETTERED',
 }
 
 export interface EventState {
@@ -178,6 +187,93 @@ export interface DeadLetterRecord {
   readonly failedAt: string;
 }
 
+export interface QueuedEvent<T = unknown> {
+  readonly queueId: string;
+  readonly event: FrontendEvent<T>;
+  readonly priority: EventPriority;
+  readonly enqueuedAt: string;
+  readonly attemptCount: number;
+  readonly status: DeliveryStatus;
+}
+
+export interface QueueStatistics {
+  readonly enqueuedCount: number;
+  readonly dequeuedCount: number;
+  readonly currentDepth: number;
+  readonly overflowCount: number;
+  readonly maxCapacity: number;
+}
+
+export interface QueueHealth {
+  readonly healthy: boolean;
+  readonly depth: number;
+  readonly capacity: number;
+  readonly isOverflowed: boolean;
+}
+
+export interface QueueConfiguration {
+  readonly maxCapacity: number;
+  readonly dropStrategy: 'DROP_OLDEST' | 'REJECT_NEW';
+}
+
+export interface RetryPolicy {
+  readonly policyId: string;
+  readonly maxRetries: number;
+  readonly initialDelayMs: number;
+  readonly backoffMultiplier: number;
+}
+
+export interface RetryRecord {
+  readonly retryId: string;
+  readonly queueId: string;
+  readonly eventId: string;
+  readonly attempt: number;
+  readonly success: boolean;
+  readonly error?: string;
+  readonly retriedAt: string;
+}
+
+export interface RetryStatistics {
+  readonly totalRetries: number;
+  readonly successfulRetries: number;
+  readonly failedRetries: number;
+  readonly exhaustedRetries: number;
+}
+
+export interface ReplayRecord {
+  readonly replayId: string;
+  readonly eventId: string;
+  readonly replayedAt: string;
+  readonly success: boolean;
+}
+
+export interface ReplayStatistics {
+  readonly totalReplays: number;
+  readonly successfulReplays: number;
+  readonly failedReplays: number;
+}
+
+export interface Acknowledgement {
+  readonly ackId: string;
+  readonly queueId: string;
+  readonly eventId: string;
+  readonly status: DeliveryStatus;
+  readonly acknowledgedAt: string;
+}
+
+export interface ReliabilityStatistics {
+  readonly queueStats: QueueStatistics;
+  readonly retryStats: RetryStatistics;
+  readonly replayStats: ReplayStatistics;
+  readonly acknowledgementCount: number;
+}
+
+export interface ReliabilityHealth {
+  readonly healthy: boolean;
+  readonly queueHealth: QueueHealth;
+  readonly retryErrorRate: number;
+}
+
 export interface EventContext {
   readonly runtimeId: string;
   readonly createdAt: string;
@@ -232,6 +328,11 @@ export interface EventDiagnostics {
   readonly dispatchHealth?: DispatchHealth;
   readonly deadLetterCount?: number;
   readonly routingEvaluations?: number;
+  readonly queueDepth?: number;
+  readonly retryStatistics?: RetryStatistics;
+  readonly replayStatistics?: ReplayStatistics;
+  readonly reliabilityStatistics?: ReliabilityStatistics;
+  readonly deadLetterQueueSize?: number;
   readonly timestamp: string;
 }
 
@@ -458,6 +559,125 @@ export function createDeadLetterRecord(
   });
 }
 
+export function createQueuedEvent<T = unknown>(
+  params: Partial<QueuedEvent<T>> & { event: FrontendEvent<T> },
+): QueuedEvent<T> {
+  return Object.freeze({
+    queueId: params.queueId ?? `qid_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    event: params.event,
+    priority: params.priority ?? params.event.priority ?? EventPriority.NORMAL,
+    enqueuedAt: params.enqueuedAt ?? new Date().toISOString(),
+    attemptCount: params.attemptCount ?? 0,
+    status: params.status ?? DeliveryStatus.PENDING,
+  });
+}
+
+export function createQueueStatistics(params: Partial<QueueStatistics> = {}): QueueStatistics {
+  return Object.freeze({
+    enqueuedCount: params.enqueuedCount ?? 0,
+    dequeuedCount: params.dequeuedCount ?? 0,
+    currentDepth: params.currentDepth ?? 0,
+    overflowCount: params.overflowCount ?? 0,
+    maxCapacity: params.maxCapacity ?? 1000,
+  });
+}
+
+export function createQueueHealth(params: Partial<QueueHealth> = {}): QueueHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    depth: params.depth ?? 0,
+    capacity: params.capacity ?? 1000,
+    isOverflowed: params.isOverflowed ?? false,
+  });
+}
+
+export function createQueueConfiguration(params: Partial<QueueConfiguration> = {}): QueueConfiguration {
+  return Object.freeze({
+    maxCapacity: params.maxCapacity ?? 1000,
+    dropStrategy: params.dropStrategy ?? 'DROP_OLDEST',
+  });
+}
+
+export function createRetryPolicy(params: Partial<RetryPolicy> = {}): RetryPolicy {
+  return Object.freeze({
+    policyId: params.policyId ?? 'default_retry_policy',
+    maxRetries: params.maxRetries ?? 3,
+    initialDelayMs: params.initialDelayMs ?? 100,
+    backoffMultiplier: params.backoffMultiplier ?? 2.0,
+  });
+}
+
+export function createRetryRecord(
+  params: Partial<RetryRecord> & { queueId: string; eventId: string; attempt: number },
+): RetryRecord {
+  return Object.freeze({
+    retryId: params.retryId ?? `ret_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    queueId: params.queueId,
+    eventId: params.eventId,
+    attempt: params.attempt,
+    success: params.success ?? false,
+    error: params.error,
+    retriedAt: params.retriedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createRetryStatistics(params: Partial<RetryStatistics> = {}): RetryStatistics {
+  return Object.freeze({
+    totalRetries: params.totalRetries ?? 0,
+    successfulRetries: params.successfulRetries ?? 0,
+    failedRetries: params.failedRetries ?? 0,
+    exhaustedRetries: params.exhaustedRetries ?? 0,
+  });
+}
+
+export function createReplayRecord(
+  params: Partial<ReplayRecord> & { eventId: string },
+): ReplayRecord {
+  return Object.freeze({
+    replayId: params.replayId ?? `rpl_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    eventId: params.eventId,
+    replayedAt: params.replayedAt ?? new Date().toISOString(),
+    success: params.success ?? true,
+  });
+}
+
+export function createReplayStatistics(params: Partial<ReplayStatistics> = {}): ReplayStatistics {
+  return Object.freeze({
+    totalReplays: params.totalReplays ?? 0,
+    successfulReplays: params.successfulReplays ?? 0,
+    failedReplays: params.failedReplays ?? 0,
+  });
+}
+
+export function createAcknowledgement(
+  params: Partial<Acknowledgement> & { queueId: string; eventId: string },
+): Acknowledgement {
+  return Object.freeze({
+    ackId: params.ackId ?? `ack_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    queueId: params.queueId,
+    eventId: params.eventId,
+    status: params.status ?? DeliveryStatus.DELIVERED,
+    acknowledgedAt: params.acknowledgedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createReliabilityStatistics(params: Partial<ReliabilityStatistics> = {}): ReliabilityStatistics {
+  return Object.freeze({
+    queueStats: params.queueStats ?? createQueueStatistics(),
+    retryStats: params.retryStats ?? createRetryStatistics(),
+    replayStats: params.replayStats ?? createReplayStatistics(),
+    acknowledgementCount: params.acknowledgementCount ?? 0,
+  });
+}
+
+export function createReliabilityHealth(params: Partial<ReliabilityHealth> = {}): ReliabilityHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    queueHealth: params.queueHealth ?? createQueueHealth(),
+    retryErrorRate: params.retryErrorRate ?? 0,
+  });
+}
+
 export function createEventContext(params: Partial<EventContext> = {}): EventContext {
   return Object.freeze({
     runtimeId: params.runtimeId ?? `event_runtime_${Date.now()}`,
@@ -523,6 +743,11 @@ export function createEventDiagnostics(params: Partial<EventDiagnostics> = {}): 
     dispatchHealth: params.dispatchHealth,
     deadLetterCount: params.deadLetterCount,
     routingEvaluations: params.routingEvaluations,
+    queueDepth: params.queueDepth,
+    retryStatistics: params.retryStatistics,
+    replayStatistics: params.replayStatistics,
+    reliabilityStatistics: params.reliabilityStatistics,
+    deadLetterQueueSize: params.deadLetterQueueSize,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }

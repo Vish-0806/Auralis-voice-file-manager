@@ -1,10 +1,13 @@
 /**
- * Event Runtime Coordinator Implementation (Phase 16.4.4).
+ * Event Runtime Coordinator Implementation (Phase 16.4.5).
  *
  * Implements IEventRuntime acting as central coordinator delegating to IEventProvider.
  */
 
 import {
+  Acknowledgement,
+  DeadLetterRecord,
+  DeliveryStatus,
   DispatchHealth,
   DispatchStatistics,
   EventCapabilities,
@@ -18,6 +21,8 @@ import {
   EventSubscription,
   FrontendEvent,
   PublishedEvent,
+  QueuedEvent,
+  ReplayRecord,
   RoutingDecision,
   RoutingRule,
   SubscriberRegistration,
@@ -150,5 +155,41 @@ export class EventRuntime implements IEventRuntime {
 
   public dispatchHealth(): DispatchHealth {
     return this._provider.dispatchHealth();
+  }
+
+  public enqueue<T = unknown>(event: FrontendEvent<T>): QueuedEvent<T> {
+    return this._provider.enqueue(event);
+  }
+
+  public dequeue<T = unknown>(): QueuedEvent<T> | undefined {
+    return this._provider.dequeue<T>();
+  }
+
+  public peek<T = unknown>(): QueuedEvent<T> | undefined {
+    return this._provider.peek<T>();
+  }
+
+  public queueSize(): number {
+    return this._provider.queueSize();
+  }
+
+  public retry(queueId: string): boolean {
+    return this._provider.retry(queueId);
+  }
+
+  public replay(filter?: (evt: PublishedEvent) => boolean): ReadonlyArray<ReplayRecord> {
+    return this._provider.replay(filter);
+  }
+
+  public acknowledge(queueId: string, status = DeliveryStatus.DELIVERED): Acknowledgement {
+    return this._provider.acknowledge(queueId, status);
+  }
+
+  public deadLetters(): ReadonlyArray<DeadLetterRecord> {
+    return this._provider.deadLetters();
+  }
+
+  public clearDeadLetters(): void {
+    this._provider.clearDeadLetters();
   }
 }

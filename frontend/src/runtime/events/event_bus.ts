@@ -1,16 +1,20 @@
 /**
- * Event Bus Implementation (Phase 16.4.4).
+ * Event Bus Implementation (Phase 16.4.5).
  *
  * Implements IEventBus managing event publication, registration validation, sequence numbering,
- * bounded event history tracking, routing evaluation, and dispatch execution management.
+ * bounded event history tracking, queueing, routing evaluation, dispatch execution, retries, replay, and acknowledgements.
  */
 
 import {
+  Acknowledgement,
+  createAcknowledgement,
   createEventBusHealth,
   createEventBusStatistics,
   createEventHistory,
   createFrontendEvent,
   createPublishedEvent,
+  DeadLetterRecord,
+  DeliveryStatus,
   EventBusHealth,
   EventBusStatistics,
   EventHistory,
@@ -18,14 +22,19 @@ import {
   EventSubscription,
   FrontendEvent,
   PublishedEvent,
+  QueuedEvent,
+  ReplayRecord,
   SubscriberRegistration,
 } from './models';
 import { EventValidationException } from './exceptions';
 import {
   IDispatchManager,
   IEventBus,
+  IEventQueue,
   IEventRegistry,
   IEventRouter,
+  IReplayManager,
+  IRetryManager,
   ISubscriberRegistry,
   ISubscriptionManager,
 } from './interfaces';
@@ -33,6 +42,9 @@ import { SubscriberRegistry } from './subscriber_registry';
 import { SubscriptionManager } from './subscription_manager';
 import { EventRouter } from './event_router';
 import { DispatchManager } from './dispatch_manager';
+import { EventQueue } from './event_queue';
+import { RetryManager } from './retry_manager';
+import { ReplayManager } from './replay_manager';
 
 export class EventBus implements IEventBus {
   private readonly _registry: IEventRegistry;
@@ -40,9 +52,13 @@ export class EventBus implements IEventBus {
   private readonly _subscriptionManager: ISubscriptionManager;
   private readonly _router: IEventRouter;
   private readonly _dispatchManager: IDispatchManager;
+  private readonly _queue: IEventQueue;
+  private readonly _retryManager: IRetryManager;
+  private readonly _replayManager: IReplayManager;
   private readonly _maxHistorySize: number;
 
   private readonly _history: PublishedEvent[] = [];
+  private readonly _acknowledgements: Acknowledgement[] = [];
   private _sequenceNumber = 0;
 
   private _publishCount = 0;
@@ -55,6 +71,9 @@ export class EventBus implements IEventBus {
     subscriptionManager?: ISubscriptionManager,
     router?: IEventRouter,
     dispatchManager?: IDispatchManager,
+    queue?: IEventQueue,
+    retryManager?: IRetryManager,
+    replayManager?: IReplayManager,
     maxHistorySize = 1000,
   ) {
     this._registry = registry;
@@ -63,6 +82,9 @@ export class EventBus implements IEventBus {
     this._router = router ?? new EventRouter();
     this._dispatchManager =
       dispatchManager ?? new DispatchManager(this._subscriptionManager);
+    this._queue = queue ?? new EventQueue();
+    this._retryManager = retryManager ?? new RetryManager();
+    this._replayManager = replayManager ?? new ReplayManager();
     this._maxHistorySize = maxHistorySize;
   }
 
@@ -104,13 +126,72 @@ export class EventBus implements IEventBus {
 
     this._totalPayloadBytes += this.estimatePayloadSize(payload);
 
-    // Event Routing & Priority Dispatch Pipeline
-    const decision = this._router.route(event);
+    // Reliable Pipeline: Queue -> Dequeue -> Route -> Dispatch
+    const queued = this._queue.enqueue(event);
+    const dequeued = this._queue.dequeue();
+
+    const targetEvent = dequeued ? dequeued.event : event;
+    const decision = this._router.route(targetEvent);
     const subscribers = this._subscriberRegistry.getSubscribers<T>(type);
 
-    this._dispatchManager.dispatch(decision, subscribers);
+    const record = this._dispatchManager.dispatch(decision, subscribers);
+
+    if (record.success) {
+      this.acknowledge(queued.queueId, DeliveryStatus.DELIVERED);
+    } else {
+      if (this._retryManager.shouldRetry(queued.attemptCount + 1)) {
+        this._retryManager.recordRetry(queued.queueId, targetEvent.eventId, queued.attemptCount + 1, false, 'Dispatch failure');
+      }
+      this.acknowledge(queued.queueId, DeliveryStatus.FAILED);
+    }
 
     return published;
+  }
+
+  public enqueue<T = unknown>(event: FrontendEvent<T>): QueuedEvent<T> {
+    return this._queue.enqueue(event);
+  }
+
+  public dequeue<T = unknown>(): QueuedEvent<T> | undefined {
+    return this._queue.dequeue<T>();
+  }
+
+  public peek<T = unknown>(): QueuedEvent<T> | undefined {
+    return this._queue.peek<T>();
+  }
+
+  public queueSize(): number {
+    return this._queue.size();
+  }
+
+  public retry(queueId: string): boolean {
+    this._retryManager.recordRetry(queueId, 'manual_retry', 1, true);
+    return true;
+  }
+
+  public replay(filter?: (evt: PublishedEvent) => boolean): ReadonlyArray<ReplayRecord> {
+    if (filter) {
+      return this._replayManager.replayFiltered(this._history, filter);
+    }
+    return this._replayManager.replayAll(this._history);
+  }
+
+  public acknowledge(queueId: string, status = DeliveryStatus.DELIVERED): Acknowledgement {
+    const ack = createAcknowledgement({
+      queueId,
+      eventId: queueId,
+      status,
+    });
+    this._acknowledgements.push(ack);
+    return ack;
+  }
+
+  public deadLetters(): ReadonlyArray<DeadLetterRecord> {
+    return this._dispatchManager.listDeadLetters();
+  }
+
+  public clearDeadLetters(): void {
+    this._dispatchManager.clearDeadLetters();
   }
 
   public subscribe<T = unknown>(

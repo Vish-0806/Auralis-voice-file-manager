@@ -1,5 +1,5 @@
 /**
- * Event & Messaging Runtime Foundation, Event Bus, PubSub & Routing Engine Barrel Export (Phase 16.4.4).
+ * Event & Messaging Runtime Foundation, Event Bus, PubSub, Routing, Event Queue & Reliability Engine Barrel Export (Phase 16.4.5).
  */
 
 export * from './models';
@@ -11,6 +11,9 @@ export * from './subscriber_registry';
 export * from './subscription_manager';
 export * from './event_router';
 export * from './dispatch_manager';
+export * from './event_queue';
+export * from './retry_manager';
+export * from './replay_manager';
 export * from './event_provider';
 export * from './event_runtime';
 export * from './runtime';

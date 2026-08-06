@@ -1,12 +1,14 @@
 /**
- * Event & Messaging Runtime Interfaces (Phase 16.4.4).
+ * Event & Messaging Runtime Interfaces (Phase 16.4.5).
  *
  * Defines contracts for IEventRegistry, IEventBus, ISubscriberRegistry, ISubscriptionManager,
- * IEventRouter, IDispatchManager, IEventProvider, and IEventRuntime.
+ * IEventRouter, IDispatchManager, IEventQueue, IRetryManager, IReplayManager, IEventProvider, and IEventRuntime.
  */
 
 import {
+  Acknowledgement,
   DeadLetterRecord,
+  DeliveryStatus,
   DispatchHealth,
   DispatchRecord,
   DispatchStatistics,
@@ -25,6 +27,13 @@ import {
   EventSubscription,
   FrontendEvent,
   PublishedEvent,
+  QueuedEvent,
+  QueueHealth,
+  QueueStatistics,
+  ReplayRecord,
+  ReplayStatistics,
+  RetryRecord,
+  RetryStatistics,
   RoutingDecision,
   RoutingRule,
   SubscriberHealth,
@@ -86,6 +95,32 @@ export interface IDispatchManager {
   clearDeadLetters(): void;
   statistics(): DispatchStatistics;
   health(): DispatchHealth;
+}
+
+export interface IEventQueue {
+  enqueue<T = unknown>(event: FrontendEvent<T>): QueuedEvent<T>;
+  dequeue<T = unknown>(): QueuedEvent<T> | undefined;
+  peek<T = unknown>(): QueuedEvent<T> | undefined;
+  size(): number;
+  clear(): void;
+  statistics(): QueueStatistics;
+  health(): QueueHealth;
+}
+
+export interface IRetryManager {
+  shouldRetry(attemptCount: number): boolean;
+  recordRetry(queueId: string, eventId: string, attempt: number, success: boolean, error?: string): RetryRecord;
+  statistics(): RetryStatistics;
+}
+
+export interface IReplayManager {
+  replayEvent(publishedEvent: PublishedEvent): ReplayRecord;
+  replayAll(history: ReadonlyArray<PublishedEvent>): ReadonlyArray<ReplayRecord>;
+  replayFiltered(
+    history: ReadonlyArray<PublishedEvent>,
+    filter: (evt: PublishedEvent) => boolean,
+  ): ReadonlyArray<ReplayRecord>;
+  statistics(): ReplayStatistics;
 }
 
 export interface IEventBus {
@@ -150,6 +185,16 @@ export interface IEventProvider {
   route<T = unknown>(event: FrontendEvent<T>): RoutingDecision;
   dispatchStatistics(): DispatchStatistics;
   dispatchHealth(): DispatchHealth;
+
+  enqueue<T = unknown>(event: FrontendEvent<T>): QueuedEvent<T>;
+  dequeue<T = unknown>(): QueuedEvent<T> | undefined;
+  peek<T = unknown>(): QueuedEvent<T> | undefined;
+  queueSize(): number;
+  retry(queueId: string): boolean;
+  replay(filter?: (evt: PublishedEvent) => boolean): ReadonlyArray<ReplayRecord>;
+  acknowledge(queueId: string, status?: DeliveryStatus): Acknowledgement;
+  deadLetters(): ReadonlyArray<DeadLetterRecord>;
+  clearDeadLetters(): void;
 }
 
 export interface IEventRuntime {
@@ -191,4 +236,14 @@ export interface IEventRuntime {
   route<T = unknown>(event: FrontendEvent<T>): RoutingDecision;
   dispatchStatistics(): DispatchStatistics;
   dispatchHealth(): DispatchHealth;
+
+  enqueue<T = unknown>(event: FrontendEvent<T>): QueuedEvent<T>;
+  dequeue<T = unknown>(): QueuedEvent<T> | undefined;
+  peek<T = unknown>(): QueuedEvent<T> | undefined;
+  queueSize(): number;
+  retry(queueId: string): boolean;
+  replay(filter?: (evt: PublishedEvent) => boolean): ReadonlyArray<ReplayRecord>;
+  acknowledge(queueId: string, status?: DeliveryStatus): Acknowledgement;
+  deadLetters(): ReadonlyArray<DeadLetterRecord>;
+  clearDeadLetters(): void;
 }
