@@ -1,10 +1,10 @@
 /**
- * Configuration Runtime Domain Models (Phase 16.3.3).
+ * Configuration Runtime Domain Models (Phase 16.3.4).
  *
  * Provides immutable state models, configuration objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, diagnostics
  * telemetry, source priority enums, entry records, snapshots, schemas, validation results,
- * and resolution results for the Frontend Configuration Runtime.
+ * resolution results, configuration profile definitions, and feature flag evaluation models for the Frontend Configuration Runtime.
  */
 
 export enum ConfigurationRuntimeState {
@@ -16,6 +16,7 @@ export enum ConfigurationRuntimeState {
 }
 
 export enum ConfigurationSourcePriority {
+  PROFILE = 600,
   MEMORY = 500,
   RUNTIME = 400,
   ENVIRONMENT = 300,
@@ -168,6 +169,67 @@ export interface ResolutionStatistics {
   readonly failedResolutions: number;
 }
 
+export interface FeatureFlag {
+  readonly featureName: string;
+  readonly enabled: boolean;
+  readonly description?: string;
+  readonly rolloutPercentage?: number;
+  readonly allowedProfiles?: ReadonlyArray<string>;
+  readonly allowedEnvironments?: ReadonlyArray<string>;
+  readonly dependencies?: ReadonlyArray<string>;
+}
+
+export interface FeatureEvaluation {
+  readonly featureName: string;
+  readonly enabled: boolean;
+  readonly reason: string;
+  readonly profileName?: string;
+  readonly environmentName?: string;
+  readonly evaluatedAt: string;
+}
+
+export interface FeatureStatistics {
+  readonly evaluations: number;
+  readonly enabledEvaluations: number;
+  readonly disabledEvaluations: number;
+  readonly cachedEvaluations: number;
+}
+
+export interface FeatureHealth {
+  readonly healthy: boolean;
+  readonly totalFeatures: number;
+  readonly enabledFeatures: number;
+  readonly disabledFeatures: number;
+}
+
+export interface ConfigurationProfileDefinition {
+  readonly profileType: string;
+  readonly profileName: string;
+  readonly parentProfileName?: string;
+  readonly overrides: Readonly<Record<string, unknown>>;
+  readonly active: boolean;
+  readonly priority: number;
+}
+
+export interface ConfigurationProfileSnapshot {
+  readonly activeProfileName: string;
+  readonly mergedOverrides: Readonly<Record<string, unknown>>;
+  readonly registeredProfiles: ReadonlyArray<string>;
+  readonly timestamp: string;
+}
+
+export interface ProfileStatistics {
+  readonly registrations: number;
+  readonly activations: number;
+  readonly overrideKeysCount: number;
+}
+
+export interface ProfileHealth {
+  readonly healthy: boolean;
+  readonly activeProfileName: string;
+  readonly totalProfiles: number;
+}
+
 export interface ConfigurationDiagnostics {
   readonly health: ConfigurationHealth;
   readonly statistics: ConfigurationStatistics;
@@ -178,6 +240,11 @@ export interface ConfigurationDiagnostics {
   readonly schemas?: ReadonlyArray<string>;
   readonly validationStats?: ValidationStatistics;
   readonly resolutionStats?: ResolutionStatistics;
+  readonly activeProfile?: string;
+  readonly profilesSnapshot?: ConfigurationProfileSnapshot;
+  readonly profileStats?: ProfileStatistics;
+  readonly featureStats?: FeatureStatistics;
+  readonly featureHealth?: FeatureHealth;
   readonly timestamp: string;
 }
 
@@ -405,6 +472,99 @@ export function createResolutionStatistics(
   });
 }
 
+export function createFeatureFlag(
+  params: Partial<FeatureFlag> & { featureName: string },
+): FeatureFlag {
+  return Object.freeze({
+    featureName: params.featureName,
+    enabled: params.enabled ?? false,
+    description: params.description,
+    rolloutPercentage: params.rolloutPercentage,
+    allowedProfiles: params.allowedProfiles ? Object.freeze([...params.allowedProfiles]) : undefined,
+    allowedEnvironments: params.allowedEnvironments ? Object.freeze([...params.allowedEnvironments]) : undefined,
+    dependencies: params.dependencies ? Object.freeze([...params.dependencies]) : undefined,
+  });
+}
+
+export function createFeatureEvaluation(
+  params: Partial<FeatureEvaluation> & { featureName: string; enabled: boolean; reason: string },
+): FeatureEvaluation {
+  return Object.freeze({
+    featureName: params.featureName,
+    enabled: params.enabled,
+    reason: params.reason,
+    profileName: params.profileName,
+    environmentName: params.environmentName,
+    evaluatedAt: params.evaluatedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createFeatureStatistics(
+  params: Partial<FeatureStatistics> = {},
+): FeatureStatistics {
+  return Object.freeze({
+    evaluations: params.evaluations ?? 0,
+    enabledEvaluations: params.enabledEvaluations ?? 0,
+    disabledEvaluations: params.disabledEvaluations ?? 0,
+    cachedEvaluations: params.cachedEvaluations ?? 0,
+  });
+}
+
+export function createFeatureHealth(
+  params: Partial<FeatureHealth> = {},
+): FeatureHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    totalFeatures: params.totalFeatures ?? 0,
+    enabledFeatures: params.enabledFeatures ?? 0,
+    disabledFeatures: params.disabledFeatures ?? 0,
+  });
+}
+
+export function createConfigurationProfileDefinition(
+  params: Partial<ConfigurationProfileDefinition> & { profileType: string; profileName: string },
+): ConfigurationProfileDefinition {
+  return Object.freeze({
+    profileType: params.profileType,
+    profileName: params.profileName,
+    parentProfileName: params.parentProfileName,
+    overrides: Object.freeze({ ...(params.overrides ?? {}) }),
+    active: params.active ?? false,
+    priority: params.priority ?? 100,
+  });
+}
+
+export function createConfigurationProfileSnapshot(
+  params: Partial<ConfigurationProfileSnapshot> = {},
+): ConfigurationProfileSnapshot {
+  return Object.freeze({
+    activeProfileName: params.activeProfileName ?? 'production',
+    mergedOverrides: Object.freeze({ ...(params.mergedOverrides ?? {}) }),
+    registeredProfiles: Object.freeze([...(params.registeredProfiles ?? [])]),
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createProfileStatistics(
+  params: Partial<ProfileStatistics> = {},
+): ProfileStatistics {
+  return Object.freeze({
+    registrations: params.registrations ?? 0,
+    activations: params.activations ?? 0,
+    overrideKeysCount: params.overrideKeysCount ?? 0,
+  });
+}
+
+export function createProfileHealth(
+  params: Partial<ProfileHealth> = {},
+): ProfileHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    activeProfileName: params.activeProfileName ?? 'production',
+    totalProfiles: params.totalProfiles ?? 0,
+  });
+}
+
 export function createConfigurationDiagnostics(
   params: Partial<ConfigurationDiagnostics> = {},
 ): ConfigurationDiagnostics {
@@ -418,6 +578,11 @@ export function createConfigurationDiagnostics(
     schemas: params.schemas ? Object.freeze([...params.schemas]) : undefined,
     validationStats: params.validationStats,
     resolutionStats: params.resolutionStats,
+    activeProfile: params.activeProfile,
+    profilesSnapshot: params.profilesSnapshot,
+    profileStats: params.profileStats,
+    featureStats: params.featureStats,
+    featureHealth: params.featureHealth,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }

@@ -1,29 +1,40 @@
 /**
- * Configuration Source Manager & Resolution Engine (Phase 16.3.2).
+ * Configuration Source Manager & Resolution Engine (Phase 16.3.4).
  *
  * Implements priority-based key resolution, entry extraction, merged dictionary generation,
- * and immutable configuration snapshot creation across registered configuration sources.
+ * active profile override integration, and immutable configuration snapshot creation across registered configuration sources.
  */
 
 import {
   ConfigurationEntry,
   ConfigurationSnapshot,
+  ConfigurationSourcePriority,
   createConfigurationEntry,
   createConfigurationSnapshot,
 } from './models';
 import { SourceRegistry } from './source_registry';
+import { ProfileManager } from './profile_manager';
 
 export class ConfigurationSourceManager {
   private readonly _registry: SourceRegistry;
+  private readonly _profileManager?: ProfileManager;
 
-  constructor(registry: SourceRegistry) {
+  constructor(registry: SourceRegistry, profileManager?: ProfileManager) {
     this._registry = registry;
+    this._profileManager = profileManager;
   }
 
   public get<T = unknown>(key: string, defaultValue?: T): T | undefined {
     const k = key.trim();
-    const sources = this._registry.listSources();
 
+    if (this._profileManager) {
+      const overrides = this._profileManager.getMergedOverrides();
+      if (k in overrides) {
+        return overrides[k] as T;
+      }
+    }
+
+    const sources = this._registry.listSources();
     for (const source of sources) {
       if (source.enabled && source.contains(k)) {
         return source.get(k) as T;
@@ -35,8 +46,15 @@ export class ConfigurationSourceManager {
 
   public has(key: string): boolean {
     const k = key.trim();
-    const sources = this._registry.listSources();
 
+    if (this._profileManager) {
+      const overrides = this._profileManager.getMergedOverrides();
+      if (k in overrides) {
+        return true;
+      }
+    }
+
+    const sources = this._registry.listSources();
     for (const source of sources) {
       if (source.enabled && source.contains(k)) {
         return true;
@@ -48,8 +66,21 @@ export class ConfigurationSourceManager {
 
   public getEntry(key: string): ConfigurationEntry | undefined {
     const k = key.trim();
-    const sources = this._registry.listSources();
 
+    if (this._profileManager) {
+      const overrides = this._profileManager.getMergedOverrides();
+      if (k in overrides) {
+        const activeProf = this._profileManager.getActiveProfile();
+        return createConfigurationEntry({
+          key: k,
+          value: overrides[k],
+          sourceName: `Profile:${activeProf?.profileName ?? 'default'}`,
+          priority: ConfigurationSourcePriority.PROFILE,
+        });
+      }
+    }
+
+    const sources = this._registry.listSources();
     for (const source of sources) {
       if (source.enabled && source.contains(k)) {
         const value = source.get(k);
@@ -75,6 +106,13 @@ export class ConfigurationSourceManager {
         for (const [k, v] of Object.entries(items)) {
           merged[k] = v;
         }
+      }
+    }
+
+    if (this._profileManager) {
+      const overrides = this._profileManager.getMergedOverrides();
+      for (const [k, v] of Object.entries(overrides)) {
+        merged[k] = v;
       }
     }
 

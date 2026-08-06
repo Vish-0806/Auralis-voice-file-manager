@@ -1,8 +1,8 @@
 /**
- * Configuration Runtime Interfaces (Phase 16.3.3).
+ * Configuration Runtime Interfaces (Phase 16.3.4).
  *
  * Defines contracts for IConfigurationSource, IConfigurationValidator, IConfigurationProvider,
- * and IConfigurationRuntime including Schema, Resolution, and Validation APIs.
+ * and IConfigurationRuntime including Profiles and Feature Flag APIs.
  */
 
 import {
@@ -12,6 +12,8 @@ import {
   ConfigurationDiagnostics,
   ConfigurationEntry,
   ConfigurationHealth,
+  ConfigurationProfileDefinition,
+  ConfigurationProfileSnapshot,
   ConfigurationSchema,
   ConfigurationSnapshot,
   ConfigurationSourceHealth,
@@ -19,6 +21,10 @@ import {
   ConfigurationState,
   ConfigurationStatistics,
   ConfigurationValidationResult,
+  FeatureEvaluation,
+  FeatureFlag,
+  FeatureHealth,
+  FeatureStatistics,
 } from './models';
 
 export interface IConfigurationSource {
@@ -71,6 +77,25 @@ export interface IConfigurationProvider {
   resolve<T = unknown>(key: string, targetType?: string, defaultValue?: T): T;
   resolveAll(): Readonly<Record<string, unknown>>;
   validate(schemaName?: string): ConfigurationValidationResult;
+
+  registerProfile(profile: ConfigurationProfileDefinition): void;
+  activateProfile(profileName: string): void;
+  getActiveProfile(): ConfigurationProfileDefinition | undefined;
+  createProfileSnapshot(): ConfigurationProfileSnapshot;
+  listProfiles(): ReadonlyArray<ConfigurationProfileDefinition>;
+
+  registerFeature(feature: FeatureFlag): void;
+  removeFeature(featureName: string): boolean;
+  enableFeature(featureName: string): void;
+  disableFeature(featureName: string): void;
+  toggleFeature(featureName: string): boolean;
+  evaluateFeature(
+    featureName: string,
+    context?: { profileName?: string; environmentName?: string; userId?: string },
+  ): FeatureEvaluation;
+  listFeatures(): ReadonlyArray<FeatureFlag>;
+  featureStatistics(): FeatureStatistics;
+  featureHealth(): FeatureHealth;
 }
 
 export interface IConfigurationRuntime {
@@ -100,4 +125,23 @@ export interface IConfigurationRuntime {
   resolve<T = unknown>(key: string, targetType?: string, defaultValue?: T): T;
   resolveAll(): Readonly<Record<string, unknown>>;
   validate(schemaName?: string): ConfigurationValidationResult;
+
+  registerProfile(profile: ConfigurationProfileDefinition): void;
+  activateProfile(profileName: string): void;
+  getActiveProfile(): ConfigurationProfileDefinition | undefined;
+  createProfileSnapshot(): ConfigurationProfileSnapshot;
+  listProfiles(): ReadonlyArray<ConfigurationProfileDefinition>;
+
+  registerFeature(feature: FeatureFlag): void;
+  removeFeature(featureName: string): boolean;
+  enableFeature(featureName: string): void;
+  disableFeature(featureName: string): void;
+  toggleFeature(featureName: string): boolean;
+  evaluateFeature(
+    featureName: string,
+    context?: { profileName?: string; environmentName?: string; userId?: string },
+  ): FeatureEvaluation;
+  listFeatures(): ReadonlyArray<FeatureFlag>;
+  featureStatistics(): FeatureStatistics;
+  featureHealth(): FeatureHealth;
 }

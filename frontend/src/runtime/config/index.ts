@@ -1,5 +1,5 @@
 /**
- * Configuration Runtime Foundation, Source Resolution & Validation Engine Barrel Export (Phase 16.3.3).
+ * Configuration Runtime Foundation, Source Resolution, Validation & Feature Flag Barrel Export (Phase 16.3.4).
  */
 
 export * from './models';
@@ -12,6 +12,8 @@ export * from './configuration_source_manager';
 export * from './configuration_schema';
 export * from './configuration_resolver';
 export * from './configuration_validator';
+export * from './profile_manager';
+export * from './feature_flag_manager';
 export * from './configuration_provider';
 export * from './configuration_runtime';
 export * from './runtime';

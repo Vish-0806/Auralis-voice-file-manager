@@ -1,9 +1,10 @@
 /**
- * Configuration Provider Implementation (Phase 16.3.3).
+ * Configuration Provider Implementation (Phase 16.3.4).
  *
  * Implements IConfigurationProvider owning configuration runtime state transitions,
  * telemetry statistics, health evaluation, context metadata, capabilities reporting,
- * source resolution delegation, schema management, type conversion, and constraint validation.
+ * source resolution delegation, schema management, type conversion, constraint validation,
+ * profile management, and feature flag evaluations.
  */
 
 import {
@@ -13,6 +14,8 @@ import {
   ConfigurationDiagnostics,
   ConfigurationEntry,
   ConfigurationHealth,
+  ConfigurationProfileDefinition,
+  ConfigurationProfileSnapshot,
   ConfigurationRuntimeState,
   ConfigurationSchema,
   ConfigurationSnapshot,
@@ -29,6 +32,10 @@ import {
   createConfigurationState,
   createConfigurationStatistics,
   createConfigurationValidationResult,
+  FeatureEvaluation,
+  FeatureFlag,
+  FeatureHealth,
+  FeatureStatistics,
 } from './models';
 import { IConfigurationProvider, IConfigurationSource } from './interfaces';
 import { SourceRegistry } from './source_registry';
@@ -37,12 +44,17 @@ import { MemoryConfigurationSource } from './memory_source';
 import { ConfigurationSchemaManager } from './configuration_schema';
 import { ConfigurationResolver } from './configuration_resolver';
 import { ConfigurationValidator } from './configuration_validator';
+import { ProfileManager } from './profile_manager';
+import { FeatureFlagManager } from './feature_flag_manager';
 
 export class ConfigurationProvider implements IConfigurationProvider {
   private _runtimeState: ConfigurationRuntimeState = ConfigurationRuntimeState.UNINITIALIZED;
   private readonly _config: ConfigurationConfiguration;
   private readonly _capabilities: ConfigurationCapabilities;
   private readonly _context: ConfigurationContext;
+
+  private readonly _profileManager: ProfileManager;
+  private readonly _featureFlagManager: FeatureFlagManager;
 
   private readonly _registry: SourceRegistry;
   private readonly _sourceManager: ConfigurationSourceManager;
@@ -64,13 +76,18 @@ export class ConfigurationProvider implements IConfigurationProvider {
     context?: ConfigurationContext,
     registry?: SourceRegistry,
     schemaManager?: ConfigurationSchemaManager,
+    profileManager?: ProfileManager,
+    featureFlagManager?: FeatureFlagManager,
   ) {
     this._config = config ?? createConfigurationConfiguration();
     this._capabilities = capabilities ?? createConfigurationCapabilities();
     this._context = context ?? createConfigurationContext();
 
+    this._profileManager = profileManager ?? new ProfileManager();
+    this._featureFlagManager = featureFlagManager ?? new FeatureFlagManager();
+
     this._registry = registry ?? new SourceRegistry();
-    this._sourceManager = new ConfigurationSourceManager(this._registry);
+    this._sourceManager = new ConfigurationSourceManager(this._registry, this._profileManager);
 
     this._defaultMemorySource = new MemoryConfigurationSource();
     this._registry.register(this._defaultMemorySource);
@@ -157,6 +174,7 @@ export class ConfigurationProvider implements IConfigurationProvider {
     );
 
     const schemaNames = this.listSchemas().map((s) => s.schemaName);
+    const activeProf = this.getActiveProfile();
 
     return createConfigurationDiagnostics({
       health: this.health(),
@@ -168,6 +186,11 @@ export class ConfigurationProvider implements IConfigurationProvider {
       schemas: schemaNames,
       validationStats: this._validator.statistics(),
       resolutionStats: this._resolver.statistics(),
+      activeProfile: activeProf?.profileName,
+      profilesSnapshot: this.createProfileSnapshot(),
+      profileStats: this._profileManager.statistics(),
+      featureStats: this.featureStatistics(),
+      featureHealth: this.featureHealth(),
       timestamp: new Date().toISOString(),
     });
   }
@@ -273,5 +296,70 @@ export class ConfigurationProvider implements IConfigurationProvider {
       warnings: combinedWarnings,
       timestamp: new Date().toISOString(),
     });
+  }
+
+  public registerProfile(profile: ConfigurationProfileDefinition): void {
+    this._profileManager.registerProfile(profile);
+  }
+
+  public activateProfile(profileName: string): void {
+    this._profileManager.activateProfile(profileName);
+  }
+
+  public getActiveProfile(): ConfigurationProfileDefinition | undefined {
+    return this._profileManager.getActiveProfile();
+  }
+
+  public createProfileSnapshot(): ConfigurationProfileSnapshot {
+    return this._profileManager.createSnapshot();
+  }
+
+  public listProfiles(): ReadonlyArray<ConfigurationProfileDefinition> {
+    return this._profileManager.listProfiles();
+  }
+
+  public registerFeature(feature: FeatureFlag): void {
+    this._featureFlagManager.registerFeature(feature);
+  }
+
+  public removeFeature(featureName: string): boolean {
+    return this._featureFlagManager.removeFeature(featureName);
+  }
+
+  public enableFeature(featureName: string): void {
+    this._featureFlagManager.enable(featureName);
+  }
+
+  public disableFeature(featureName: string): void {
+    this._featureFlagManager.disable(featureName);
+  }
+
+  public toggleFeature(featureName: string): boolean {
+    return this._featureFlagManager.toggle(featureName);
+  }
+
+  public evaluateFeature(
+    featureName: string,
+    context?: { profileName?: string; environmentName?: string; userId?: string },
+  ): FeatureEvaluation {
+    const activeProf = this.getActiveProfile();
+    const effectiveContext = {
+      profileName: context?.profileName ?? activeProf?.profileName,
+      environmentName: context?.environmentName ?? this._context.environment,
+      userId: context?.userId,
+    };
+    return this._featureFlagManager.evaluate(featureName, effectiveContext);
+  }
+
+  public listFeatures(): ReadonlyArray<FeatureFlag> {
+    return this._featureFlagManager.listFeatures();
+  }
+
+  public featureStatistics(): FeatureStatistics {
+    return this._featureFlagManager.statistics();
+  }
+
+  public featureHealth(): FeatureHealth {
+    return this._featureFlagManager.health();
   }
 }

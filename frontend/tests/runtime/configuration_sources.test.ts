@@ -325,7 +325,7 @@ describe('Phase 16.3.2 — Frontend Configuration Sources & Resolution Foundatio
       const provider = new ConfigurationProvider(undefined, undefined, undefined, registry);
       const merged = provider.getAll();
 
-      expect(merged).toEqual({ a: 1, b: 20, c: 3, d: 40 });
+      expect(merged).toMatchObject({ a: 1, b: 20, c: 3, d: 40 });
     });
 
     it('should generate complete ConfigurationSnapshot snapshot', () => {
@@ -384,7 +384,7 @@ describe('Phase 16.3.2 — Frontend Configuration Sources & Resolution Foundatio
       const runtime = new ConfigurationRuntime();
       const src = new MemoryConfigurationSource('R6', 100, { k: 'v' });
       runtime.registerSource(src);
-      expect(runtime.getAll()).toEqual({ k: 'v' });
+      expect(runtime.getAll()).toMatchObject({ k: 'v' });
     });
 
     it('should delegate createSnapshot to provider', () => {

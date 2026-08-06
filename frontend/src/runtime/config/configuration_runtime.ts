@@ -1,19 +1,26 @@
 /**
- * Configuration Runtime Coordinator Implementation (Phase 16.3.3).
+ * Configuration Runtime Coordinator Implementation (Phase 16.3.4).
  *
  * Implements IConfigurationRuntime acting as central coordinator for configuration lifecycle,
- * source resolution, schema registration, type conversion, and constraint validation operations.
+ * source resolution, schema management, type conversion, constraint validation, profile management,
+ * and feature flag evaluations.
  */
 
 import {
   ConfigurationDiagnostics,
   ConfigurationEntry,
   ConfigurationHealth,
+  ConfigurationProfileDefinition,
+  ConfigurationProfileSnapshot,
   ConfigurationSchema,
   ConfigurationSnapshot,
   ConfigurationState,
   ConfigurationStatistics,
   ConfigurationValidationResult,
+  FeatureEvaluation,
+  FeatureFlag,
+  FeatureHealth,
+  FeatureStatistics,
 } from './models';
 import { IConfigurationProvider, IConfigurationRuntime, IConfigurationSource } from './interfaces';
 import { ConfigurationProvider } from './configuration_provider';
@@ -115,5 +122,64 @@ export class ConfigurationRuntime implements IConfigurationRuntime {
 
   public validate(schemaName?: string): ConfigurationValidationResult {
     return this._provider.validate(schemaName);
+  }
+
+  public registerProfile(profile: ConfigurationProfileDefinition): void {
+    this._provider.registerProfile(profile);
+  }
+
+  public activateProfile(profileName: string): void {
+    this._provider.activateProfile(profileName);
+  }
+
+  public getActiveProfile(): ConfigurationProfileDefinition | undefined {
+    return this._provider.getActiveProfile();
+  }
+
+  public createProfileSnapshot(): ConfigurationProfileSnapshot {
+    return this._provider.createProfileSnapshot();
+  }
+
+  public listProfiles(): ReadonlyArray<ConfigurationProfileDefinition> {
+    return this._provider.listProfiles();
+  }
+
+  public registerFeature(feature: FeatureFlag): void {
+    this._provider.registerFeature(feature);
+  }
+
+  public removeFeature(featureName: string): boolean {
+    return this._provider.removeFeature(featureName);
+  }
+
+  public enableFeature(featureName: string): void {
+    this._provider.enableFeature(featureName);
+  }
+
+  public disableFeature(featureName: string): void {
+    this._provider.disableFeature(featureName);
+  }
+
+  public toggleFeature(featureName: string): boolean {
+    return this._provider.toggleFeature(featureName);
+  }
+
+  public evaluateFeature(
+    featureName: string,
+    context?: { profileName?: string; environmentName?: string; userId?: string },
+  ): FeatureEvaluation {
+    return this._provider.evaluateFeature(featureName, context);
+  }
+
+  public listFeatures(): ReadonlyArray<FeatureFlag> {
+    return this._provider.listFeatures();
+  }
+
+  public featureStatistics(): FeatureStatistics {
+    return this._provider.featureStatistics();
+  }
+
+  public featureHealth(): FeatureHealth {
+    return this._provider.featureHealth();
   }
 }
