@@ -1,10 +1,11 @@
 /**
- * Event & Messaging Runtime Domain Models (Phase 16.4.3).
+ * Event & Messaging Runtime Domain Models (Phase 16.4.4).
  *
  * Provides immutable state models, event objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, diagnostics
  * telemetry, priority enums, configuration objects, event registration definitions,
- * published event records, subscriber registrations, execution results, and subscriber health for the Frontend Event Runtime.
+ * published event records, subscriber registrations, execution results, subscriber health,
+ * routing rules, routing decisions, dispatch policies, dispatch records, and dead-letter telemetry for the Frontend Event Runtime.
  */
 
 export enum EventRuntimeState {
@@ -122,6 +123,61 @@ export interface SubscriberHealth {
   readonly errorRate: number;
 }
 
+export interface RoutingRule {
+  readonly ruleId: string;
+  readonly name: string;
+  readonly topicPattern: string;
+  readonly predicate?: (event: FrontendEvent) => boolean;
+  readonly priority: EventPriority;
+  readonly enabled: boolean;
+}
+
+export interface RoutingDecision {
+  readonly decisionId: string;
+  readonly event: FrontendEvent;
+  readonly matchedRules: ReadonlyArray<RoutingRule>;
+  readonly matched: boolean;
+  readonly evaluatedAt: string;
+}
+
+export interface DispatchPolicy {
+  readonly policyId: string;
+  readonly name: string;
+  readonly stopOnFirstFailure: boolean;
+  readonly deadLetterEnabled: boolean;
+}
+
+export interface DispatchRecord {
+  readonly dispatchId: string;
+  readonly decision: RoutingDecision;
+  readonly executions: ReadonlyArray<SubscriptionExecution>;
+  readonly success: boolean;
+  readonly totalDurationMs: number;
+  readonly dispatchedAt: string;
+}
+
+export interface DispatchStatistics {
+  readonly totalDispatches: number;
+  readonly successfulDispatches: number;
+  readonly failedDispatches: number;
+  readonly averageDispatchMs: number;
+  readonly deadLetterCount: number;
+}
+
+export interface DispatchHealth {
+  readonly healthy: boolean;
+  readonly activeRulesCount: number;
+  readonly dispatchErrorRate: number;
+}
+
+export interface DeadLetterRecord {
+  readonly deadLetterId: string;
+  readonly event: FrontendEvent;
+  readonly reason: string;
+  readonly error?: string;
+  readonly failedAt: string;
+}
+
 export interface EventContext {
   readonly runtimeId: string;
   readonly createdAt: string;
@@ -171,6 +227,11 @@ export interface EventDiagnostics {
   readonly subscriptionCount?: number;
   readonly subscriberStatistics?: SubscriberStatistics;
   readonly subscriberHealth?: SubscriberHealth;
+  readonly routingRules?: ReadonlyArray<string>;
+  readonly dispatchStatistics?: DispatchStatistics;
+  readonly dispatchHealth?: DispatchHealth;
+  readonly deadLetterCount?: number;
+  readonly routingEvaluations?: number;
   readonly timestamp: string;
 }
 
@@ -318,6 +379,85 @@ export function createSubscriberHealth(params: Partial<SubscriberHealth> = {}): 
   });
 }
 
+export function createRoutingRule(
+  params: Partial<RoutingRule> & { name: string; topicPattern: string },
+): RoutingRule {
+  return Object.freeze({
+    ruleId: params.ruleId ?? `rule_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    name: params.name,
+    topicPattern: params.topicPattern,
+    predicate: params.predicate,
+    priority: params.priority ?? EventPriority.NORMAL,
+    enabled: params.enabled ?? true,
+  });
+}
+
+export function createRoutingDecision(
+  params: Partial<RoutingDecision> & { event: FrontendEvent; matchedRules: ReadonlyArray<RoutingRule> },
+): RoutingDecision {
+  const rules = params.matchedRules ?? [];
+  return Object.freeze({
+    decisionId: params.decisionId ?? `dec_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    event: params.event,
+    matchedRules: Object.freeze([...rules]),
+    matched: params.matched ?? rules.length > 0,
+    evaluatedAt: params.evaluatedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createDispatchPolicy(params: Partial<DispatchPolicy> = {}): DispatchPolicy {
+  return Object.freeze({
+    policyId: params.policyId ?? `policy_default`,
+    name: params.name ?? 'Default Dispatch Policy',
+    stopOnFirstFailure: params.stopOnFirstFailure ?? false,
+    deadLetterEnabled: params.deadLetterEnabled ?? true,
+  });
+}
+
+export function createDispatchRecord(
+  params: Partial<DispatchRecord> & { decision: RoutingDecision },
+): DispatchRecord {
+  const executions = params.executions ?? [];
+  return Object.freeze({
+    dispatchId: params.dispatchId ?? `dsp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    decision: params.decision,
+    executions: Object.freeze([...executions]),
+    success: params.success ?? (executions.length === 0 || executions.every((e) => e.success)),
+    totalDurationMs: params.totalDurationMs ?? 0,
+    dispatchedAt: params.dispatchedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createDispatchStatistics(params: Partial<DispatchStatistics> = {}): DispatchStatistics {
+  return Object.freeze({
+    totalDispatches: params.totalDispatches ?? 0,
+    successfulDispatches: params.successfulDispatches ?? 0,
+    failedDispatches: params.failedDispatches ?? 0,
+    averageDispatchMs: params.averageDispatchMs ?? 0,
+    deadLetterCount: params.deadLetterCount ?? 0,
+  });
+}
+
+export function createDispatchHealth(params: Partial<DispatchHealth> = {}): DispatchHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    activeRulesCount: params.activeRulesCount ?? 0,
+    dispatchErrorRate: params.dispatchErrorRate ?? 0,
+  });
+}
+
+export function createDeadLetterRecord(
+  params: Partial<DeadLetterRecord> & { event: FrontendEvent; reason: string },
+): DeadLetterRecord {
+  return Object.freeze({
+    deadLetterId: params.deadLetterId ?? `dl_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    event: params.event,
+    reason: params.reason,
+    error: params.error,
+    failedAt: params.failedAt ?? new Date().toISOString(),
+  });
+}
+
 export function createEventContext(params: Partial<EventContext> = {}): EventContext {
   return Object.freeze({
     runtimeId: params.runtimeId ?? `event_runtime_${Date.now()}`,
@@ -378,6 +518,11 @@ export function createEventDiagnostics(params: Partial<EventDiagnostics> = {}): 
     subscriptionCount: params.subscriptionCount,
     subscriberStatistics: params.subscriberStatistics,
     subscriberHealth: params.subscriberHealth,
+    routingRules: params.routingRules ? Object.freeze([...params.routingRules]) : undefined,
+    dispatchStatistics: params.dispatchStatistics,
+    dispatchHealth: params.dispatchHealth,
+    deadLetterCount: params.deadLetterCount,
+    routingEvaluations: params.routingEvaluations,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }

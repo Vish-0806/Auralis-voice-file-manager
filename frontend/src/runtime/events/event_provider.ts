@@ -1,9 +1,10 @@
 /**
- * Event Provider Implementation (Phase 16.4.3).
+ * Event Provider Implementation (Phase 16.4.4).
  *
  * Implements IEventProvider owning runtime state transitions,
  * telemetry statistics, health evaluation, context metadata, capabilities reporting,
- * event registration management, event publishing, subscriber management, and diagnostics aggregation.
+ * event registration management, event publishing, subscriber management,
+ * event routing, priority dispatch, and diagnostics aggregation.
  */
 
 import {
@@ -14,6 +15,8 @@ import {
   createEventHealth,
   createEventState,
   createEventStatistics,
+  DispatchHealth,
+  DispatchStatistics,
   EventCapabilities,
   EventConfiguration,
   EventContext,
@@ -28,6 +31,8 @@ import {
   EventSubscription,
   FrontendEvent,
   PublishedEvent,
+  RoutingDecision,
+  RoutingRule,
   SubscriberRegistration,
 } from './models';
 import { IEventProvider } from './interfaces';
@@ -35,6 +40,8 @@ import { EventRegistry } from './event_registry';
 import { EventBus } from './event_bus';
 import { SubscriberRegistry } from './subscriber_registry';
 import { SubscriptionManager } from './subscription_manager';
+import { EventRouter } from './event_router';
+import { DispatchManager } from './dispatch_manager';
 
 export class EventProvider implements IEventProvider {
   private _runtimeState: EventRuntimeState = EventRuntimeState.UNINITIALIZED;
@@ -45,6 +52,8 @@ export class EventProvider implements IEventProvider {
   private readonly _registry: EventRegistry;
   private readonly _subscriberRegistry: SubscriberRegistry;
   private readonly _subscriptionManager: SubscriptionManager;
+  private readonly _router: EventRouter;
+  private readonly _dispatchManager: DispatchManager;
   private readonly _bus: EventBus;
 
   private _startedAt: string | null = null;
@@ -60,6 +69,8 @@ export class EventProvider implements IEventProvider {
     registry?: EventRegistry,
     subscriberRegistry?: SubscriberRegistry,
     subscriptionManager?: SubscriptionManager,
+    router?: EventRouter,
+    dispatchManager?: DispatchManager,
     bus?: EventBus,
   ) {
     this._config = config ?? createEventConfiguration();
@@ -69,6 +80,9 @@ export class EventProvider implements IEventProvider {
     this._registry = registry ?? new EventRegistry();
     this._subscriberRegistry = subscriberRegistry ?? new SubscriberRegistry();
     this._subscriptionManager = subscriptionManager ?? new SubscriptionManager();
+    this._router = router ?? new EventRouter();
+    this._dispatchManager =
+      dispatchManager ?? new DispatchManager(this._subscriptionManager);
 
     this._bus =
       bus ??
@@ -76,6 +90,8 @@ export class EventProvider implements IEventProvider {
         this._registry,
         this._subscriberRegistry,
         this._subscriptionManager,
+        this._router,
+        this._dispatchManager,
         this._config.maxQueueSize ?? 1000,
       );
   }
@@ -153,6 +169,10 @@ export class EventProvider implements IEventProvider {
     const history = this._bus.history();
     const subStats = this._subscriptionManager.statistics();
     const subHealth = this._subscriptionManager.health();
+    const rules = this._router.listRules().map((r) => `${r.name} (${r.topicPattern})`);
+    const dspStats = this._dispatchManager.statistics();
+    const dspHealth = this._dispatchManager.health();
+    const routerTelem = this._router.telemetry();
 
     return createEventDiagnostics({
       health: this.health(),
@@ -167,6 +187,11 @@ export class EventProvider implements IEventProvider {
       subscriptionCount: this._subscriberRegistry.listSubscriptions().length,
       subscriberStatistics: subStats,
       subscriberHealth: subHealth,
+      routingRules: rules,
+      dispatchStatistics: dspStats,
+      dispatchHealth: dspHealth,
+      deadLetterCount: dspStats.deadLetterCount,
+      routingEvaluations: routerTelem.evaluations,
       timestamp: new Date().toISOString(),
     });
   }
@@ -245,5 +270,29 @@ export class EventProvider implements IEventProvider {
 
   public clearHistory(): void {
     this._bus.clearHistory();
+  }
+
+  public registerRoutingRule(rule: RoutingRule): void {
+    this._router.registerRule(rule);
+  }
+
+  public removeRoutingRule(ruleId: string): boolean {
+    return this._router.removeRule(ruleId);
+  }
+
+  public listRoutingRules(): ReadonlyArray<RoutingRule> {
+    return this._router.listRules();
+  }
+
+  public route<T = unknown>(event: FrontendEvent<T>): RoutingDecision {
+    return this._router.route(event);
+  }
+
+  public dispatchStatistics(): DispatchStatistics {
+    return this._dispatchManager.statistics();
+  }
+
+  public dispatchHealth(): DispatchHealth {
+    return this._dispatchManager.health();
   }
 }

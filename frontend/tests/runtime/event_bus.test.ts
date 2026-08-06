@@ -220,7 +220,7 @@ describe('Phase 16.4.2 — Frontend Event Bus & Publish Registration Engine', ()
       registry.register(createEventRegistration({ eventType: 'stream.data' }));
 
       const maxHistory = 5;
-      const bus = new EventBus(registry, undefined, undefined, maxHistory);
+      const bus = new EventBus(registry, undefined, undefined, undefined, undefined, maxHistory);
 
       for (let i = 1; i <= 10; i++) {
         bus.publish('stream.data', { seq: i });

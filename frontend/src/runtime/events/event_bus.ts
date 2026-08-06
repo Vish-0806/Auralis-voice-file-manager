@@ -1,8 +1,8 @@
 /**
- * Event Bus Implementation (Phase 16.4.3).
+ * Event Bus Implementation (Phase 16.4.4).
  *
  * Implements IEventBus managing event publication, registration validation, sequence numbering,
- * bounded event history tracking, subscriber registration delegation, and publish-to-subscriber execution dispatch.
+ * bounded event history tracking, routing evaluation, and dispatch execution management.
  */
 
 import {
@@ -21,14 +21,25 @@ import {
   SubscriberRegistration,
 } from './models';
 import { EventValidationException } from './exceptions';
-import { IEventBus, IEventRegistry, ISubscriberRegistry, ISubscriptionManager } from './interfaces';
+import {
+  IDispatchManager,
+  IEventBus,
+  IEventRegistry,
+  IEventRouter,
+  ISubscriberRegistry,
+  ISubscriptionManager,
+} from './interfaces';
 import { SubscriberRegistry } from './subscriber_registry';
 import { SubscriptionManager } from './subscription_manager';
+import { EventRouter } from './event_router';
+import { DispatchManager } from './dispatch_manager';
 
 export class EventBus implements IEventBus {
   private readonly _registry: IEventRegistry;
   private readonly _subscriberRegistry: ISubscriberRegistry;
   private readonly _subscriptionManager: ISubscriptionManager;
+  private readonly _router: IEventRouter;
+  private readonly _dispatchManager: IDispatchManager;
   private readonly _maxHistorySize: number;
 
   private readonly _history: PublishedEvent[] = [];
@@ -42,11 +53,16 @@ export class EventBus implements IEventBus {
     registry: IEventRegistry,
     subscriberRegistry?: ISubscriberRegistry,
     subscriptionManager?: ISubscriptionManager,
+    router?: IEventRouter,
+    dispatchManager?: IDispatchManager,
     maxHistorySize = 1000,
   ) {
     this._registry = registry;
     this._subscriberRegistry = subscriberRegistry ?? new SubscriberRegistry();
     this._subscriptionManager = subscriptionManager ?? new SubscriptionManager();
+    this._router = router ?? new EventRouter();
+    this._dispatchManager =
+      dispatchManager ?? new DispatchManager(this._subscriptionManager);
     this._maxHistorySize = maxHistorySize;
   }
 
@@ -88,11 +104,11 @@ export class EventBus implements IEventBus {
 
     this._totalPayloadBytes += this.estimatePayloadSize(payload);
 
-    // PubSub Dispatch: Lookup subscribers and execute callbacks
+    // Event Routing & Priority Dispatch Pipeline
+    const decision = this._router.route(event);
     const subscribers = this._subscriberRegistry.getSubscribers<T>(type);
-    if (subscribers.length > 0) {
-      this._subscriptionManager.executeSubscribers(published, subscribers);
-    }
+
+    this._dispatchManager.dispatch(decision, subscribers);
 
     return published;
   }

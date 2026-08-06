@@ -1,11 +1,15 @@
 /**
- * Event & Messaging Runtime Interfaces (Phase 16.4.3).
+ * Event & Messaging Runtime Interfaces (Phase 16.4.4).
  *
  * Defines contracts for IEventRegistry, IEventBus, ISubscriberRegistry, ISubscriptionManager,
- * IEventProvider, and IEventRuntime.
+ * IEventRouter, IDispatchManager, IEventProvider, and IEventRuntime.
  */
 
 import {
+  DeadLetterRecord,
+  DispatchHealth,
+  DispatchRecord,
+  DispatchStatistics,
   EventBusHealth,
   EventBusStatistics,
   EventCapabilities,
@@ -21,6 +25,8 @@ import {
   EventSubscription,
   FrontendEvent,
   PublishedEvent,
+  RoutingDecision,
+  RoutingRule,
   SubscriberHealth,
   SubscriberRegistration,
   SubscriberStatistics,
@@ -60,6 +66,26 @@ export interface ISubscriptionManager {
   ): SubscriptionResult;
   statistics(): SubscriberStatistics;
   health(): SubscriberHealth;
+}
+
+export interface IEventRouter {
+  registerRule(rule: RoutingRule): void;
+  removeRule(ruleId: string): boolean;
+  getRule(ruleId: string): RoutingRule | undefined;
+  listRules(): ReadonlyArray<RoutingRule>;
+  route<T = unknown>(event: FrontendEvent<T>): RoutingDecision;
+  clearRules(): void;
+}
+
+export interface IDispatchManager {
+  dispatch<T = unknown>(
+    decision: RoutingDecision,
+    subscribers: ReadonlyArray<SubscriberRegistration<T>>,
+  ): DispatchRecord;
+  listDeadLetters(): ReadonlyArray<DeadLetterRecord>;
+  clearDeadLetters(): void;
+  statistics(): DispatchStatistics;
+  health(): DispatchHealth;
 }
 
 export interface IEventBus {
@@ -117,6 +143,13 @@ export interface IEventProvider {
   subscriberCount(eventType?: string): number;
   history(): EventHistory;
   clearHistory(): void;
+
+  registerRoutingRule(rule: RoutingRule): void;
+  removeRoutingRule(ruleId: string): boolean;
+  listRoutingRules(): ReadonlyArray<RoutingRule>;
+  route<T = unknown>(event: FrontendEvent<T>): RoutingDecision;
+  dispatchStatistics(): DispatchStatistics;
+  dispatchHealth(): DispatchHealth;
 }
 
 export interface IEventRuntime {
@@ -151,4 +184,11 @@ export interface IEventRuntime {
   subscriberCount(eventType?: string): number;
   history(): EventHistory;
   clearHistory(): void;
+
+  registerRoutingRule(rule: RoutingRule): void;
+  removeRoutingRule(ruleId: string): boolean;
+  listRoutingRules(): ReadonlyArray<RoutingRule>;
+  route<T = unknown>(event: FrontendEvent<T>): RoutingDecision;
+  dispatchStatistics(): DispatchStatistics;
+  dispatchHealth(): DispatchHealth;
 }

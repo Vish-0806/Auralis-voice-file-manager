@@ -1,10 +1,12 @@
 /**
- * Event Runtime Coordinator Implementation (Phase 16.4.3).
+ * Event Runtime Coordinator Implementation (Phase 16.4.4).
  *
  * Implements IEventRuntime acting as central coordinator delegating to IEventProvider.
  */
 
 import {
+  DispatchHealth,
+  DispatchStatistics,
   EventCapabilities,
   EventDiagnostics,
   EventHealth,
@@ -16,6 +18,8 @@ import {
   EventSubscription,
   FrontendEvent,
   PublishedEvent,
+  RoutingDecision,
+  RoutingRule,
   SubscriberRegistration,
 } from './models';
 import { IEventProvider, IEventRuntime } from './interfaces';
@@ -122,5 +126,29 @@ export class EventRuntime implements IEventRuntime {
 
   public clearHistory(): void {
     this._provider.clearHistory();
+  }
+
+  public registerRoutingRule(rule: RoutingRule): void {
+    this._provider.registerRoutingRule(rule);
+  }
+
+  public removeRoutingRule(ruleId: string): boolean {
+    return this._provider.removeRoutingRule(ruleId);
+  }
+
+  public listRoutingRules(): ReadonlyArray<RoutingRule> {
+    return this._provider.listRoutingRules();
+  }
+
+  public route<T = unknown>(event: FrontendEvent<T>): RoutingDecision {
+    return this._provider.route(event);
+  }
+
+  public dispatchStatistics(): DispatchStatistics {
+    return this._provider.dispatchStatistics();
+  }
+
+  public dispatchHealth(): DispatchHealth {
+    return this._provider.dispatchHealth();
   }
 }
