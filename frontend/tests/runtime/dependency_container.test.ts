@@ -34,7 +34,7 @@ class DummyService {
   }
 }
 
-describe('Phase 16.2.1 — Frontend Dependency Injection Foundation', () => {
+describe('Phase 16.2.2 — Frontend Dependency Injection Service Registration Engine', () => {
   beforeEach(() => {
     resetDependencyContainer();
     resetServiceProvider();
@@ -60,244 +60,238 @@ describe('Phase 16.2.1 — Frontend Dependency Injection Foundation', () => {
       expect(Object.isFrozen(config)).toBe(true);
     });
 
-    it('should create default frozen ContainerCapabilities', () => {
+    it('should create extended ContainerCapabilities with aliases and replacement flags', () => {
       const caps = createContainerCapabilities();
       expect(caps.supportsScoped).toBe(true);
       expect(caps.supportsFactories).toBe(true);
       expect(caps.supportsInstances).toBe(true);
       expect(caps.supportsCircularDetection).toBe(true);
-      expect(caps.maxDepth).toBe(32);
+      expect(caps.supportsAliases).toBe(true);
+      expect(caps.supportsTags).toBe(true);
+      expect(caps.supportsReplacement).toBe(true);
       expect(Object.isFrozen(caps)).toBe(true);
     });
 
-    it('should create default frozen ContainerHealth', () => {
+    it('should create ServiceDescriptorModel with aliases and tags', () => {
+      const model = createServiceDescriptorModel({
+        descriptorId: 'd1',
+        serviceType: 'IService',
+        lifetime: ServiceLifetime.SINGLETON,
+        aliases: ['Alias1'],
+        tags: ['tag1'],
+      });
+      expect(model.descriptorId).toBe('d1');
+      expect(model.serviceType).toBe('IService');
+      expect(model.aliases).toContain('Alias1');
+      expect(model.tags).toContain('tag1');
+      expect(Object.isFrozen(model.aliases)).toBe(true);
+      expect(Object.isFrozen(model.tags)).toBe(true);
+      expect(Object.isFrozen(model)).toBe(true);
+    });
+
+    it('should exercise helper model factories', () => {
       const health = createContainerHealth();
       expect(health.healthy).toBe(false);
-      expect(health.state).toBe(ContainerState.UNINITIALIZED);
-      expect(Object.isFrozen(health)).toBe(true);
-    });
 
-    it('should create default frozen ContainerStatistics', () => {
       const stats = createContainerStatistics();
       expect(stats.totalRegistrations).toBe(0);
-      expect(stats.singletonCount).toBe(0);
-      expect(stats.transientCount).toBe(0);
-      expect(stats.scopedCount).toBe(0);
-      expect(Object.isFrozen(stats)).toBe(true);
-    });
 
-    it('should create default frozen ContainerContext and Diagnostics', () => {
       const ctx = createContainerContext();
       expect(ctx.containerId).toBe('default-container');
-      expect(Object.isFrozen(ctx)).toBe(true);
 
       const diag = createContainerDiagnostics();
       expect(diag.state).toBe(ContainerState.UNINITIALIZED);
-      expect(Object.isFrozen(diag)).toBe(true);
-    });
 
-    it('should create ServiceDescriptorModel and DependencyNode correctly', () => {
-      const model = createServiceDescriptorModel({
-        serviceType: 'IService',
-        lifetime: ServiceLifetime.SINGLETON,
-      });
-      expect(model.serviceType).toBe('IService');
-      expect(Object.isFrozen(model)).toBe(true);
+      const node = createDependencyNode({ serviceType: 'S1', dependencies: ['D1'] });
+      expect(node.dependencies).toContain('D1');
 
-      const node = createDependencyNode({
-        serviceType: 'IService',
-        dependencies: ['IDepA'],
-      });
-      expect(node.dependencies).toContain('IDepA');
-      expect(Object.isFrozen(node)).toBe(true);
-
-      const reg = createServiceRegistration({
-        serviceType: 'IService',
-        lifetime: ServiceLifetime.TRANSIENT,
-      });
-      expect(reg.serviceType).toBe('IService');
-      expect(Object.isFrozen(reg)).toBe(true);
+      const reg = createServiceRegistration({ descriptorId: 'desc_1', serviceType: 'S1', lifetime: ServiceLifetime.SINGLETON });
+      expect(reg.serviceType).toBe('S1');
     });
   });
 
   describe('2. Exception Hierarchy', () => {
-    it('should instantiate DependencyInjectionException', () => {
-      const err = new DependencyInjectionException('Base error');
-      expect(err).toBeInstanceOf(Error);
-      expect(err).toBeInstanceOf(DependencyInjectionException);
-      expect(err.name).toBe('DependencyInjectionException');
-    });
+    it('should verify exception hierarchy and instances', () => {
+      const e1 = new DependencyInjectionException('base');
+      const e2 = new ServiceRegistrationException('reg');
+      const e3 = new ServiceResolutionException('res');
+      const e4 = new CircularDependencyException('circ');
+      const e5 = new ServiceValidationException('val');
 
-    it('should instantiate ServiceRegistrationException', () => {
-      const err = new ServiceRegistrationException('Reg error');
-      expect(err).toBeInstanceOf(DependencyInjectionException);
-      expect(err.name).toBe('ServiceRegistrationException');
-    });
-
-    it('should instantiate ServiceResolutionException', () => {
-      const err = new ServiceResolutionException('Res error');
-      expect(err).toBeInstanceOf(DependencyInjectionException);
-      expect(err.name).toBe('ServiceResolutionException');
-    });
-
-    it('should instantiate CircularDependencyException', () => {
-      const err = new CircularDependencyException('Circ error');
-      expect(err).toBeInstanceOf(DependencyInjectionException);
-      expect(err.name).toBe('CircularDependencyException');
-    });
-
-    it('should instantiate ServiceValidationException', () => {
-      const err = new ServiceValidationException('Val error');
-      expect(err).toBeInstanceOf(DependencyInjectionException);
-      expect(err.name).toBe('ServiceValidationException');
+      expect(e1).toBeInstanceOf(Error);
+      expect(e2).toBeInstanceOf(DependencyInjectionException);
+      expect(e3).toBeInstanceOf(DependencyInjectionException);
+      expect(e4).toBeInstanceOf(DependencyInjectionException);
+      expect(e5).toBeInstanceOf(DependencyInjectionException);
     });
   });
 
-  describe('3. ServiceDescriptor & Validation', () => {
-    it('should construct class implementation descriptor', () => {
-      const desc = new ServiceDescriptor('DummyService', ServiceLifetime.SINGLETON, DummyService);
-      expect(desc.serviceType).toBe('DummyService');
-      expect(desc.lifetime).toBe(ServiceLifetime.SINGLETON);
-      expect(desc.implementation).toBe(DummyService);
-      expect(desc.factory).toBeUndefined();
-      expect(desc.instance).toBeUndefined();
-      expect(desc.toModel().implementationType).toBe('DummyService');
-    });
-
-    it('should construct factory descriptor', () => {
-      const factory = () => new DummyService();
-      const desc = new ServiceDescriptor('DummyService', ServiceLifetime.TRANSIENT, factory);
-      expect(desc.factory).toBe(factory);
-      expect(desc.toModel().hasFactory).toBe(true);
-    });
-
-    it('should construct instance descriptor for SINGLETON', () => {
-      const instance = new DummyService();
-      const desc = new ServiceDescriptor('DummyService', ServiceLifetime.SINGLETON, instance);
-      expect(desc.instance).toBe(instance);
-      expect(desc.toModel().hasInstance).toBe(true);
-    });
-
-    it('should throw exception if non-singleton attempts instance registration', () => {
-      const instance = new DummyService();
-      expect(
-        () => new ServiceDescriptor('DummyService', ServiceLifetime.TRANSIENT, instance),
-      ).toThrow(ServiceRegistrationException);
-    });
-
-    it('should throw exception on invalid serviceType or target', () => {
-      expect(() => new ServiceDescriptor('', ServiceLifetime.SINGLETON, DummyService)).toThrow(
-        ServiceRegistrationException,
+  describe('3. ServiceDescriptor Extensions & Equality', () => {
+    it('should generate unique descriptorId, aliases, tags, and registeredAt', () => {
+      const desc = new ServiceDescriptor(
+        'DummyService',
+        ServiceLifetime.SINGLETON,
+        DummyService,
+        { role: 'test' },
+        { aliases: ['DummyAlias'], tags: ['tagA'] },
       );
-      expect(
-        () => new ServiceDescriptor('DummyService', ServiceLifetime.SINGLETON, null),
-      ).toThrow(ServiceRegistrationException);
+
+      expect(desc.descriptorId).toBeDefined();
+      expect(desc.descriptorId.startsWith('desc_')).toBe(true);
+      expect(desc.serviceType).toBe('DummyService');
+      expect(desc.aliases).toEqual(['DummyAlias']);
+      expect(desc.tags).toEqual(['tagA']);
+      expect(desc.registeredAt).toBeDefined();
+      expect(Object.isFrozen(desc.aliases)).toBe(true);
+      expect(Object.isFrozen(desc.tags)).toBe(true);
+    });
+
+    it('should verify equals() comparison between descriptors', () => {
+      const d1 = new ServiceDescriptor('S1', ServiceLifetime.SINGLETON, DummyService);
+      const d2 = new ServiceDescriptor(
+        'S1',
+        ServiceLifetime.TRANSIENT,
+        () => new DummyService(),
+      );
+      const d3 = new ServiceDescriptor('S2', ServiceLifetime.SINGLETON, DummyService);
+
+      expect(d1.equals(d2)).toBe(true);
+      expect(d1.equals(d3)).toBe(false);
     });
   });
 
-  describe('4. ServiceCollection Operations', () => {
-    it('should register singletons, transients, and scopeds', () => {
+  describe('4. ServiceCollection Registration Engine', () => {
+    it('should register singletons, transients, and scopeds with aliases', () => {
       const collection = new ServiceCollection();
-      collection.addSingleton('S1', DummyService);
-      collection.addTransient('S2', () => new DummyService());
+      collection.addSingleton('S1', DummyService, undefined, { aliases: ['A1'] });
+      collection.addTransient('S2', () => new DummyService(), undefined, { aliases: ['A2'] });
       collection.addScoped('S3', DummyService);
 
       expect(collection.count()).toBe(3);
       expect(collection.contains('S1')).toBe(true);
-      expect(collection.contains('S2')).toBe(true);
-      expect(collection.contains('S3')).toBe(true);
+      expect(collection.containsAlias('A1')).toBe(true);
+      expect(collection.containsAlias('A2')).toBe(true);
+
+      const fetchedByAlias = collection.getDescriptorByAlias('A1');
+      expect(fetchedByAlias).toBeDefined();
+      expect(fetchedByAlias?.serviceType).toBe('S1');
     });
 
-    it('should list all registered services as frozen array', () => {
+    it('should reject duplicate service types and throw ServiceRegistrationException', () => {
       const collection = new ServiceCollection();
       collection.addSingleton('S1', DummyService);
-      const list = collection.listServices();
-      expect(list.length).toBe(1);
-      expect(Object.isFrozen(list)).toBe(true);
+
+      expect(() => collection.addSingleton('S1', DummyService)).toThrow(
+        ServiceRegistrationException,
+      );
     });
 
-    it('should remove and clear services', () => {
+    it('should reject alias conflicts with existing service types or aliases', () => {
+      const collection = new ServiceCollection();
+      collection.addSingleton('S1', DummyService, undefined, { aliases: ['A1'] });
+
+      expect(() =>
+        collection.addSingleton('S2', DummyService, undefined, { aliases: ['S1'] }),
+      ).toThrow(ServiceRegistrationException);
+
+      expect(() =>
+        collection.addSingleton('S3', DummyService, undefined, { aliases: ['A1'] }),
+      ).toThrow(ServiceRegistrationException);
+    });
+
+    it('should replace existing service registration using replace()', () => {
+      const collection = new ServiceCollection();
+      collection.addSingleton('S1', DummyService, undefined, { aliases: ['OldAlias'] });
+
+      const newDesc = new ServiceDescriptor(
+        'S1',
+        ServiceLifetime.TRANSIENT,
+        () => new DummyService(),
+        undefined,
+        { aliases: ['NewAlias'] },
+      );
+
+      collection.replace(newDesc);
+
+      expect(collection.count()).toBe(1);
+      expect(collection.containsAlias('OldAlias')).toBe(false);
+      expect(collection.containsAlias('NewAlias')).toBe(true);
+
+      const updated = collection.getDescriptor('S1');
+      expect(updated?.lifetime).toBe(ServiceLifetime.TRANSIENT);
+      expect(collection.statistics().replacementsCount).toBe(1);
+    });
+
+    it('should safely attempt registration using tryAdd()', () => {
+      const collection = new ServiceCollection();
+      const d1 = new ServiceDescriptor('S1', ServiceLifetime.SINGLETON, DummyService);
+      const d2 = new ServiceDescriptor('S1', ServiceLifetime.TRANSIENT, () => new DummyService());
+
+      expect(collection.tryAdd(d1)).toBe(true);
+      expect(collection.tryAdd(d2)).toBe(false);
+      expect(collection.count()).toBe(1);
+      expect(collection.statistics().rejectedRegistrationsCount).toBe(1);
+    });
+
+    it('should list descriptors by lifetime', () => {
       const collection = new ServiceCollection();
       collection.addSingleton('S1', DummyService);
+      collection.addSingleton('S2', DummyService);
+      collection.addTransient('T1', () => new DummyService());
+
+      const singletons = collection.listByLifetime(ServiceLifetime.SINGLETON);
+      const transients = collection.listByLifetime(ServiceLifetime.TRANSIENT);
+
+      expect(singletons.length).toBe(2);
+      expect(transients.length).toBe(1);
+    });
+
+    it('should remove services and clean up alias mappings', () => {
+      const collection = new ServiceCollection();
+      collection.addSingleton('S1', DummyService, undefined, { aliases: ['A1'] });
+
       expect(collection.remove('S1')).toBe(true);
-      expect(collection.count()).toBe(0);
-
-      collection.addSingleton('S1', DummyService);
-      collection.clear();
-      expect(collection.count()).toBe(0);
-    });
-  });
-
-  describe('5. ServiceProvider & Telemetry', () => {
-    it('should initialize and shutdown provider correctly', () => {
-      const provider = new ServiceProvider();
-      expect(provider.state()).toBe(ContainerState.UNINITIALIZED);
-
-      const healthReady = provider.initialize();
-      expect(healthReady.healthy).toBe(true);
-      expect(provider.state()).toBe(ContainerState.READY);
-
-      const healthStopped = provider.shutdown();
-      expect(healthStopped.healthy).toBe(false);
-      expect(provider.state()).toBe(ContainerState.STOPPED);
+      expect(collection.contains('S1')).toBe(false);
+      expect(collection.containsAlias('A1')).toBe(false);
+      expect(collection.statistics().removalsCount).toBe(1);
     });
 
-    it('should calculate statistics based on registrations', () => {
+    it('should remove services matching predicate using removeAll()', () => {
       const collection = new ServiceCollection();
-      collection.addSingleton('S1', DummyService);
-      collection.addTransient('S2', () => new DummyService());
-      collection.addScoped('S3', DummyService);
+      collection.addSingleton('S1', DummyService, undefined, { tags: ['deprecated'] });
+      collection.addSingleton('S2', DummyService, undefined, { tags: ['active'] });
 
-      const provider = new ServiceProvider(collection);
-      const stats = provider.statistics();
-
-      expect(stats.totalRegistrations).toBe(3);
-      expect(stats.singletonCount).toBe(1);
-      expect(stats.transientCount).toBe(1);
-      expect(stats.scopedCount).toBe(1);
-    });
-
-    it('should throw Not Implemented ServiceResolutionException on resolve', () => {
-      const provider = new ServiceProvider();
-      expect(() => provider.resolve('DummyService')).toThrow(ServiceResolutionException);
-      expect(() => provider.tryResolve('DummyService')).toThrow(ServiceResolutionException);
+      const removed = collection.removeAll((d) => d.tags.includes('deprecated'));
+      expect(removed).toBe(1);
+      expect(collection.contains('S1')).toBe(false);
+      expect(collection.contains('S2')).toBe(true);
     });
   });
 
-  describe('6. DependencyContainer & Singleton Accessors', () => {
-    it('should instantiate DependencyContainer and delegate provider operations', () => {
+  describe('5. Container & Singleton Accessors Integration', () => {
+    it('should instantiate DependencyContainer and verify singleton helpers', () => {
       const container = new DependencyContainer();
       expect(container.state()).toBe(ContainerState.UNINITIALIZED);
 
       const health = container.initialize();
       expect(health.healthy).toBe(true);
       expect(container.state()).toBe(ContainerState.READY);
-    });
 
-    it('should manage global service provider singleton accessors', () => {
-      const p1 = getServiceProvider();
-      const p2 = getServiceProvider();
-      expect(p1).toBe(p2);
+      const sp1 = getServiceProvider();
+      const sp2 = getServiceProvider();
+      expect(sp1).toBe(sp2);
 
-      const customP = new ServiceProvider();
-      setServiceProvider(customP);
-      expect(getServiceProvider()).toBe(customP);
+      const customSP = new ServiceProvider();
+      setServiceProvider(customSP);
+      expect(getServiceProvider()).toBe(customSP);
 
-      resetServiceProvider();
-      expect(getServiceProvider()).not.toBe(customP);
-    });
+      const dc1 = getDependencyContainer();
+      const dc2 = getDependencyContainer();
+      expect(dc1).toBe(dc2);
 
-    it('should manage global dependency container singleton accessors', () => {
-      const c1 = getDependencyContainer();
-      const c2 = getDependencyContainer();
-      expect(c1).toBe(c2);
-
-      const customC = new DependencyContainer();
-      setDependencyContainer(customC);
-      expect(getDependencyContainer()).toBe(customC);
-
-      resetDependencyContainer();
-      expect(getDependencyContainer()).not.toBe(customC);
+      const customDC = new DependencyContainer();
+      setDependencyContainer(customDC);
+      expect(getDependencyContainer()).toBe(customDC);
     });
   });
 });

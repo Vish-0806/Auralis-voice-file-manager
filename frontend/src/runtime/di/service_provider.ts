@@ -1,9 +1,9 @@
 /**
- * Service Provider Foundation Implementation (Phase 16.2.1).
+ * Service Provider Foundation Implementation (Phase 16.2.2).
  *
  * Implements IServiceProvider owning container configuration, context, health,
  * statistics, capabilities, and diagnostics telemetry.
- * Service resolution methods intentionally throw "Not Implemented" pending Phase 16.2.3.
+ * Resolution methods intentionally throw "Not Implemented" pending Phase 16.2.3.
  */
 
 import {
@@ -20,7 +20,6 @@ import {
   createContainerDiagnostics,
   createContainerHealth,
   createContainerStatistics,
-  ServiceLifetime,
 } from './models';
 import { IServiceCollection, IServiceProvider } from './interfaces';
 import { ServiceCollection } from './service_collection';
@@ -91,22 +90,16 @@ export class ServiceProvider implements IServiceProvider {
   }
 
   public statistics(): ContainerStatistics {
-    const services = this._collection.listServices();
-    let singletons = 0;
-    let transients = 0;
-    let scopeds = 0;
-
-    for (const descriptor of services) {
-      if (descriptor.lifetime === ServiceLifetime.SINGLETON) singletons++;
-      else if (descriptor.lifetime === ServiceLifetime.TRANSIENT) transients++;
-      else if (descriptor.lifetime === ServiceLifetime.SCOPED) scopeds++;
-    }
-
+    const collStats = this._collection.statistics();
     return createContainerStatistics({
-      totalRegistrations: services.length,
-      singletonCount: singletons,
-      transientCount: transients,
-      scopedCount: scopeds,
+      totalRegistrations: collStats.totalRegistrations,
+      singletonCount: collStats.singletonCount,
+      transientCount: collStats.transientCount,
+      scopedCount: collStats.scopedCount,
+      replacementsCount: collStats.replacementsCount,
+      removalsCount: collStats.removalsCount,
+      rejectedRegistrationsCount: collStats.rejectedRegistrationsCount,
+      aliasCount: collStats.aliasCount,
       totalResolutions: this._totalResolutionsCount,
       failedResolutions: this._failedResolutionsCount,
     });
@@ -143,7 +136,7 @@ export class ServiceProvider implements IServiceProvider {
     this._totalResolutionsCount++;
     this._failedResolutionsCount++;
     throw new ServiceResolutionException(
-      `Service resolution for '${serviceType}' is not implemented in Phase 16.2.1 (scheduled for Phase 16.2.3).`,
+      `Service resolution for '${serviceType}' is not implemented in Phase 16.2.2 (scheduled for Phase 16.2.3).`,
     );
   }
 
@@ -151,7 +144,7 @@ export class ServiceProvider implements IServiceProvider {
     this._totalResolutionsCount++;
     this._failedResolutionsCount++;
     throw new ServiceResolutionException(
-      `Service tryResolve for '${serviceType}' is not implemented in Phase 16.2.1 (scheduled for Phase 16.2.3).`,
+      `Service tryResolve for '${serviceType}' is not implemented in Phase 16.2.2 (scheduled for Phase 16.2.3).`,
     );
   }
 }

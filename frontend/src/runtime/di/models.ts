@@ -1,9 +1,9 @@
 /**
- * Dependency Injection Domain Models (Phase 16.2.1).
+ * Dependency Injection Domain Models (Phase 16.2.2).
  *
  * Provides immutable state models, configuration objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, and diagnostics telemetry
- * for the Frontend Dependency Injection Container.
+ * for the Frontend Dependency Injection Container and Service Registration Engine.
  */
 
 export enum ServiceLifetime {
@@ -21,15 +21,20 @@ export enum ContainerState {
 }
 
 export interface ServiceDescriptorModel {
+  readonly descriptorId: string;
   readonly serviceType: string;
   readonly lifetime: ServiceLifetime;
   readonly implementationType?: string;
   readonly hasFactory: boolean;
   readonly hasInstance: boolean;
+  readonly aliases: ReadonlyArray<string>;
+  readonly tags: ReadonlyArray<string>;
   readonly metadata: Readonly<Record<string, unknown>>;
+  readonly registeredAt: string;
 }
 
 export interface ServiceRegistration {
+  readonly descriptorId: string;
   readonly serviceType: string;
   readonly lifetime: ServiceLifetime;
   readonly registeredAt: string;
@@ -45,6 +50,9 @@ export interface ContainerCapabilities {
   readonly supportsFactories: boolean;
   readonly supportsInstances: boolean;
   readonly supportsCircularDetection: boolean;
+  readonly supportsAliases: boolean;
+  readonly supportsTags: boolean;
+  readonly supportsReplacement: boolean;
   readonly maxDepth: number;
 }
 
@@ -53,6 +61,10 @@ export interface ContainerStatistics {
   readonly singletonCount: number;
   readonly transientCount: number;
   readonly scopedCount: number;
+  readonly replacementsCount: number;
+  readonly removalsCount: number;
+  readonly rejectedRegistrationsCount: number;
+  readonly aliasCount: number;
   readonly totalResolutions: number;
   readonly failedResolutions: number;
 }
@@ -87,22 +99,35 @@ export interface ContainerDiagnostics {
 }
 
 export function createServiceDescriptorModel(
-  params: Partial<ServiceDescriptorModel> & { serviceType: string; lifetime: ServiceLifetime },
+  params: Partial<ServiceDescriptorModel> & {
+    descriptorId: string;
+    serviceType: string;
+    lifetime: ServiceLifetime;
+  },
 ): ServiceDescriptorModel {
   return Object.freeze({
+    descriptorId: params.descriptorId,
     serviceType: params.serviceType,
     lifetime: params.lifetime,
     implementationType: params.implementationType,
     hasFactory: params.hasFactory ?? false,
     hasInstance: params.hasInstance ?? false,
+    aliases: Object.freeze([...(params.aliases ?? [])]),
+    tags: Object.freeze([...(params.tags ?? [])]),
     metadata: Object.freeze({ ...(params.metadata ?? {}) }),
+    registeredAt: params.registeredAt ?? new Date().toISOString(),
   });
 }
 
 export function createServiceRegistration(
-  params: Partial<ServiceRegistration> & { serviceType: string; lifetime: ServiceLifetime },
+  params: Partial<ServiceRegistration> & {
+    descriptorId: string;
+    serviceType: string;
+    lifetime: ServiceLifetime;
+  },
 ): ServiceRegistration {
   return Object.freeze({
+    descriptorId: params.descriptorId,
     serviceType: params.serviceType,
     lifetime: params.lifetime,
     registeredAt: params.registeredAt ?? new Date().toISOString(),
@@ -126,6 +151,9 @@ export function createContainerCapabilities(
     supportsFactories: params.supportsFactories ?? true,
     supportsInstances: params.supportsInstances ?? true,
     supportsCircularDetection: params.supportsCircularDetection ?? true,
+    supportsAliases: params.supportsAliases ?? true,
+    supportsTags: params.supportsTags ?? true,
+    supportsReplacement: params.supportsReplacement ?? true,
     maxDepth: params.maxDepth ?? 32,
   });
 }
@@ -138,6 +166,10 @@ export function createContainerStatistics(
     singletonCount: params.singletonCount ?? 0,
     transientCount: params.transientCount ?? 0,
     scopedCount: params.scopedCount ?? 0,
+    replacementsCount: params.replacementsCount ?? 0,
+    removalsCount: params.removalsCount ?? 0,
+    rejectedRegistrationsCount: params.rejectedRegistrationsCount ?? 0,
+    aliasCount: params.aliasCount ?? 0,
     totalResolutions: params.totalResolutions ?? 0,
     failedResolutions: params.failedResolutions ?? 0,
   });
