@@ -1,10 +1,10 @@
 /**
- * Configuration Provider Implementation (Phase 16.3.4).
+ * Configuration Provider Implementation (Phase 16.3.5).
  *
  * Implements IConfigurationProvider owning configuration runtime state transitions,
  * telemetry statistics, health evaluation, context metadata, capabilities reporting,
  * source resolution delegation, schema management, type conversion, constraint validation,
- * profile management, and feature flag evaluations.
+ * profile management, feature flag evaluations, and sensitive data management.
  */
 
 import {
@@ -36,6 +36,11 @@ import {
   FeatureFlag,
   FeatureHealth,
   FeatureStatistics,
+  SensitiveConfigurationSnapshot,
+  SensitiveHealth,
+  SensitiveStatistics,
+  SensitiveValuePolicy,
+  SensitiveValueType,
 } from './models';
 import { IConfigurationProvider, IConfigurationSource } from './interfaces';
 import { SourceRegistry } from './source_registry';
@@ -46,6 +51,7 @@ import { ConfigurationResolver } from './configuration_resolver';
 import { ConfigurationValidator } from './configuration_validator';
 import { ProfileManager } from './profile_manager';
 import { FeatureFlagManager } from './feature_flag_manager';
+import { SecureConfigurationManager } from './secure_configuration_manager';
 
 export class ConfigurationProvider implements IConfigurationProvider {
   private _runtimeState: ConfigurationRuntimeState = ConfigurationRuntimeState.UNINITIALIZED;
@@ -55,6 +61,7 @@ export class ConfigurationProvider implements IConfigurationProvider {
 
   private readonly _profileManager: ProfileManager;
   private readonly _featureFlagManager: FeatureFlagManager;
+  private readonly _secureManager: SecureConfigurationManager;
 
   private readonly _registry: SourceRegistry;
   private readonly _sourceManager: ConfigurationSourceManager;
@@ -78,6 +85,7 @@ export class ConfigurationProvider implements IConfigurationProvider {
     schemaManager?: ConfigurationSchemaManager,
     profileManager?: ProfileManager,
     featureFlagManager?: FeatureFlagManager,
+    secureManager?: SecureConfigurationManager,
   ) {
     this._config = config ?? createConfigurationConfiguration();
     this._capabilities = capabilities ?? createConfigurationCapabilities();
@@ -85,9 +93,14 @@ export class ConfigurationProvider implements IConfigurationProvider {
 
     this._profileManager = profileManager ?? new ProfileManager();
     this._featureFlagManager = featureFlagManager ?? new FeatureFlagManager();
+    this._secureManager = secureManager ?? new SecureConfigurationManager();
 
     this._registry = registry ?? new SourceRegistry();
-    this._sourceManager = new ConfigurationSourceManager(this._registry, this._profileManager);
+    this._sourceManager = new ConfigurationSourceManager(
+      this._registry,
+      this._profileManager,
+      this._secureManager,
+    );
 
     this._defaultMemorySource = new MemoryConfigurationSource();
     this._registry.register(this._defaultMemorySource);
@@ -191,6 +204,9 @@ export class ConfigurationProvider implements IConfigurationProvider {
       profileStats: this._profileManager.statistics(),
       featureStats: this.featureStatistics(),
       featureHealth: this.featureHealth(),
+      sensitiveSnapshot: this.createSensitiveSnapshot(),
+      sensitiveStats: this.sensitiveStatistics(),
+      sensitiveHealth: this.sensitiveHealth(),
       timestamp: new Date().toISOString(),
     });
   }
@@ -361,5 +377,38 @@ export class ConfigurationProvider implements IConfigurationProvider {
 
   public featureHealth(): FeatureHealth {
     return this._featureFlagManager.health();
+  }
+
+  public registerSensitiveValue(
+    key: string,
+    rawValue: unknown,
+    sensitiveType?: SensitiveValueType,
+    policy?: SensitiveValuePolicy,
+  ): void {
+    this._secureManager.register(key, rawValue, sensitiveType, policy);
+  }
+
+  public removeSensitiveValue(key: string): boolean {
+    return this._secureManager.remove(key);
+  }
+
+  public getSensitiveValue(key: string): unknown | undefined {
+    return this._secureManager.getSensitiveValue(key);
+  }
+
+  public getRedactedValue(key: string): string | undefined {
+    return this._secureManager.getRedactedValue(key);
+  }
+
+  public createSensitiveSnapshot(): SensitiveConfigurationSnapshot {
+    return this._secureManager.createSnapshot();
+  }
+
+  public sensitiveStatistics(): SensitiveStatistics {
+    return this._secureManager.statistics();
+  }
+
+  public sensitiveHealth(): SensitiveHealth {
+    return this._secureManager.health();
   }
 }

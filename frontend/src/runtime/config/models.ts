@@ -1,10 +1,11 @@
 /**
- * Configuration Runtime Domain Models (Phase 16.3.4).
+ * Configuration Runtime Domain Models (Phase 16.3.5).
  *
  * Provides immutable state models, configuration objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, diagnostics
  * telemetry, source priority enums, entry records, snapshots, schemas, validation results,
- * resolution results, configuration profile definitions, and feature flag evaluation models for the Frontend Configuration Runtime.
+ * resolution results, configuration profile definitions, feature flag evaluation models,
+ * and sensitive value configuration management models for the Frontend Configuration Runtime.
  */
 
 export enum ConfigurationRuntimeState {
@@ -16,6 +17,7 @@ export enum ConfigurationRuntimeState {
 }
 
 export enum ConfigurationSourcePriority {
+  SENSITIVE = 700,
   PROFILE = 600,
   MEMORY = 500,
   RUNTIME = 400,
@@ -23,6 +25,16 @@ export enum ConfigurationSourcePriority {
   LOCAL = 200,
   SESSION = 100,
   DEFAULT = 0,
+}
+
+export enum SensitiveValueType {
+  PASSWORD = 'PASSWORD',
+  TOKEN = 'TOKEN',
+  API_KEY = 'API_KEY',
+  CERTIFICATE = 'CERTIFICATE',
+  PRIVATE_KEY = 'PRIVATE_KEY',
+  CONNECTION_STRING = 'CONNECTION_STRING',
+  CUSTOM = 'CUSTOM',
 }
 
 export interface ConfigurationState {
@@ -230,6 +242,56 @@ export interface ProfileHealth {
   readonly totalProfiles: number;
 }
 
+export interface SensitiveValuePolicy {
+  readonly allowRead: boolean;
+  readonly allowWrite: boolean;
+  readonly allowExport: boolean;
+  readonly allowLogging: boolean;
+  readonly allowRedaction: boolean;
+}
+
+export interface SensitiveConfiguration {
+  readonly key: string;
+  readonly rawValue: unknown;
+  readonly sensitiveType: SensitiveValueType;
+  readonly policy: SensitiveValuePolicy;
+  readonly registeredAt: string;
+}
+
+export interface SensitiveConfigurationReference {
+  readonly key: string;
+  readonly sensitiveType: SensitiveValueType;
+  readonly redactedValue: string;
+  readonly registeredAt: string;
+}
+
+export interface SensitiveConfigurationSnapshot {
+  readonly references: ReadonlyArray<SensitiveConfigurationReference>;
+  readonly sensitiveCount: number;
+  readonly timestamp: string;
+}
+
+export interface SensitiveAccessRecord {
+  readonly key: string;
+  readonly action: 'REGISTER' | 'READ' | 'REDACT' | 'UPDATE' | 'REMOVE';
+  readonly success: boolean;
+  readonly reason?: string;
+  readonly timestamp: string;
+}
+
+export interface SensitiveStatistics {
+  readonly totalValues: number;
+  readonly reads: number;
+  readonly redactions: number;
+  readonly blockedAccesses: number;
+  readonly auditRecordsCount: number;
+}
+
+export interface SensitiveHealth {
+  readonly healthy: boolean;
+  readonly totalValues: number;
+}
+
 export interface ConfigurationDiagnostics {
   readonly health: ConfigurationHealth;
   readonly statistics: ConfigurationStatistics;
@@ -245,6 +307,9 @@ export interface ConfigurationDiagnostics {
   readonly profileStats?: ProfileStatistics;
   readonly featureStats?: FeatureStatistics;
   readonly featureHealth?: FeatureHealth;
+  readonly sensitiveSnapshot?: SensitiveConfigurationSnapshot;
+  readonly sensitiveStats?: SensitiveStatistics;
+  readonly sensitiveHealth?: SensitiveHealth;
   readonly timestamp: string;
 }
 
@@ -565,6 +630,88 @@ export function createProfileHealth(
   });
 }
 
+export function createSensitiveValuePolicy(
+  params: Partial<SensitiveValuePolicy> = {},
+): SensitiveValuePolicy {
+  return Object.freeze({
+    allowRead: params.allowRead ?? true,
+    allowWrite: params.allowWrite ?? true,
+    allowExport: params.allowExport ?? false,
+    allowLogging: params.allowLogging ?? false,
+    allowRedaction: params.allowRedaction ?? true,
+  });
+}
+
+export function createSensitiveConfiguration(
+  params: Partial<SensitiveConfiguration> & { key: string; rawValue: unknown },
+): SensitiveConfiguration {
+  return Object.freeze({
+    key: params.key,
+    rawValue: params.rawValue,
+    sensitiveType: params.sensitiveType ?? SensitiveValueType.CUSTOM,
+    policy: createSensitiveValuePolicy(params.policy),
+    registeredAt: params.registeredAt ?? new Date().toISOString(),
+  });
+}
+
+export function createSensitiveConfigurationReference(
+  params: Partial<SensitiveConfigurationReference> & { key: string; redactedValue: string },
+): SensitiveConfigurationReference {
+  return Object.freeze({
+    key: params.key,
+    sensitiveType: params.sensitiveType ?? SensitiveValueType.CUSTOM,
+    redactedValue: params.redactedValue,
+    registeredAt: params.registeredAt ?? new Date().toISOString(),
+  });
+}
+
+export function createSensitiveConfigurationSnapshot(
+  params: Partial<SensitiveConfigurationSnapshot> = {},
+): SensitiveConfigurationSnapshot {
+  return Object.freeze({
+    references: Object.freeze([...(params.references ?? [])]),
+    sensitiveCount: params.sensitiveCount ?? (params.references ? params.references.length : 0),
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createSensitiveAccessRecord(
+  params: Partial<SensitiveAccessRecord> & {
+    key: string;
+    action: 'REGISTER' | 'READ' | 'REDACT' | 'UPDATE' | 'REMOVE';
+    success: boolean;
+  },
+): SensitiveAccessRecord {
+  return Object.freeze({
+    key: params.key,
+    action: params.action,
+    success: params.success,
+    reason: params.reason,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createSensitiveStatistics(
+  params: Partial<SensitiveStatistics> = {},
+): SensitiveStatistics {
+  return Object.freeze({
+    totalValues: params.totalValues ?? 0,
+    reads: params.reads ?? 0,
+    redactions: params.redactions ?? 0,
+    blockedAccesses: params.blockedAccesses ?? 0,
+    auditRecordsCount: params.auditRecordsCount ?? 0,
+  });
+}
+
+export function createSensitiveHealth(
+  params: Partial<SensitiveHealth> = {},
+): SensitiveHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    totalValues: params.totalValues ?? 0,
+  });
+}
+
 export function createConfigurationDiagnostics(
   params: Partial<ConfigurationDiagnostics> = {},
 ): ConfigurationDiagnostics {
@@ -583,6 +730,9 @@ export function createConfigurationDiagnostics(
     profileStats: params.profileStats,
     featureStats: params.featureStats,
     featureHealth: params.featureHealth,
+    sensitiveSnapshot: params.sensitiveSnapshot,
+    sensitiveStats: params.sensitiveStats,
+    sensitiveHealth: params.sensitiveHealth,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }

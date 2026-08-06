@@ -1,8 +1,8 @@
 /**
- * Configuration Runtime Interfaces (Phase 16.3.4).
+ * Configuration Runtime Interfaces (Phase 16.3.5).
  *
  * Defines contracts for IConfigurationSource, IConfigurationValidator, IConfigurationProvider,
- * and IConfigurationRuntime including Profiles and Feature Flag APIs.
+ * and IConfigurationRuntime including Profiles, Feature Flags, and Sensitive Configuration APIs.
  */
 
 import {
@@ -25,6 +25,11 @@ import {
   FeatureFlag,
   FeatureHealth,
   FeatureStatistics,
+  SensitiveConfigurationSnapshot,
+  SensitiveHealth,
+  SensitiveStatistics,
+  SensitiveValuePolicy,
+  SensitiveValueType,
 } from './models';
 
 export interface IConfigurationSource {
@@ -96,6 +101,19 @@ export interface IConfigurationProvider {
   listFeatures(): ReadonlyArray<FeatureFlag>;
   featureStatistics(): FeatureStatistics;
   featureHealth(): FeatureHealth;
+
+  registerSensitiveValue(
+    key: string,
+    rawValue: unknown,
+    sensitiveType?: SensitiveValueType,
+    policy?: SensitiveValuePolicy,
+  ): void;
+  removeSensitiveValue(key: string): boolean;
+  getSensitiveValue(key: string): unknown | undefined;
+  getRedactedValue(key: string): string | undefined;
+  createSensitiveSnapshot(): SensitiveConfigurationSnapshot;
+  sensitiveStatistics(): SensitiveStatistics;
+  sensitiveHealth(): SensitiveHealth;
 }
 
 export interface IConfigurationRuntime {
@@ -144,4 +162,17 @@ export interface IConfigurationRuntime {
   listFeatures(): ReadonlyArray<FeatureFlag>;
   featureStatistics(): FeatureStatistics;
   featureHealth(): FeatureHealth;
+
+  registerSensitiveValue(
+    key: string,
+    rawValue: unknown,
+    sensitiveType?: SensitiveValueType,
+    policy?: SensitiveValuePolicy,
+  ): void;
+  removeSensitiveValue(key: string): boolean;
+  getSensitiveValue(key: string): unknown | undefined;
+  getRedactedValue(key: string): string | undefined;
+  createSensitiveSnapshot(): SensitiveConfigurationSnapshot;
+  sensitiveStatistics(): SensitiveStatistics;
+  sensitiveHealth(): SensitiveHealth;
 }

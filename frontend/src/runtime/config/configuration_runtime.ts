@@ -1,9 +1,9 @@
 /**
- * Configuration Runtime Coordinator Implementation (Phase 16.3.4).
+ * Configuration Runtime Coordinator Implementation (Phase 16.3.5).
  *
  * Implements IConfigurationRuntime acting as central coordinator for configuration lifecycle,
  * source resolution, schema management, type conversion, constraint validation, profile management,
- * and feature flag evaluations.
+ * feature flag evaluations, and sensitive data management.
  */
 
 import {
@@ -21,6 +21,11 @@ import {
   FeatureFlag,
   FeatureHealth,
   FeatureStatistics,
+  SensitiveConfigurationSnapshot,
+  SensitiveHealth,
+  SensitiveStatistics,
+  SensitiveValuePolicy,
+  SensitiveValueType,
 } from './models';
 import { IConfigurationProvider, IConfigurationRuntime, IConfigurationSource } from './interfaces';
 import { ConfigurationProvider } from './configuration_provider';
@@ -181,5 +186,38 @@ export class ConfigurationRuntime implements IConfigurationRuntime {
 
   public featureHealth(): FeatureHealth {
     return this._provider.featureHealth();
+  }
+
+  public registerSensitiveValue(
+    key: string,
+    rawValue: unknown,
+    sensitiveType?: SensitiveValueType,
+    policy?: SensitiveValuePolicy,
+  ): void {
+    this._provider.registerSensitiveValue(key, rawValue, sensitiveType, policy);
+  }
+
+  public removeSensitiveValue(key: string): boolean {
+    return this._provider.removeSensitiveValue(key);
+  }
+
+  public getSensitiveValue(key: string): unknown | undefined {
+    return this._provider.getSensitiveValue(key);
+  }
+
+  public getRedactedValue(key: string): string | undefined {
+    return this._provider.getRedactedValue(key);
+  }
+
+  public createSensitiveSnapshot(): SensitiveConfigurationSnapshot {
+    return this._provider.createSensitiveSnapshot();
+  }
+
+  public sensitiveStatistics(): SensitiveStatistics {
+    return this._provider.sensitiveStatistics();
+  }
+
+  public sensitiveHealth(): SensitiveHealth {
+    return this._provider.sensitiveHealth();
   }
 }
