@@ -277,7 +277,7 @@ export class StateProvider implements IStateProvider {
   }
 
   public registerSelector<S = unknown, R = unknown>(name: string, select: (state: S) => R): Selector<S, R> {
-    const sel = createSelector<S, R>({ name, select });
+    const sel = createSelector<S, R>({ selectorId: name, name, select });
     this._selectorEngine.registerSelector(sel);
     return sel;
   }
