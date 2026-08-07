@@ -1,5 +1,5 @@
 /**
- * Command Runtime Coordinator Implementation (Phase 16.6.3).
+ * Command Runtime Coordinator Implementation (Phase 16.6.4).
  *
  * Implements ICommandRuntime acting as central coordinator delegating to ICommandProvider.
  * Contains no business logic — all operations are forwarded to the provider instance.
@@ -11,6 +11,7 @@ import {
   CommandCategory,
   CommandDefinition,
   CommandDiagnostics,
+  CommandExecutionContext,
   CommandExecutionHealth,
   CommandExecutionRecord,
   CommandExecutionRequest,
@@ -18,12 +19,18 @@ import {
   CommandExecutionStatistics,
   CommandHandler,
   CommandHealth,
+  CommandMiddleware,
   CommandRegistration,
   CommandRegistryHealth,
   CommandRegistryStatistics,
   CommandRuntimeState,
   CommandState,
   CommandStatistics,
+  InterceptorHandler,
+  InterceptorRegistration,
+  PipelineExecution,
+  PipelineHealth,
+  PipelineStatistics,
 } from './models';
 import { ICommandProvider, ICommandRuntime } from './interfaces';
 import { CommandProvider } from './command_provider';
@@ -179,5 +186,53 @@ export class CommandRuntime implements ICommandRuntime {
 
   public executionHealth(): CommandExecutionHealth {
     return this._provider.executionHealth();
+  }
+
+  public registerMiddleware(
+    middleware: Partial<CommandMiddleware> & {
+      name: string;
+      execute: (context: CommandExecutionContext, result?: CommandExecutionResult, error?: Error) => void | Promise<void>;
+    },
+  ): CommandMiddleware {
+    return this._provider.registerMiddleware(middleware);
+  }
+
+  public removeMiddleware(middlewareId: string): boolean {
+    return this._provider.removeMiddleware(middlewareId);
+  }
+
+  public listMiddlewares(phase?: 'BEFORE' | 'AFTER' | 'EXCEPTION'): ReadonlyArray<CommandMiddleware> {
+    return this._provider.listMiddlewares(phase);
+  }
+
+  public registerInterceptor<TResult = unknown>(
+    interceptor: Partial<InterceptorRegistration<TResult>> & {
+      name: string;
+      intercept: InterceptorHandler<TResult>;
+    },
+  ): InterceptorRegistration<TResult> {
+    return this._provider.registerInterceptor(interceptor);
+  }
+
+  public removeInterceptor(interceptorId: string): boolean {
+    return this._provider.removeInterceptor(interceptorId);
+  }
+
+  public listInterceptors(): ReadonlyArray<InterceptorRegistration> {
+    return this._provider.listInterceptors();
+  }
+
+  public executePipeline<TResult = unknown>(
+    request: CommandExecutionRequest,
+  ): Promise<PipelineExecution<TResult>> {
+    return this._provider.executePipeline<TResult>(request);
+  }
+
+  public pipelineStatistics(): PipelineStatistics {
+    return this._provider.pipelineStatistics();
+  }
+
+  public pipelineHealth(): PipelineHealth {
+    return this._provider.pipelineHealth();
   }
 }

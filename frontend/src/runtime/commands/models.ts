@@ -1,11 +1,12 @@
 /**
- * Command Runtime Domain Models (Phase 16.6.3).
+ * Command Runtime Domain Models (Phase 16.6.4).
  *
  * Provides immutable state models, configuration objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, command definitions,
  * parameters, registrations, categories, aliases, registry statistics, registry health,
  * execution requests, results, records, pipeline telemetry, execution statistics,
- * execution health, and diagnostics telemetry for the Frontend Command Runtime.
+ * execution health, middleware models, interceptor models, pipeline execution telemetry,
+ * pipeline statistics, pipeline health, and diagnostics telemetry for the Frontend Command Runtime.
  */
 
 export enum CommandRuntimeState {
@@ -25,6 +26,21 @@ export enum CommandExecutionStatus {
   TIMED_OUT = 'TIMED_OUT',
   REJECTED = 'REJECTED',
   VALIDATION_FAILED = 'VALIDATION_FAILED',
+}
+
+export enum MiddlewarePriority {
+  CRITICAL = 300,
+  HIGH = 200,
+  NORMAL = 100,
+  LOW = 0,
+}
+
+export enum ExecutionStage {
+  BEFORE = 'BEFORE',
+  INTERCEPT = 'INTERCEPT',
+  EXECUTE = 'EXECUTE',
+  AFTER = 'AFTER',
+  EXCEPTION = 'EXCEPTION',
 }
 
 export interface CommandState {
@@ -259,6 +275,146 @@ export interface ExecutionDiagnostics {
   readonly timestamp: string;
 }
 
+export interface CommandMiddleware {
+  readonly middlewareId: string;
+  readonly name: string;
+  readonly phase: 'BEFORE' | 'AFTER' | 'EXCEPTION';
+  readonly priority: MiddlewarePriority;
+  readonly enabled: boolean;
+  readonly execute: (
+    context: CommandExecutionContext,
+    result?: CommandExecutionResult,
+    error?: Error,
+  ) => void | Promise<void>;
+}
+
+export interface MiddlewareExecution {
+  readonly middlewareId: string;
+  readonly name: string;
+  readonly phase: 'BEFORE' | 'AFTER' | 'EXCEPTION';
+  readonly success: boolean;
+  readonly durationMs: number;
+  readonly error?: string;
+  readonly executedAt: string;
+}
+
+export interface MiddlewareResult {
+  readonly executions: ReadonlyArray<MiddlewareExecution>;
+  readonly totalExecutions: number;
+  readonly successfulExecutions: number;
+  readonly failedExecutions: number;
+  readonly executedAt: string;
+}
+
+export interface MiddlewareStatistics {
+  readonly totalRegistered: number;
+  readonly beforeCount: number;
+  readonly afterCount: number;
+  readonly exceptionCount: number;
+  readonly totalExecutions: number;
+  readonly failedExecutions: number;
+  readonly averageExecutionMs: number;
+}
+
+export interface MiddlewareHealth {
+  readonly healthy: boolean;
+  readonly activeMiddlewares: number;
+  readonly failureRate: number;
+  readonly message: string;
+}
+
+export type InterceptorHandler<TResult = unknown> = (
+  context: CommandExecutionContext,
+  next: () => Promise<CommandExecutionResult<TResult>>,
+) => Promise<CommandExecutionResult<TResult>>;
+
+export interface InterceptorRegistration<TResult = unknown> {
+  readonly interceptorId: string;
+  readonly name: string;
+  readonly priority: MiddlewarePriority;
+  readonly enabled: boolean;
+  readonly intercept: InterceptorHandler<TResult>;
+}
+
+export interface InterceptorExecution {
+  readonly interceptorId: string;
+  readonly name: string;
+  readonly success: boolean;
+  readonly durationMs: number;
+  readonly error?: string;
+  readonly executedAt: string;
+}
+
+export interface InterceptorResult<TResult = unknown> {
+  readonly executionResult: CommandExecutionResult<TResult>;
+  readonly executions: ReadonlyArray<InterceptorExecution>;
+  readonly totalInterceptors: number;
+  readonly executedAt: string;
+}
+
+export interface PipelineExecution<TResult = unknown> {
+  readonly pipelineId: string;
+  readonly commandId: string;
+  readonly executionResult: CommandExecutionResult<TResult>;
+  readonly middlewareResult: MiddlewareResult;
+  readonly interceptorResult?: InterceptorResult<TResult>;
+  readonly durationMs: number;
+  readonly executedAt: string;
+}
+
+export interface PipelineStatistics {
+  readonly middlewareExecutions: number;
+  readonly interceptorExecutions: number;
+  readonly pipelineExecutions: number;
+  readonly pipelineFailures: number;
+  readonly averagePipelineTime: number;
+  readonly maximumPipelineTime: number;
+  readonly minimumPipelineTime: number;
+  readonly activePipelines: number;
+}
+
+export interface PipelineHealth {
+  readonly healthy: boolean;
+  readonly failureRate: number;
+  readonly averagePipelineTime: number;
+  readonly registeredMiddleware: number;
+  readonly registeredInterceptors: number;
+  readonly pipelineThroughput: number;
+  readonly message: string;
+}
+
+export interface PipelineConfiguration {
+  readonly enableBeforeMiddleware: boolean;
+  readonly enableAfterMiddleware: boolean;
+  readonly enableExceptionMiddleware: boolean;
+  readonly enableInterceptors: boolean;
+  readonly pipelineTimeoutMs: number;
+}
+
+export interface PipelineCapabilities {
+  readonly supportsBeforeMiddleware: boolean;
+  readonly supportsAfterMiddleware: boolean;
+  readonly supportsExceptionMiddleware: boolean;
+  readonly supportsInterceptors: boolean;
+  readonly supportsPriorityOrdering: boolean;
+  readonly supportsContextEnrichment: boolean;
+}
+
+export interface PipelineDiagnostics {
+  readonly statistics: PipelineStatistics;
+  readonly health: PipelineHealth;
+  readonly capabilities: PipelineCapabilities;
+  readonly middlewareCount: number;
+  readonly interceptorCount: number;
+  readonly timestamp: string;
+}
+
+export interface PipelineSnapshot {
+  readonly middleware: ReadonlyArray<CommandMiddleware>;
+  readonly interceptors: ReadonlyArray<InterceptorRegistration>;
+  readonly timestamp: string;
+}
+
 export interface CommandDiagnostics {
   readonly health: CommandHealth;
   readonly statistics: CommandStatistics;
@@ -272,6 +428,10 @@ export interface CommandDiagnostics {
   readonly executionStatistics?: CommandExecutionStatistics;
   readonly executionHealth?: CommandExecutionHealth;
   readonly executionHistorySize?: number;
+  readonly pipelineStatistics?: PipelineStatistics;
+  readonly pipelineHealth?: PipelineHealth;
+  readonly middlewareCount?: number;
+  readonly interceptorCount?: number;
   readonly timestamp: string;
 }
 
@@ -577,7 +737,7 @@ export function createCommandExecutionConfiguration(
 export function createExecutionPipeline(
   params: Partial<ExecutionPipeline> = {},
 ): ExecutionPipeline {
-  const steps = params.steps ?? ['validation', 'lookup', 'parameter_validation', 'context_creation', 'handler_execution', 'telemetry', 'history'];
+  const steps = params.steps ?? ['validation', 'before_middleware', 'interceptors', 'handler_execution', 'after_middleware', 'telemetry', 'history'];
   return Object.freeze({
     pipelineId: params.pipelineId ?? `pipe_${Date.now()}`,
     steps: Object.freeze([...steps]),
@@ -613,6 +773,216 @@ export function createExecutionDiagnostics(
   });
 }
 
+export function createCommandMiddleware(
+  params: Partial<CommandMiddleware> & {
+    name: string;
+    execute: (context: CommandExecutionContext, result?: CommandExecutionResult, error?: Error) => void | Promise<void>;
+  },
+): CommandMiddleware {
+  return Object.freeze({
+    middlewareId: params.middlewareId ?? `mw_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    name: params.name,
+    phase: params.phase ?? 'BEFORE',
+    priority: params.priority ?? MiddlewarePriority.NORMAL,
+    enabled: params.enabled ?? true,
+    execute: params.execute,
+  });
+}
+
+export function createMiddlewareExecution(
+  params: Partial<MiddlewareExecution> & {
+    middlewareId: string;
+    name: string;
+    phase: 'BEFORE' | 'AFTER' | 'EXCEPTION';
+  },
+): MiddlewareExecution {
+  return Object.freeze({
+    middlewareId: params.middlewareId,
+    name: params.name,
+    phase: params.phase,
+    success: params.success ?? true,
+    durationMs: params.durationMs ?? 0,
+    error: params.error,
+    executedAt: params.executedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createMiddlewareResult(
+  params: Partial<MiddlewareResult> = {},
+): MiddlewareResult {
+  const executions = params.executions ?? [];
+  return Object.freeze({
+    executions: Object.freeze([...executions]),
+    totalExecutions: params.totalExecutions ?? executions.length,
+    successfulExecutions: params.successfulExecutions ?? executions.filter((e) => e.success).length,
+    failedExecutions: params.failedExecutions ?? executions.filter((e) => !e.success).length,
+    executedAt: params.executedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createMiddlewareStatistics(
+  params: Partial<MiddlewareStatistics> = {},
+): MiddlewareStatistics {
+  return Object.freeze({
+    totalRegistered: params.totalRegistered ?? 0,
+    beforeCount: params.beforeCount ?? 0,
+    afterCount: params.afterCount ?? 0,
+    exceptionCount: params.exceptionCount ?? 0,
+    totalExecutions: params.totalExecutions ?? 0,
+    failedExecutions: params.failedExecutions ?? 0,
+    averageExecutionMs: params.averageExecutionMs ?? 0,
+  });
+}
+
+export function createMiddlewareHealth(
+  params: Partial<MiddlewareHealth> = {},
+): MiddlewareHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    activeMiddlewares: params.activeMiddlewares ?? 0,
+    failureRate: params.failureRate ?? 0,
+    message: params.message ?? 'Middleware manager is operational.',
+  });
+}
+
+export function createInterceptorRegistration<TResult = unknown>(
+  params: Partial<InterceptorRegistration<TResult>> & {
+    name: string;
+    intercept: InterceptorHandler<TResult>;
+  },
+): InterceptorRegistration<TResult> {
+  return Object.freeze({
+    interceptorId: params.interceptorId ?? `int_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    name: params.name,
+    priority: params.priority ?? MiddlewarePriority.NORMAL,
+    enabled: params.enabled ?? true,
+    intercept: params.intercept,
+  });
+}
+
+export function createInterceptorExecution(
+  params: Partial<InterceptorExecution> & { interceptorId: string; name: string },
+): InterceptorExecution {
+  return Object.freeze({
+    interceptorId: params.interceptorId,
+    name: params.name,
+    success: params.success ?? true,
+    durationMs: params.durationMs ?? 0,
+    error: params.error,
+    executedAt: params.executedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createInterceptorResult<TResult = unknown>(
+  params: Partial<InterceptorResult<TResult>> & { executionResult: CommandExecutionResult<TResult> },
+): InterceptorResult<TResult> {
+  const executions = params.executions ?? [];
+  return Object.freeze({
+    executionResult: params.executionResult,
+    executions: Object.freeze([...executions]),
+    totalInterceptors: params.totalInterceptors ?? executions.length,
+    executedAt: params.executedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createPipelineExecution<TResult = unknown>(
+  params: Partial<PipelineExecution<TResult>> & {
+    commandId: string;
+    executionResult: CommandExecutionResult<TResult>;
+    middlewareResult: MiddlewareResult;
+  },
+): PipelineExecution<TResult> {
+  return Object.freeze({
+    pipelineId: params.pipelineId ?? `pipe_exec_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    commandId: params.commandId,
+    executionResult: params.executionResult,
+    middlewareResult: params.middlewareResult,
+    interceptorResult: params.interceptorResult,
+    durationMs: params.durationMs ?? 0,
+    executedAt: params.executedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createPipelineStatistics(
+  params: Partial<PipelineStatistics> = {},
+): PipelineStatistics {
+  return Object.freeze({
+    middlewareExecutions: params.middlewareExecutions ?? 0,
+    interceptorExecutions: params.interceptorExecutions ?? 0,
+    pipelineExecutions: params.pipelineExecutions ?? 0,
+    pipelineFailures: params.pipelineFailures ?? 0,
+    averagePipelineTime: params.averagePipelineTime ?? 0,
+    maximumPipelineTime: params.maximumPipelineTime ?? 0,
+    minimumPipelineTime: params.minimumPipelineTime ?? 0,
+    activePipelines: params.activePipelines ?? 0,
+  });
+}
+
+export function createPipelineHealth(
+  params: Partial<PipelineHealth> = {},
+): PipelineHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    failureRate: params.failureRate ?? 0,
+    averagePipelineTime: params.averagePipelineTime ?? 0,
+    registeredMiddleware: params.registeredMiddleware ?? 0,
+    registeredInterceptors: params.registeredInterceptors ?? 0,
+    pipelineThroughput: params.pipelineThroughput ?? 0,
+    message: params.message ?? 'Command pipeline engine is operational.',
+  });
+}
+
+export function createPipelineConfiguration(
+  params: Partial<PipelineConfiguration> = {},
+): PipelineConfiguration {
+  return Object.freeze({
+    enableBeforeMiddleware: params.enableBeforeMiddleware ?? true,
+    enableAfterMiddleware: params.enableAfterMiddleware ?? true,
+    enableExceptionMiddleware: params.enableExceptionMiddleware ?? true,
+    enableInterceptors: params.enableInterceptors ?? true,
+    pipelineTimeoutMs: params.pipelineTimeoutMs ?? 30000,
+  });
+}
+
+export function createPipelineCapabilities(
+  params: Partial<PipelineCapabilities> = {},
+): PipelineCapabilities {
+  return Object.freeze({
+    supportsBeforeMiddleware: params.supportsBeforeMiddleware ?? true,
+    supportsAfterMiddleware: params.supportsAfterMiddleware ?? true,
+    supportsExceptionMiddleware: params.supportsExceptionMiddleware ?? true,
+    supportsInterceptors: params.supportsInterceptors ?? true,
+    supportsPriorityOrdering: params.supportsPriorityOrdering ?? true,
+    supportsContextEnrichment: params.supportsContextEnrichment ?? true,
+  });
+}
+
+export function createPipelineDiagnostics(
+  params: Partial<PipelineDiagnostics> & {
+    statistics: PipelineStatistics;
+    health: PipelineHealth;
+  },
+): PipelineDiagnostics {
+  return Object.freeze({
+    statistics: params.statistics,
+    health: params.health,
+    capabilities: params.capabilities ?? createPipelineCapabilities(),
+    middlewareCount: params.middlewareCount ?? 0,
+    interceptorCount: params.interceptorCount ?? 0,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createPipelineSnapshot(
+  params: Partial<PipelineSnapshot> = {},
+): PipelineSnapshot {
+  return Object.freeze({
+    middleware: Object.freeze([...(params.middleware ?? [])]),
+    interceptors: Object.freeze([...(params.interceptors ?? [])]),
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
 export function createCommandDiagnostics(
   params: Partial<CommandDiagnostics> = {},
 ): CommandDiagnostics {
@@ -629,6 +999,10 @@ export function createCommandDiagnostics(
     executionStatistics: params.executionStatistics,
     executionHealth: params.executionHealth,
     executionHistorySize: params.executionHistorySize,
+    pipelineStatistics: params.pipelineStatistics,
+    pipelineHealth: params.pipelineHealth,
+    middlewareCount: params.middlewareCount,
+    interceptorCount: params.interceptorCount,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }

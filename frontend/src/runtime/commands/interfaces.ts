@@ -1,8 +1,8 @@
 /**
- * Command Runtime Interfaces (Phase 16.6.3).
+ * Command Runtime Interfaces (Phase 16.6.4).
  *
  * Defines contract specifications for ICommandRegistry, ICommandExecutor,
- * ICommandProvider, and ICommandRuntime.
+ * IMiddlewareManager, IInterceptorManager, ICommandPipeline, ICommandProvider, and ICommandRuntime.
  */
 
 import {
@@ -13,6 +13,7 @@ import {
   CommandContext,
   CommandDefinition,
   CommandDiagnostics,
+  CommandExecutionContext,
   CommandExecutionHealth,
   CommandExecutionRecord,
   CommandExecutionRequest,
@@ -20,6 +21,7 @@ import {
   CommandExecutionStatistics,
   CommandHandler,
   CommandHealth,
+  CommandMiddleware,
   CommandRegistration,
   CommandRegistryHealth,
   CommandRegistryStatistics,
@@ -27,6 +29,17 @@ import {
   CommandState,
   CommandStatistics,
   ExecutionDiagnostics,
+  InterceptorHandler,
+  InterceptorRegistration,
+  InterceptorResult,
+  MiddlewareHealth,
+  MiddlewareResult,
+  MiddlewareStatistics,
+  PipelineDiagnostics,
+  PipelineExecution,
+  PipelineHealth,
+  PipelineSnapshot,
+  PipelineStatistics,
 } from './models';
 
 export interface ICommandRegistry {
@@ -64,6 +77,65 @@ export interface ICommandExecutor {
   statistics(): CommandExecutionStatistics;
   health(): CommandExecutionHealth;
   diagnostics(): ExecutionDiagnostics;
+}
+
+export interface IMiddlewareManager {
+  registerMiddleware(
+    middleware: Partial<CommandMiddleware> & {
+      name: string;
+      execute: (context: CommandExecutionContext, result?: CommandExecutionResult, error?: Error) => void | Promise<void>;
+    },
+  ): CommandMiddleware;
+  removeMiddleware(middlewareId: string): boolean;
+  listMiddlewares(phase?: 'BEFORE' | 'AFTER' | 'EXCEPTION'): ReadonlyArray<CommandMiddleware>;
+  executeBefore(context: CommandExecutionContext): Promise<MiddlewareResult>;
+  executeAfter(context: CommandExecutionContext, result: CommandExecutionResult): Promise<MiddlewareResult>;
+  executeException(context: CommandExecutionContext, error: Error): Promise<MiddlewareResult>;
+  statistics(): MiddlewareStatistics;
+  health(): MiddlewareHealth;
+  clear(): void;
+}
+
+export interface IInterceptorManager {
+  registerInterceptor<TResult = unknown>(
+    interceptor: Partial<InterceptorRegistration<TResult>> & {
+      name: string;
+      intercept: InterceptorHandler<TResult>;
+    },
+  ): InterceptorRegistration<TResult>;
+  removeInterceptor(interceptorId: string): boolean;
+  listInterceptors(): ReadonlyArray<InterceptorRegistration>;
+  executeChain<TResult = unknown>(
+    context: CommandExecutionContext,
+    coreExecution: () => Promise<CommandExecutionResult<TResult>>,
+  ): Promise<InterceptorResult<TResult>>;
+  clear(): void;
+}
+
+export interface ICommandPipeline {
+  registerMiddleware(
+    middleware: Partial<CommandMiddleware> & {
+      name: string;
+      execute: (context: CommandExecutionContext, result?: CommandExecutionResult, error?: Error) => void | Promise<void>;
+    },
+  ): CommandMiddleware;
+  removeMiddleware(middlewareId: string): boolean;
+  listMiddlewares(phase?: 'BEFORE' | 'AFTER' | 'EXCEPTION'): ReadonlyArray<CommandMiddleware>;
+  registerInterceptor<TResult = unknown>(
+    interceptor: Partial<InterceptorRegistration<TResult>> & {
+      name: string;
+      intercept: InterceptorHandler<TResult>;
+    },
+  ): InterceptorRegistration<TResult>;
+  removeInterceptor(interceptorId: string): boolean;
+  listInterceptors(): ReadonlyArray<InterceptorRegistration>;
+  executePipeline<TResult = unknown>(
+    request: CommandExecutionRequest,
+  ): Promise<PipelineExecution<TResult>>;
+  statistics(): PipelineStatistics;
+  health(): PipelineHealth;
+  diagnostics(): PipelineDiagnostics;
+  snapshot(): PipelineSnapshot;
 }
 
 export interface ICommandProvider {
@@ -109,6 +181,28 @@ export interface ICommandProvider {
   clearExecutionHistory(): void;
   executionStatistics(): CommandExecutionStatistics;
   executionHealth(): CommandExecutionHealth;
+
+  registerMiddleware(
+    middleware: Partial<CommandMiddleware> & {
+      name: string;
+      execute: (context: CommandExecutionContext, result?: CommandExecutionResult, error?: Error) => void | Promise<void>;
+    },
+  ): CommandMiddleware;
+  removeMiddleware(middlewareId: string): boolean;
+  listMiddlewares(phase?: 'BEFORE' | 'AFTER' | 'EXCEPTION'): ReadonlyArray<CommandMiddleware>;
+  registerInterceptor<TResult = unknown>(
+    interceptor: Partial<InterceptorRegistration<TResult>> & {
+      name: string;
+      intercept: InterceptorHandler<TResult>;
+    },
+  ): InterceptorRegistration<TResult>;
+  removeInterceptor(interceptorId: string): boolean;
+  listInterceptors(): ReadonlyArray<InterceptorRegistration>;
+  executePipeline<TResult = unknown>(
+    request: CommandExecutionRequest,
+  ): Promise<PipelineExecution<TResult>>;
+  pipelineStatistics(): PipelineStatistics;
+  pipelineHealth(): PipelineHealth;
 }
 
 export interface ICommandRuntime {
@@ -153,4 +247,26 @@ export interface ICommandRuntime {
   clearExecutionHistory(): void;
   executionStatistics(): CommandExecutionStatistics;
   executionHealth(): CommandExecutionHealth;
+
+  registerMiddleware(
+    middleware: Partial<CommandMiddleware> & {
+      name: string;
+      execute: (context: CommandExecutionContext, result?: CommandExecutionResult, error?: Error) => void | Promise<void>;
+    },
+  ): CommandMiddleware;
+  removeMiddleware(middlewareId: string): boolean;
+  listMiddlewares(phase?: 'BEFORE' | 'AFTER' | 'EXCEPTION'): ReadonlyArray<CommandMiddleware>;
+  registerInterceptor<TResult = unknown>(
+    interceptor: Partial<InterceptorRegistration<TResult>> & {
+      name: string;
+      intercept: InterceptorHandler<TResult>;
+    },
+  ): InterceptorRegistration<TResult>;
+  removeInterceptor(interceptorId: string): boolean;
+  listInterceptors(): ReadonlyArray<InterceptorRegistration>;
+  executePipeline<TResult = unknown>(
+    request: CommandExecutionRequest,
+  ): Promise<PipelineExecution<TResult>>;
+  pipelineStatistics(): PipelineStatistics;
+  pipelineHealth(): PipelineHealth;
 }

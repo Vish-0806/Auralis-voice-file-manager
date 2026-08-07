@@ -1,10 +1,11 @@
 /**
- * Command Provider Implementation (Phase 16.6.3).
+ * Command Provider Implementation (Phase 16.6.4).
  *
  * Implements ICommandProvider owning runtime state transitions,
  * telemetry statistics, health evaluation, context metadata, capabilities
  * reporting, command registration management, execution pipelines, handler management,
- * history tracking, execution health, and diagnostics generation.
+ * middleware pipelines, interceptor chains, history tracking, execution health,
+ * pipeline statistics, and diagnostics generation.
  */
 
 import {
@@ -15,6 +16,7 @@ import {
   CommandContext,
   CommandDefinition,
   CommandDiagnostics,
+  CommandExecutionContext,
   CommandExecutionHealth,
   CommandExecutionRecord,
   CommandExecutionRequest,
@@ -22,12 +24,18 @@ import {
   CommandExecutionStatistics,
   CommandHandler,
   CommandHealth,
+  CommandMiddleware,
   CommandRegistration,
   CommandRegistryHealth,
   CommandRegistryStatistics,
   CommandRuntimeState,
   CommandState,
   CommandStatistics,
+  InterceptorHandler,
+  InterceptorRegistration,
+  PipelineExecution,
+  PipelineHealth,
+  PipelineStatistics,
   createCommandCapabilities,
   createCommandConfiguration,
   createCommandContext,
@@ -36,9 +44,15 @@ import {
   createCommandState,
   createCommandStatistics,
 } from './models';
-import { ICommandExecutor, ICommandProvider, ICommandRegistry } from './interfaces';
+import {
+  ICommandExecutor,
+  ICommandPipeline,
+  ICommandProvider,
+  ICommandRegistry,
+} from './interfaces';
 import { CommandRegistry } from './command_registry';
 import { CommandExecutor } from './command_executor';
+import { CommandPipeline } from './command_pipeline';
 
 export class CommandProvider implements ICommandProvider {
   private _runtimeState: CommandRuntimeState = CommandRuntimeState.UNINITIALIZED;
@@ -47,6 +61,7 @@ export class CommandProvider implements ICommandProvider {
   private readonly _context: CommandContext;
   private readonly _registry: ICommandRegistry;
   private readonly _executor: ICommandExecutor;
+  private readonly _pipeline: ICommandPipeline;
 
   private _startedAt: string | null = null;
   private _initializations = 0;
@@ -60,12 +75,14 @@ export class CommandProvider implements ICommandProvider {
     context?: CommandContext,
     registry?: ICommandRegistry,
     executor?: ICommandExecutor,
+    pipeline?: ICommandPipeline,
   ) {
     this._config = config ?? createCommandConfiguration();
     this._capabilities = capabilities ?? createCommandCapabilities();
     this._context = context ?? createCommandContext();
     this._registry = registry ?? new CommandRegistry();
     this._executor = executor ?? new CommandExecutor(this._registry);
+    this._pipeline = pipeline ?? new CommandPipeline(this._executor);
   }
 
   public initialize(): CommandHealth {
@@ -142,6 +159,8 @@ export class CommandProvider implements ICommandProvider {
     const execStats = this._executor.statistics();
     const execHealth = this._executor.health();
     const execHistory = this._executor.executionHistory();
+    const pipeStats = this._pipeline.statistics();
+    const pipeHealth = this._pipeline.health();
 
     return createCommandDiagnostics({
       health: this.health(),
@@ -156,6 +175,10 @@ export class CommandProvider implements ICommandProvider {
       executionStatistics: execStats,
       executionHealth: execHealth,
       executionHistorySize: execHistory.length,
+      pipelineStatistics: pipeStats,
+      pipelineHealth: pipeHealth,
+      middlewareCount: this._pipeline.listMiddlewares().length,
+      interceptorCount: this._pipeline.listInterceptors().length,
       timestamp: new Date().toISOString(),
     });
   }
@@ -284,5 +307,53 @@ export class CommandProvider implements ICommandProvider {
 
   public executionHealth(): CommandExecutionHealth {
     return this._executor.health();
+  }
+
+  public registerMiddleware(
+    middleware: Partial<CommandMiddleware> & {
+      name: string;
+      execute: (context: CommandExecutionContext, result?: CommandExecutionResult, error?: Error) => void | Promise<void>;
+    },
+  ): CommandMiddleware {
+    return this._pipeline.registerMiddleware(middleware);
+  }
+
+  public removeMiddleware(middlewareId: string): boolean {
+    return this._pipeline.removeMiddleware(middlewareId);
+  }
+
+  public listMiddlewares(phase?: 'BEFORE' | 'AFTER' | 'EXCEPTION'): ReadonlyArray<CommandMiddleware> {
+    return this._pipeline.listMiddlewares(phase);
+  }
+
+  public registerInterceptor<TResult = unknown>(
+    interceptor: Partial<InterceptorRegistration<TResult>> & {
+      name: string;
+      intercept: InterceptorHandler<TResult>;
+    },
+  ): InterceptorRegistration<TResult> {
+    return this._pipeline.registerInterceptor(interceptor);
+  }
+
+  public removeInterceptor(interceptorId: string): boolean {
+    return this._pipeline.removeInterceptor(interceptorId);
+  }
+
+  public listInterceptors(): ReadonlyArray<InterceptorRegistration> {
+    return this._pipeline.listInterceptors();
+  }
+
+  public executePipeline<TResult = unknown>(
+    request: CommandExecutionRequest,
+  ): Promise<PipelineExecution<TResult>> {
+    return this._pipeline.executePipeline<TResult>(request);
+  }
+
+  public pipelineStatistics(): PipelineStatistics {
+    return this._pipeline.statistics();
+  }
+
+  public pipelineHealth(): PipelineHealth {
+    return this._pipeline.health();
   }
 }
