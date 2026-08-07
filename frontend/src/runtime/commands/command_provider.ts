@@ -1,17 +1,24 @@
 /**
- * Command Provider Implementation (Phase 16.6.1).
+ * Command Provider Implementation (Phase 16.6.2).
  *
  * Implements ICommandProvider owning runtime state transitions,
  * telemetry statistics, health evaluation, context metadata, capabilities
- * reporting, and diagnostics generation for the Frontend Command Runtime.
+ * reporting, command registration management, alias resolution, category lookup,
+ * search engine evaluation, registry health, and diagnostics generation.
  */
 
 import {
+  CommandAlias,
   CommandCapabilities,
+  CommandCategory,
   CommandConfiguration,
   CommandContext,
+  CommandDefinition,
   CommandDiagnostics,
   CommandHealth,
+  CommandRegistration,
+  CommandRegistryHealth,
+  CommandRegistryStatistics,
   CommandRuntimeState,
   CommandState,
   CommandStatistics,
@@ -23,13 +30,15 @@ import {
   createCommandState,
   createCommandStatistics,
 } from './models';
-import { ICommandProvider } from './interfaces';
+import { ICommandProvider, ICommandRegistry } from './interfaces';
+import { CommandRegistry } from './command_registry';
 
 export class CommandProvider implements ICommandProvider {
   private _runtimeState: CommandRuntimeState = CommandRuntimeState.UNINITIALIZED;
   private readonly _config: CommandConfiguration;
   private readonly _capabilities: CommandCapabilities;
   private readonly _context: CommandContext;
+  private readonly _registry: ICommandRegistry;
 
   private _startedAt: string | null = null;
   private _initializations = 0;
@@ -41,10 +50,12 @@ export class CommandProvider implements ICommandProvider {
     config?: CommandConfiguration,
     capabilities?: CommandCapabilities,
     context?: CommandContext,
+    registry?: ICommandRegistry,
   ) {
     this._config = config ?? createCommandConfiguration();
     this._capabilities = capabilities ?? createCommandCapabilities();
     this._context = context ?? createCommandContext();
+    this._registry = registry ?? new CommandRegistry();
   }
 
   public initialize(): CommandHealth {
@@ -115,11 +126,20 @@ export class CommandProvider implements ICommandProvider {
   }
 
   public diagnostics(): CommandDiagnostics {
+    const commands = this._registry.listCommands();
+    const categories = this._registry.listCategories();
+    const aliases = this._registry.listAliases();
+
     return createCommandDiagnostics({
       health: this.health(),
       statistics: this.statistics(),
       capabilities: this.capabilities(),
       context: this._context,
+      registeredCommands: commands.map((c) => c.id),
+      registeredCategories: categories.map((c) => c.name),
+      registeredAliases: aliases.map((a) => a.alias),
+      registryStatistics: this._registry.statistics(),
+      registryHealth: this._registry.health(),
       timestamp: new Date().toISOString(),
     });
   }
@@ -142,5 +162,60 @@ export class CommandProvider implements ICommandProvider {
 
   public status(): CommandRuntimeState {
     return this._runtimeState;
+  }
+
+  public registerCommand(registration: CommandRegistration | CommandDefinition): CommandDefinition {
+    return this._registry.registerCommand(registration);
+  }
+
+  public removeCommand(commandId: string): boolean {
+    return this._registry.removeCommand(commandId);
+  }
+
+  public updateCommand(
+    commandId: string,
+    updates: Partial<CommandDefinition>,
+  ): CommandDefinition {
+    return this._registry.updateCommand(commandId, updates);
+  }
+
+  public containsCommand(commandId: string): boolean {
+    return this._registry.containsCommand(commandId);
+  }
+
+  public findCommand(commandId: string): CommandDefinition | undefined {
+    return this._registry.findCommand(commandId);
+  }
+
+  public findByAlias(alias: string): CommandDefinition | undefined {
+    return this._registry.findByAlias(alias);
+  }
+
+  public findByName(name: string): CommandDefinition | undefined {
+    return this._registry.findByName(name);
+  }
+
+  public listCommands(category?: string): ReadonlyArray<CommandDefinition> {
+    return this._registry.listCommands(category);
+  }
+
+  public listAliases(): ReadonlyArray<CommandAlias> {
+    return this._registry.listAliases();
+  }
+
+  public listCategories(): ReadonlyArray<CommandCategory> {
+    return this._registry.listCategories();
+  }
+
+  public search(query: string): ReadonlyArray<CommandDefinition> {
+    return this._registry.search(query);
+  }
+
+  public registryStatistics(): CommandRegistryStatistics {
+    return this._registry.statistics();
+  }
+
+  public registryHealth(): CommandRegistryHealth {
+    return this._registry.health();
   }
 }
