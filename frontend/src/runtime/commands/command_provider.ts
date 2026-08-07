@@ -1,11 +1,11 @@
 /**
- * Command Provider Implementation (Phase 16.6.4).
+ * Command Provider Implementation (Phase 16.6.5).
  *
  * Implements ICommandProvider owning runtime state transitions,
  * telemetry statistics, health evaluation, context metadata, capabilities
  * reporting, command registration management, execution pipelines, handler management,
- * middleware pipelines, interceptor chains, history tracking, execution health,
- * pipeline statistics, and diagnostics generation.
+ * middleware pipelines, interceptor chains, validation rules, permission authorization,
+ * policy evaluation, history tracking, execution health, pipeline statistics, and diagnostics generation.
  */
 
 import {
@@ -25,17 +25,29 @@ import {
   CommandHandler,
   CommandHealth,
   CommandMiddleware,
+  CommandPermission,
   CommandRegistration,
   CommandRegistryHealth,
   CommandRegistryStatistics,
   CommandRuntimeState,
   CommandState,
   CommandStatistics,
+  ExecutionPolicy,
   InterceptorHandler,
   InterceptorRegistration,
+  PermissionHealth,
+  PermissionResult,
+  PermissionStatistics,
   PipelineExecution,
   PipelineHealth,
   PipelineStatistics,
+  PolicyDecision,
+  PolicyHealth,
+  PolicyStatistics,
+  ValidationHealth,
+  ValidationResult,
+  ValidationRule,
+  ValidationStatistics,
   createCommandCapabilities,
   createCommandConfiguration,
   createCommandContext,
@@ -49,10 +61,16 @@ import {
   ICommandPipeline,
   ICommandProvider,
   ICommandRegistry,
+  ICommandValidator,
+  IPermissionManager,
+  IPolicyManager,
 } from './interfaces';
 import { CommandRegistry } from './command_registry';
 import { CommandExecutor } from './command_executor';
 import { CommandPipeline } from './command_pipeline';
+import { CommandValidator } from './command_validator';
+import { PermissionManager } from './permission_manager';
+import { PolicyManager } from './policy_manager';
 
 export class CommandProvider implements ICommandProvider {
   private _runtimeState: CommandRuntimeState = CommandRuntimeState.UNINITIALIZED;
@@ -61,6 +79,9 @@ export class CommandProvider implements ICommandProvider {
   private readonly _context: CommandContext;
   private readonly _registry: ICommandRegistry;
   private readonly _executor: ICommandExecutor;
+  private readonly _validator: ICommandValidator;
+  private readonly _permissionManager: IPermissionManager;
+  private readonly _policyManager: IPolicyManager;
   private readonly _pipeline: ICommandPipeline;
 
   private _startedAt: string | null = null;
@@ -76,13 +97,30 @@ export class CommandProvider implements ICommandProvider {
     registry?: ICommandRegistry,
     executor?: ICommandExecutor,
     pipeline?: ICommandPipeline,
+    validator?: ICommandValidator,
+    permissionManager?: IPermissionManager,
+    policyManager?: IPolicyManager,
   ) {
     this._config = config ?? createCommandConfiguration();
     this._capabilities = capabilities ?? createCommandCapabilities();
     this._context = context ?? createCommandContext();
     this._registry = registry ?? new CommandRegistry();
     this._executor = executor ?? new CommandExecutor(this._registry);
-    this._pipeline = pipeline ?? new CommandPipeline(this._executor);
+    this._validator = validator ?? new CommandValidator(this._registry);
+    this._permissionManager = permissionManager ?? new PermissionManager();
+    this._policyManager = policyManager ?? new PolicyManager();
+    this._pipeline =
+      pipeline ??
+      new CommandPipeline(
+        this._executor,
+        undefined,
+        undefined,
+        undefined,
+        this._registry,
+        this._validator,
+        this._permissionManager,
+        this._policyManager,
+      );
   }
 
   public initialize(): CommandHealth {
@@ -179,6 +217,9 @@ export class CommandProvider implements ICommandProvider {
       pipelineHealth: pipeHealth,
       middlewareCount: this._pipeline.listMiddlewares().length,
       interceptorCount: this._pipeline.listInterceptors().length,
+      validationDiagnostics: this._validator.diagnostics(),
+      permissionDiagnostics: this._permissionManager.diagnostics(),
+      policyDiagnostics: this._policyManager.diagnostics(),
       timestamp: new Date().toISOString(),
     });
   }
@@ -309,12 +350,7 @@ export class CommandProvider implements ICommandProvider {
     return this._executor.health();
   }
 
-  public registerMiddleware(
-    middleware: Partial<CommandMiddleware> & {
-      name: string;
-      execute: (context: CommandExecutionContext, result?: CommandExecutionResult, error?: Error) => void | Promise<void>;
-    },
-  ): CommandMiddleware {
+  public registerMiddleware(middleware: Parameters<ICommandPipeline['registerMiddleware']>[0]): CommandMiddleware {
     return this._pipeline.registerMiddleware(middleware);
   }
 
@@ -332,7 +368,7 @@ export class CommandProvider implements ICommandProvider {
       intercept: InterceptorHandler<TResult>;
     },
   ): InterceptorRegistration<TResult> {
-    return this._pipeline.registerInterceptor(interceptor);
+    return this._pipeline.registerInterceptor<TResult>(interceptor);
   }
 
   public removeInterceptor(interceptorId: string): boolean {
@@ -355,5 +391,94 @@ export class CommandProvider implements ICommandProvider {
 
   public pipelineHealth(): PipelineHealth {
     return this._pipeline.health();
+  }
+
+  public registerValidationRule(
+    rule: Parameters<ICommandValidator['registerValidationRule']>[0],
+  ): ValidationRule {
+    return this._validator.registerValidationRule(rule);
+  }
+
+  public removeValidationRule(ruleId: string): boolean {
+    return this._validator.removeValidationRule(ruleId);
+  }
+
+  public listValidationRules(): ReadonlyArray<ValidationRule> {
+    return this._validator.listValidationRules();
+  }
+
+  public validate(request: CommandExecutionRequest): Promise<ValidationResult> {
+    return this._validator.validate(request);
+  }
+
+  public validationStatistics(): ValidationStatistics {
+    return this._validator.statistics();
+  }
+
+  public validationHealth(): ValidationHealth {
+    return this._validator.health();
+  }
+
+  public registerPermission(
+    permission: Parameters<IPermissionManager['registerPermission']>[0],
+  ): CommandPermission {
+    return this._permissionManager.registerPermission(permission);
+  }
+
+  public removePermission(permissionId: string): boolean {
+    return this._permissionManager.removePermission(permissionId);
+  }
+
+  public listPermissions(): ReadonlyArray<CommandPermission> {
+    return this._permissionManager.listPermissions();
+  }
+
+  public grantPermission(userIdOrRole: string, permissionId: string): void {
+    this._permissionManager.grantPermission(userIdOrRole, permissionId);
+  }
+
+  public revokePermission(userIdOrRole: string, permissionId: string): boolean {
+    return this._permissionManager.revokePermission(userIdOrRole, permissionId);
+  }
+
+  public hasPermission(userIdOrRole: string, permissionId: string): PermissionResult {
+    return this._permissionManager.hasPermission(userIdOrRole, permissionId);
+  }
+
+  public permissionStatistics(): PermissionStatistics {
+    return this._permissionManager.statistics();
+  }
+
+  public permissionHealth(): PermissionHealth {
+    return this._permissionManager.health();
+  }
+
+  public registerPolicy(
+    policy: Parameters<IPolicyManager['registerPolicy']>[0],
+  ): ExecutionPolicy {
+    return this._policyManager.registerPolicy(policy);
+  }
+
+  public removePolicy(policyId: string): boolean {
+    return this._policyManager.removePolicy(policyId);
+  }
+
+  public listPolicies(): ReadonlyArray<ExecutionPolicy> {
+    return this._policyManager.listPolicies();
+  }
+
+  public evaluatePolicy(
+    request: CommandExecutionRequest,
+    context?: CommandExecutionContext,
+  ): Promise<PolicyDecision> {
+    return this._policyManager.evaluatePolicy(request, context);
+  }
+
+  public policyStatistics(): PolicyStatistics {
+    return this._policyManager.statistics();
+  }
+
+  public policyHealth(): PolicyHealth {
+    return this._policyManager.health();
   }
 }

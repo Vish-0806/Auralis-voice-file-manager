@@ -1,8 +1,9 @@
 /**
- * Command Runtime Interfaces (Phase 16.6.4).
+ * Command Runtime Interfaces (Phase 16.6.5).
  *
  * Defines contract specifications for ICommandRegistry, ICommandExecutor,
- * IMiddlewareManager, IInterceptorManager, ICommandPipeline, ICommandProvider, and ICommandRuntime.
+ * IMiddlewareManager, IInterceptorManager, ICommandPipeline, ICommandValidator,
+ * IPermissionManager, IPolicyManager, ICommandProvider, and ICommandRuntime.
  */
 
 import {
@@ -22,6 +23,7 @@ import {
   CommandHandler,
   CommandHealth,
   CommandMiddleware,
+  CommandPermission,
   CommandRegistration,
   CommandRegistryHealth,
   CommandRegistryStatistics,
@@ -29,17 +31,31 @@ import {
   CommandState,
   CommandStatistics,
   ExecutionDiagnostics,
+  ExecutionPolicy,
   InterceptorHandler,
   InterceptorRegistration,
   InterceptorResult,
   MiddlewareHealth,
   MiddlewareResult,
   MiddlewareStatistics,
+  PermissionDiagnostics,
+  PermissionHealth,
+  PermissionResult,
+  PermissionStatistics,
   PipelineDiagnostics,
   PipelineExecution,
   PipelineHealth,
   PipelineSnapshot,
   PipelineStatistics,
+  PolicyDecision,
+  PolicyDiagnostics,
+  PolicyHealth,
+  PolicyStatistics,
+  ValidationDiagnostics,
+  ValidationHealth,
+  ValidationResult,
+  ValidationRule,
+  ValidationStatistics,
 } from './models';
 
 export interface ICommandRegistry {
@@ -138,6 +154,56 @@ export interface ICommandPipeline {
   snapshot(): PipelineSnapshot;
 }
 
+export interface ICommandValidator {
+  registerValidationRule(
+    rule: Partial<ValidationRule> & {
+      name: string;
+      validate: ValidationRule['validate'];
+    },
+  ): ValidationRule;
+  removeValidationRule(ruleId: string): boolean;
+  listValidationRules(): ReadonlyArray<ValidationRule>;
+  validate(request: CommandExecutionRequest): Promise<ValidationResult>;
+  statistics(): ValidationStatistics;
+  health(): ValidationHealth;
+  diagnostics(): ValidationDiagnostics;
+  clear(): void;
+}
+
+export interface IPermissionManager {
+  registerPermission(
+    permission: Partial<CommandPermission> & { name: string },
+  ): CommandPermission;
+  removePermission(permissionId: string): boolean;
+  listPermissions(): ReadonlyArray<CommandPermission>;
+  grantPermission(userIdOrRole: string, permissionId: string): void;
+  revokePermission(userIdOrRole: string, permissionId: string): boolean;
+  hasPermission(userIdOrRole: string, permissionId: string): PermissionResult;
+  statistics(): PermissionStatistics;
+  health(): PermissionHealth;
+  diagnostics(): PermissionDiagnostics;
+  clear(): void;
+}
+
+export interface IPolicyManager {
+  registerPolicy(
+    policy: Partial<ExecutionPolicy> & {
+      name: string;
+      evaluate: ExecutionPolicy['evaluate'];
+    },
+  ): ExecutionPolicy;
+  removePolicy(policyId: string): boolean;
+  listPolicies(): ReadonlyArray<ExecutionPolicy>;
+  evaluatePolicy(
+    request: CommandExecutionRequest,
+    context?: CommandExecutionContext,
+  ): Promise<PolicyDecision>;
+  statistics(): PolicyStatistics;
+  health(): PolicyHealth;
+  diagnostics(): PolicyDiagnostics;
+  clear(): void;
+}
+
 export interface ICommandProvider {
   initialize(): CommandHealth;
   shutdown(): CommandHealth;
@@ -203,6 +269,44 @@ export interface ICommandProvider {
   ): Promise<PipelineExecution<TResult>>;
   pipelineStatistics(): PipelineStatistics;
   pipelineHealth(): PipelineHealth;
+
+  registerValidationRule(
+    rule: Partial<ValidationRule> & {
+      name: string;
+      validate: ValidationRule['validate'];
+    },
+  ): ValidationRule;
+  removeValidationRule(ruleId: string): boolean;
+  listValidationRules(): ReadonlyArray<ValidationRule>;
+  validate(request: CommandExecutionRequest): Promise<ValidationResult>;
+  validationStatistics(): ValidationStatistics;
+  validationHealth(): ValidationHealth;
+
+  registerPermission(
+    permission: Partial<CommandPermission> & { name: string },
+  ): CommandPermission;
+  removePermission(permissionId: string): boolean;
+  listPermissions(): ReadonlyArray<CommandPermission>;
+  grantPermission(userIdOrRole: string, permissionId: string): void;
+  revokePermission(userIdOrRole: string, permissionId: string): boolean;
+  hasPermission(userIdOrRole: string, permissionId: string): PermissionResult;
+  permissionStatistics(): PermissionStatistics;
+  permissionHealth(): PermissionHealth;
+
+  registerPolicy(
+    policy: Partial<ExecutionPolicy> & {
+      name: string;
+      evaluate: ExecutionPolicy['evaluate'];
+    },
+  ): ExecutionPolicy;
+  removePolicy(policyId: string): boolean;
+  listPolicies(): ReadonlyArray<ExecutionPolicy>;
+  evaluatePolicy(
+    request: CommandExecutionRequest,
+    context?: CommandExecutionContext,
+  ): Promise<PolicyDecision>;
+  policyStatistics(): PolicyStatistics;
+  policyHealth(): PolicyHealth;
 }
 
 export interface ICommandRuntime {
@@ -269,4 +373,42 @@ export interface ICommandRuntime {
   ): Promise<PipelineExecution<TResult>>;
   pipelineStatistics(): PipelineStatistics;
   pipelineHealth(): PipelineHealth;
+
+  registerValidationRule(
+    rule: Partial<ValidationRule> & {
+      name: string;
+      validate: ValidationRule['validate'];
+    },
+  ): ValidationRule;
+  removeValidationRule(ruleId: string): boolean;
+  listValidationRules(): ReadonlyArray<ValidationRule>;
+  validate(request: CommandExecutionRequest): Promise<ValidationResult>;
+  validationStatistics(): ValidationStatistics;
+  validationHealth(): ValidationHealth;
+
+  registerPermission(
+    permission: Partial<CommandPermission> & { name: string },
+  ): CommandPermission;
+  removePermission(permissionId: string): boolean;
+  listPermissions(): ReadonlyArray<CommandPermission>;
+  grantPermission(userIdOrRole: string, permissionId: string): void;
+  revokePermission(userIdOrRole: string, permissionId: string): boolean;
+  hasPermission(userIdOrRole: string, permissionId: string): PermissionResult;
+  permissionStatistics(): PermissionStatistics;
+  permissionHealth(): PermissionHealth;
+
+  registerPolicy(
+    policy: Partial<ExecutionPolicy> & {
+      name: string;
+      evaluate: ExecutionPolicy['evaluate'];
+    },
+  ): ExecutionPolicy;
+  removePolicy(policyId: string): boolean;
+  listPolicies(): ReadonlyArray<ExecutionPolicy>;
+  evaluatePolicy(
+    request: CommandExecutionRequest,
+    context?: CommandExecutionContext,
+  ): Promise<PolicyDecision>;
+  policyStatistics(): PolicyStatistics;
+  policyHealth(): PolicyHealth;
 }

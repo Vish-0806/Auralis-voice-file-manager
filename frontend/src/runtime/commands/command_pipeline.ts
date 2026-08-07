@@ -1,13 +1,13 @@
 /**
- * Command Pipeline Implementation (Phase 16.6.4).
+ * Command Pipeline Implementation (Phase 16.6.5).
  *
- * Implements ICommandPipeline orchestrating MiddlewareManager, InterceptorManager,
- * and CommandExecutor into a unified, high-performance execution pipeline with pre/post-processing,
- * exception isolation, context enrichment, telemetry statistics, and health reporting.
+ * Implements ICommandPipeline orchestrating CommandValidator, PermissionManager,
+ * PolicyManager, MiddlewareManager, InterceptorManager, and CommandExecutor into a unified,
+ * high-performance execution pipeline with validation, permissions, policy enforcement,
+ * pre/post-processing, exception isolation, context enrichment, telemetry statistics, and health reporting.
  */
 
 import {
-  CommandExecutionContext,
   CommandExecutionRequest,
   CommandExecutionResult,
   CommandExecutionStatus,
@@ -37,17 +37,29 @@ import {
 import {
   ICommandExecutor,
   ICommandPipeline,
+  ICommandRegistry,
+  ICommandValidator,
   IInterceptorManager,
   IMiddlewareManager,
+  IPermissionManager,
+  IPolicyManager,
 } from './interfaces';
+import { CommandRegistry } from './command_registry';
 import { CommandExecutor } from './command_executor';
 import { MiddlewareManager } from './middleware_manager';
 import { InterceptorManager } from './interceptor_manager';
+import { CommandValidator } from './command_validator';
+import { PermissionManager } from './permission_manager';
+import { PolicyManager } from './policy_manager';
 
 export class CommandPipeline implements ICommandPipeline {
+  private readonly _registry: ICommandRegistry;
+  private readonly _executor: ICommandExecutor;
   private readonly _middlewareManager: IMiddlewareManager;
   private readonly _interceptorManager: IInterceptorManager;
-  private readonly _executor: ICommandExecutor;
+  private readonly _validator: ICommandValidator;
+  private readonly _permissionManager: IPermissionManager;
+  private readonly _policyManager: IPolicyManager;
   private readonly _config: PipelineConfiguration;
 
   private _pipelineExecutions = 0;
@@ -60,19 +72,22 @@ export class CommandPipeline implements ICommandPipeline {
     middlewareManager?: IMiddlewareManager,
     interceptorManager?: IInterceptorManager,
     config?: PipelineConfiguration,
+    registry?: ICommandRegistry,
+    validator?: ICommandValidator,
+    permissionManager?: IPermissionManager,
+    policyManager?: IPolicyManager,
   ) {
-    this._executor = executor ?? new CommandExecutor();
+    this._registry = registry ?? new CommandRegistry();
+    this._executor = executor ?? new CommandExecutor(this._registry);
     this._middlewareManager = middlewareManager ?? new MiddlewareManager();
     this._interceptorManager = interceptorManager ?? new InterceptorManager();
+    this._validator = validator ?? new CommandValidator(this._registry);
+    this._permissionManager = permissionManager ?? new PermissionManager();
+    this._policyManager = policyManager ?? new PolicyManager();
     this._config = config ?? createPipelineConfiguration();
   }
 
-  public registerMiddleware(
-    middleware: Partial<CommandMiddleware> & {
-      name: string;
-      execute: (context: CommandExecutionContext, result?: CommandExecutionResult, error?: Error) => void | Promise<void>;
-    },
-  ): CommandMiddleware {
+  public registerMiddleware(middleware: Parameters<IMiddlewareManager['registerMiddleware']>[0]): CommandMiddleware {
     return this._middlewareManager.registerMiddleware(middleware);
   }
 
@@ -90,7 +105,7 @@ export class CommandPipeline implements ICommandPipeline {
       intercept: InterceptorHandler<TResult>;
     },
   ): InterceptorRegistration<TResult> {
-    return this._interceptorManager.registerInterceptor(interceptor);
+    return this._interceptorManager.registerInterceptor<TResult>(interceptor);
   }
 
   public removeInterceptor(interceptorId: string): boolean {
@@ -120,9 +135,109 @@ export class CommandPipeline implements ICommandPipeline {
       metadata: request?.metadata,
     });
 
-    let beforeResult: MiddlewareResult = createMiddlewareResult();
+    // 1. Validation Stage
+    const validationResult = await this._validator.validate(request);
+    if (!validationResult.valid) {
+      this._pipelineFailures++;
+      this._activePipelines = Math.max(0, this._activePipelines - 1);
+      const endPerf = performance ? performance.now() : Date.now();
 
-    // 1. BEFORE Middleware Phase
+      const firstError = validationResult.issues.find((i) => i.severity === 'error');
+      const timing = createExecutionTiming({
+        startTime,
+        endTime: new Date().toISOString(),
+        durationMs: Math.max(0, Math.round((endPerf - startPerf) * 100) / 100),
+      });
+
+      const execResult = createCommandExecutionResult<TResult>({
+        commandId: request?.commandId ?? 'unknown',
+        status: CommandExecutionStatus.VALIDATION_FAILED,
+        error: createExecutionError({
+          code: firstError?.code ?? 'VALIDATION_FAILED',
+          message: firstError?.message ?? 'Command validation failed.',
+        }),
+        timing,
+        context,
+      });
+
+      return createPipelineExecution<TResult>({
+        commandId: request?.commandId ?? 'unknown',
+        executionResult: execResult,
+        middlewareResult: createMiddlewareResult(),
+        durationMs: timing.durationMs,
+      });
+    }
+
+    // 2. Permission Check Stage
+    const definition = this._registry.findCommand(request.commandId) ?? this._registry.findByAlias(request.commandId);
+    if (definition && definition.permission) {
+      const subject = request.userId ?? 'anonymous';
+      const permResult = this._permissionManager.hasPermission(subject, definition.permission);
+      if (!permResult.granted) {
+        this._pipelineFailures++;
+        this._activePipelines = Math.max(0, this._activePipelines - 1);
+        const endPerf = performance ? performance.now() : Date.now();
+
+        const timing = createExecutionTiming({
+          startTime,
+          endTime: new Date().toISOString(),
+          durationMs: Math.max(0, Math.round((endPerf - startPerf) * 100) / 100),
+        });
+
+        const execResult = createCommandExecutionResult<TResult>({
+          commandId: definition.id,
+          status: CommandExecutionStatus.REJECTED,
+          error: createExecutionError({
+            code: 'PERMISSION_DENIED',
+            message: permResult.reason ?? `Permission '${definition.permission}' denied for user '${subject}'.`,
+          }),
+          timing,
+          context,
+        });
+
+        return createPipelineExecution<TResult>({
+          commandId: definition.id,
+          executionResult: execResult,
+          middlewareResult: createMiddlewareResult(),
+          durationMs: timing.durationMs,
+        });
+      }
+    }
+
+    // 3. Policy Evaluation Stage
+    const policyDecision = await this._policyManager.evaluatePolicy(request, context);
+    if (!policyDecision.allowed) {
+      this._pipelineFailures++;
+      this._activePipelines = Math.max(0, this._activePipelines - 1);
+      const endPerf = performance ? performance.now() : Date.now();
+
+      const timing = createExecutionTiming({
+        startTime,
+        endTime: new Date().toISOString(),
+        durationMs: Math.max(0, Math.round((endPerf - startPerf) * 100) / 100),
+      });
+
+      const execResult = createCommandExecutionResult<TResult>({
+        commandId: request?.commandId ?? 'unknown',
+        status: CommandExecutionStatus.REJECTED,
+        error: createExecutionError({
+          code: 'POLICY_DENIED',
+          message: policyDecision.reason ?? 'Command execution denied by policy.',
+        }),
+        timing,
+        context,
+      });
+
+      return createPipelineExecution<TResult>({
+        commandId: request?.commandId ?? 'unknown',
+        executionResult: execResult,
+        middlewareResult: createMiddlewareResult(),
+        durationMs: timing.durationMs,
+      });
+    }
+
+    // 4. BEFORE Middleware Phase
+    let beforeResult: MiddlewareResult = createMiddlewareResult();
     if (this._config.enableBeforeMiddleware) {
       beforeResult = await this._middlewareManager.executeBefore(context);
     }
@@ -131,7 +246,7 @@ export class CommandPipeline implements ICommandPipeline {
     let interceptorResult = undefined;
 
     try {
-      // 2. Interceptor Chain & Executor Phase
+      // 5. Interceptor Chain & Executor Phase
       if (this._config.enableInterceptors) {
         const intRes = await this._interceptorManager.executeChain<TResult>(
           context,
@@ -143,7 +258,6 @@ export class CommandPipeline implements ICommandPipeline {
         executionResult = await this._executor.executeAsync<TResult>(request);
       }
 
-      // Check if command execution failed
       if (executionResult.status === CommandExecutionStatus.FAILED) {
         this._pipelineFailures++;
         if (this._config.enableExceptionMiddleware && executionResult.error) {
@@ -180,7 +294,7 @@ export class CommandPipeline implements ICommandPipeline {
       });
     }
 
-    // 3. AFTER Middleware Phase
+    // 6. AFTER Middleware Phase
     let afterResult: MiddlewareResult = createMiddlewareResult();
     if (this._config.enableAfterMiddleware) {
       afterResult = await this._middlewareManager.executeAfter(context, executionResult);

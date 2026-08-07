@@ -42,7 +42,7 @@ describe('Phase 16.6.4 — Frontend Command Pipeline, Middleware & Interceptor E
     executor = new CommandExecutor(registry);
     middlewareManager = new MiddlewareManager();
     interceptorManager = new InterceptorManager();
-    pipeline = new CommandPipeline(executor, middlewareManager, interceptorManager);
+    pipeline = new CommandPipeline(executor, middlewareManager, interceptorManager, undefined, registry);
   });
 
   describe('1. Immutable Pipeline Domain Models & Factory Functions', () => {

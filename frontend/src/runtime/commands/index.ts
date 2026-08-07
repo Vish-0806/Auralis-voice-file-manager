@@ -1,5 +1,5 @@
 /**
- * Command Runtime Foundation, Command Registry, Execution & Pipeline Barrel Export (Phase 16.6.4).
+ * Command Runtime Foundation, Command Registry, Execution, Pipeline, Validation, Permission & Policy Barrel Export (Phase 16.6.5).
  */
 
 export * from './models';
@@ -10,6 +10,9 @@ export * from './command_executor';
 export * from './middleware_manager';
 export * from './interceptor_manager';
 export * from './command_pipeline';
+export * from './command_validator';
+export * from './permission_manager';
+export * from './policy_manager';
 export * from './command_provider';
 export * from './command_runtime';
 export * from './runtime';

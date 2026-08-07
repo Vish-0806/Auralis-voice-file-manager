@@ -1,12 +1,15 @@
 /**
- * Command Runtime Domain Models (Phase 16.6.4).
+ * Command Runtime Domain Models (Phase 16.6.5).
  *
  * Provides immutable state models, configuration objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, command definitions,
  * parameters, registrations, categories, aliases, registry statistics, registry health,
  * execution requests, results, records, pipeline telemetry, execution statistics,
  * execution health, middleware models, interceptor models, pipeline execution telemetry,
- * pipeline statistics, pipeline health, and diagnostics telemetry for the Frontend Command Runtime.
+ * pipeline statistics, pipeline health, validation rules, validation issues, validation results,
+ * validation telemetry, permission scopes, permissions, permission evaluation results,
+ * permission telemetry, policy rules, execution policies, policy decisions, policy telemetry,
+ * and diagnostics telemetry for the Frontend Command Runtime.
  */
 
 export enum CommandRuntimeState {
@@ -42,6 +45,8 @@ export enum ExecutionStage {
   AFTER = 'AFTER',
   EXCEPTION = 'EXCEPTION',
 }
+
+export type PermissionScope = 'global' | 'workspace' | 'session' | 'user';
 
 export interface CommandState {
   readonly runtimeState: CommandRuntimeState;
@@ -415,6 +420,139 @@ export interface PipelineSnapshot {
   readonly timestamp: string;
 }
 
+export interface CommandPermission {
+  readonly permissionId: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly scope: PermissionScope;
+  readonly roles: ReadonlyArray<string>;
+  readonly enabled: boolean;
+}
+
+export interface PermissionResult {
+  readonly granted: boolean;
+  readonly permissionId?: string;
+  readonly userId?: string;
+  readonly reason?: string;
+  readonly evaluatedAt: string;
+}
+
+export interface PermissionStatistics {
+  readonly totalChecks: number;
+  readonly grantedChecks: number;
+  readonly deniedChecks: number;
+  readonly activePermissions: number;
+}
+
+export interface PermissionHealth {
+  readonly healthy: boolean;
+  readonly grantedRate: number;
+  readonly activePermissions: number;
+  readonly message: string;
+}
+
+export interface ValidationIssue {
+  readonly severity: 'error' | 'warning';
+  readonly code: string;
+  readonly message: string;
+  readonly field?: string;
+}
+
+export interface ValidationRule {
+  readonly ruleId: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly validate: (
+    request: CommandExecutionRequest,
+    definition?: CommandDefinition,
+  ) => ValidationIssue | undefined | null | Promise<ValidationIssue | undefined | null>;
+}
+
+export interface ValidationResult {
+  readonly valid: boolean;
+  readonly commandId: string;
+  readonly issues: ReadonlyArray<ValidationIssue>;
+  readonly validatedAt: string;
+}
+
+export interface ValidationStatistics {
+  readonly totalValidations: number;
+  readonly successfulValidations: number;
+  readonly failedValidations: number;
+  readonly warningCount: number;
+  readonly averageValidationMs: number;
+}
+
+export interface ValidationHealth {
+  readonly healthy: boolean;
+  readonly failureRate: number;
+  readonly averageValidationMs: number;
+  readonly message: string;
+}
+
+export interface PolicyRule {
+  readonly ruleId: string;
+  readonly name: string;
+  readonly policyId: string;
+  readonly condition: (
+    request: CommandExecutionRequest,
+    context?: CommandExecutionContext,
+  ) => boolean | Promise<boolean>;
+}
+
+export interface ExecutionPolicy {
+  readonly policyId: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly enabled: boolean;
+  readonly evaluate: (
+    request: CommandExecutionRequest,
+    context?: CommandExecutionContext,
+  ) => PolicyDecision | Promise<PolicyDecision>;
+}
+
+export interface PolicyDecision {
+  readonly allowed: boolean;
+  readonly policyId?: string;
+  readonly reason?: string;
+  readonly evaluatedAt: string;
+}
+
+export interface PolicyStatistics {
+  readonly totalEvaluations: number;
+  readonly allowedEvaluations: number;
+  readonly deniedEvaluations: number;
+  readonly averageEvaluationMs: number;
+}
+
+export interface PolicyHealth {
+  readonly healthy: boolean;
+  readonly allowedRate: number;
+  readonly activePolicies: number;
+  readonly message: string;
+}
+
+export interface ValidationDiagnostics {
+  readonly statistics: ValidationStatistics;
+  readonly health: ValidationHealth;
+  readonly ruleCount: number;
+  readonly timestamp: string;
+}
+
+export interface PermissionDiagnostics {
+  readonly statistics: PermissionStatistics;
+  readonly health: PermissionHealth;
+  readonly permissionCount: number;
+  readonly timestamp: string;
+}
+
+export interface PolicyDiagnostics {
+  readonly statistics: PolicyStatistics;
+  readonly health: PolicyHealth;
+  readonly policyCount: number;
+  readonly timestamp: string;
+}
+
 export interface CommandDiagnostics {
   readonly health: CommandHealth;
   readonly statistics: CommandStatistics;
@@ -432,6 +570,9 @@ export interface CommandDiagnostics {
   readonly pipelineHealth?: PipelineHealth;
   readonly middlewareCount?: number;
   readonly interceptorCount?: number;
+  readonly validationDiagnostics?: ValidationDiagnostics;
+  readonly permissionDiagnostics?: PermissionDiagnostics;
+  readonly policyDiagnostics?: PolicyDiagnostics;
   readonly timestamp: string;
 }
 
@@ -983,6 +1124,219 @@ export function createPipelineSnapshot(
   });
 }
 
+export function createCommandPermission(
+  params: Partial<CommandPermission> & { name: string },
+): CommandPermission {
+  const roles = params.roles ?? [];
+  return Object.freeze({
+    permissionId: params.permissionId ?? `perm_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    name: params.name,
+    description: params.description,
+    scope: params.scope ?? 'global',
+    roles: Object.freeze([...roles]),
+    enabled: params.enabled ?? true,
+  });
+}
+
+export function createPermissionResult(
+  params: Partial<PermissionResult> = {},
+): PermissionResult {
+  return Object.freeze({
+    granted: params.granted ?? true,
+    permissionId: params.permissionId,
+    userId: params.userId,
+    reason: params.reason,
+    evaluatedAt: params.evaluatedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createPermissionStatistics(
+  params: Partial<PermissionStatistics> = {},
+): PermissionStatistics {
+  return Object.freeze({
+    totalChecks: params.totalChecks ?? 0,
+    grantedChecks: params.grantedChecks ?? 0,
+    deniedChecks: params.deniedChecks ?? 0,
+    activePermissions: params.activePermissions ?? 0,
+  });
+}
+
+export function createPermissionHealth(
+  params: Partial<PermissionHealth> = {},
+): PermissionHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    grantedRate: params.grantedRate ?? 100,
+    activePermissions: params.activePermissions ?? 0,
+    message: params.message ?? 'Permission manager is operational.',
+  });
+}
+
+export function createValidationIssue(
+  params: Partial<ValidationIssue> & { message: string },
+): ValidationIssue {
+  return Object.freeze({
+    severity: params.severity ?? 'error',
+    code: params.code ?? 'VALIDATION_ERROR',
+    message: params.message,
+    field: params.field,
+  });
+}
+
+export function createValidationRule(
+  params: Partial<ValidationRule> & {
+    name: string;
+    validate: (request: CommandExecutionRequest, definition?: CommandDefinition) => ValidationIssue | undefined | null | Promise<ValidationIssue | undefined | null>;
+  },
+): ValidationRule {
+  return Object.freeze({
+    ruleId: params.ruleId ?? `vrule_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    name: params.name,
+    description: params.description,
+    validate: params.validate,
+  });
+}
+
+export function createValidationResult(
+  params: Partial<ValidationResult> & { commandId: string },
+): ValidationResult {
+  const issues = params.issues ?? [];
+  return Object.freeze({
+    valid: params.valid ?? issues.every((i) => i.severity !== 'error'),
+    commandId: params.commandId,
+    issues: Object.freeze([...issues]),
+    validatedAt: params.validatedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createValidationStatistics(
+  params: Partial<ValidationStatistics> = {},
+): ValidationStatistics {
+  return Object.freeze({
+    totalValidations: params.totalValidations ?? 0,
+    successfulValidations: params.successfulValidations ?? 0,
+    failedValidations: params.failedValidations ?? 0,
+    warningCount: params.warningCount ?? 0,
+    averageValidationMs: params.averageValidationMs ?? 0,
+  });
+}
+
+export function createValidationHealth(
+  params: Partial<ValidationHealth> = {},
+): ValidationHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    failureRate: params.failureRate ?? 0,
+    averageValidationMs: params.averageValidationMs ?? 0,
+    message: params.message ?? 'Command validator is operational.',
+  });
+}
+
+export function createPolicyRule(
+  params: Partial<PolicyRule> & {
+    name: string;
+    policyId: string;
+    condition: (request: CommandExecutionRequest, context?: CommandExecutionContext) => boolean | Promise<boolean>;
+  },
+): PolicyRule {
+  return Object.freeze({
+    ruleId: params.ruleId ?? `prule_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    name: params.name,
+    policyId: params.policyId,
+    condition: params.condition,
+  });
+}
+
+export function createExecutionPolicy(
+  params: Partial<ExecutionPolicy> & {
+    name: string;
+    evaluate: (request: CommandExecutionRequest, context?: CommandExecutionContext) => PolicyDecision | Promise<PolicyDecision>;
+  },
+): ExecutionPolicy {
+  return Object.freeze({
+    policyId: params.policyId ?? `policy_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    name: params.name,
+    description: params.description,
+    enabled: params.enabled ?? true,
+    evaluate: params.evaluate,
+  });
+}
+
+export function createPolicyDecision(
+  params: Partial<PolicyDecision> = {},
+): PolicyDecision {
+  return Object.freeze({
+    allowed: params.allowed ?? true,
+    policyId: params.policyId,
+    reason: params.reason,
+    evaluatedAt: params.evaluatedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createPolicyStatistics(
+  params: Partial<PolicyStatistics> = {},
+): PolicyStatistics {
+  return Object.freeze({
+    totalEvaluations: params.totalEvaluations ?? 0,
+    allowedEvaluations: params.allowedEvaluations ?? 0,
+    deniedEvaluations: params.deniedEvaluations ?? 0,
+    averageEvaluationMs: params.averageEvaluationMs ?? 0,
+  });
+}
+
+export function createPolicyHealth(
+  params: Partial<PolicyHealth> = {},
+): PolicyHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    allowedRate: params.allowedRate ?? 100,
+    activePolicies: params.activePolicies ?? 0,
+    message: params.message ?? 'Policy manager is operational.',
+  });
+}
+
+export function createValidationDiagnostics(
+  params: Partial<ValidationDiagnostics> & {
+    statistics: ValidationStatistics;
+    health: ValidationHealth;
+  },
+): ValidationDiagnostics {
+  return Object.freeze({
+    statistics: params.statistics,
+    health: params.health,
+    ruleCount: params.ruleCount ?? 0,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createPermissionDiagnostics(
+  params: Partial<PermissionDiagnostics> & {
+    statistics: PermissionStatistics;
+    health: PermissionHealth;
+  },
+): PermissionDiagnostics {
+  return Object.freeze({
+    statistics: params.statistics,
+    health: params.health,
+    permissionCount: params.permissionCount ?? 0,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createPolicyDiagnostics(
+  params: Partial<PolicyDiagnostics> & {
+    statistics: PolicyStatistics;
+    health: PolicyHealth;
+  },
+): PolicyDiagnostics {
+  return Object.freeze({
+    statistics: params.statistics,
+    health: params.health,
+    policyCount: params.policyCount ?? 0,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
 export function createCommandDiagnostics(
   params: Partial<CommandDiagnostics> = {},
 ): CommandDiagnostics {
@@ -1003,6 +1357,9 @@ export function createCommandDiagnostics(
     pipelineHealth: params.pipelineHealth,
     middlewareCount: params.middlewareCount,
     interceptorCount: params.interceptorCount,
+    validationDiagnostics: params.validationDiagnostics,
+    permissionDiagnostics: params.permissionDiagnostics,
+    policyDiagnostics: params.policyDiagnostics,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }

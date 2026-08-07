@@ -1,5 +1,5 @@
 /**
- * Command Runtime Coordinator Implementation (Phase 16.6.4).
+ * Command Runtime Coordinator Implementation (Phase 16.6.5).
  *
  * Implements ICommandRuntime acting as central coordinator delegating to ICommandProvider.
  * Contains no business logic — all operations are forwarded to the provider instance.
@@ -20,17 +20,29 @@ import {
   CommandHandler,
   CommandHealth,
   CommandMiddleware,
+  CommandPermission,
   CommandRegistration,
   CommandRegistryHealth,
   CommandRegistryStatistics,
   CommandRuntimeState,
   CommandState,
   CommandStatistics,
+  ExecutionPolicy,
   InterceptorHandler,
   InterceptorRegistration,
+  PermissionHealth,
+  PermissionResult,
+  PermissionStatistics,
   PipelineExecution,
   PipelineHealth,
   PipelineStatistics,
+  PolicyDecision,
+  PolicyHealth,
+  PolicyStatistics,
+  ValidationHealth,
+  ValidationResult,
+  ValidationRule,
+  ValidationStatistics,
 } from './models';
 import { ICommandProvider, ICommandRuntime } from './interfaces';
 import { CommandProvider } from './command_provider';
@@ -211,7 +223,7 @@ export class CommandRuntime implements ICommandRuntime {
       intercept: InterceptorHandler<TResult>;
     },
   ): InterceptorRegistration<TResult> {
-    return this._provider.registerInterceptor(interceptor);
+    return this._provider.registerInterceptor<TResult>(interceptor);
   }
 
   public removeInterceptor(interceptorId: string): boolean {
@@ -234,5 +246,94 @@ export class CommandRuntime implements ICommandRuntime {
 
   public pipelineHealth(): PipelineHealth {
     return this._provider.pipelineHealth();
+  }
+
+  public registerValidationRule(
+    rule: Parameters<ICommandProvider['registerValidationRule']>[0],
+  ): ValidationRule {
+    return this._provider.registerValidationRule(rule);
+  }
+
+  public removeValidationRule(ruleId: string): boolean {
+    return this._provider.removeValidationRule(ruleId);
+  }
+
+  public listValidationRules(): ReadonlyArray<ValidationRule> {
+    return this._provider.listValidationRules();
+  }
+
+  public validate(request: CommandExecutionRequest): Promise<ValidationResult> {
+    return this._provider.validate(request);
+  }
+
+  public validationStatistics(): ValidationStatistics {
+    return this._provider.validationStatistics();
+  }
+
+  public validationHealth(): ValidationHealth {
+    return this._provider.validationHealth();
+  }
+
+  public registerPermission(
+    permission: Parameters<ICommandProvider['registerPermission']>[0],
+  ): CommandPermission {
+    return this._provider.registerPermission(permission);
+  }
+
+  public removePermission(permissionId: string): boolean {
+    return this._provider.removePermission(permissionId);
+  }
+
+  public listPermissions(): ReadonlyArray<CommandPermission> {
+    return this._provider.listPermissions();
+  }
+
+  public grantPermission(userIdOrRole: string, permissionId: string): void {
+    this._provider.grantPermission(userIdOrRole, permissionId);
+  }
+
+  public revokePermission(userIdOrRole: string, permissionId: string): boolean {
+    return this._provider.revokePermission(userIdOrRole, permissionId);
+  }
+
+  public hasPermission(userIdOrRole: string, permissionId: string): PermissionResult {
+    return this._provider.hasPermission(userIdOrRole, permissionId);
+  }
+
+  public permissionStatistics(): PermissionStatistics {
+    return this._provider.permissionStatistics();
+  }
+
+  public permissionHealth(): PermissionHealth {
+    return this._provider.permissionHealth();
+  }
+
+  public registerPolicy(
+    policy: Parameters<ICommandProvider['registerPolicy']>[0],
+  ): ExecutionPolicy {
+    return this._provider.registerPolicy(policy);
+  }
+
+  public removePolicy(policyId: string): boolean {
+    return this._provider.removePolicy(policyId);
+  }
+
+  public listPolicies(): ReadonlyArray<ExecutionPolicy> {
+    return this._provider.listPolicies();
+  }
+
+  public evaluatePolicy(
+    request: CommandExecutionRequest,
+    context?: CommandExecutionContext,
+  ): Promise<PolicyDecision> {
+    return this._provider.evaluatePolicy(request, context);
+  }
+
+  public policyStatistics(): PolicyStatistics {
+    return this._provider.policyStatistics();
+  }
+
+  public policyHealth(): PolicyHealth {
+    return this._provider.policyHealth();
   }
 }
