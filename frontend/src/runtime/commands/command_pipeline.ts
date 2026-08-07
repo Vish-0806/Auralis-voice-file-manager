@@ -1,10 +1,12 @@
 /**
- * Command Pipeline Implementation (Phase 16.6.5).
+ * Command Pipeline Implementation (Phase 16.6.6).
  *
  * Implements ICommandPipeline orchestrating CommandValidator, PermissionManager,
- * PolicyManager, MiddlewareManager, InterceptorManager, and CommandExecutor into a unified,
+ * PolicyManager, CommandScheduler, CommandQueue, BackgroundExecutionManager,
+ * MiddlewareManager, InterceptorManager, and CommandExecutor into a unified,
  * high-performance execution pipeline with validation, permissions, policy enforcement,
- * pre/post-processing, exception isolation, context enrichment, telemetry statistics, and health reporting.
+ * scheduling, priority queueing, background manager routing, pre/post-processing,
+ * exception isolation, context enrichment, telemetry statistics, and health reporting.
  */
 
 import {
@@ -43,6 +45,9 @@ import {
   IMiddlewareManager,
   IPermissionManager,
   IPolicyManager,
+  ICommandScheduler,
+  ICommandQueue,
+  IBackgroundExecutionManager,
 } from './interfaces';
 import { CommandRegistry } from './command_registry';
 import { CommandExecutor } from './command_executor';
@@ -51,6 +56,9 @@ import { InterceptorManager } from './interceptor_manager';
 import { CommandValidator } from './command_validator';
 import { PermissionManager } from './permission_manager';
 import { PolicyManager } from './policy_manager';
+import { CommandScheduler } from './command_scheduler';
+import { CommandQueue } from './command_queue';
+import { BackgroundExecutionManager } from './background_execution_manager';
 
 export class CommandPipeline implements ICommandPipeline {
   private readonly _registry: ICommandRegistry;
@@ -60,6 +68,9 @@ export class CommandPipeline implements ICommandPipeline {
   private readonly _validator: ICommandValidator;
   private readonly _permissionManager: IPermissionManager;
   private readonly _policyManager: IPolicyManager;
+  private readonly _scheduler: ICommandScheduler;
+  private readonly _queue: ICommandQueue;
+  private readonly _backgroundExecutionManager: IBackgroundExecutionManager;
   private readonly _config: PipelineConfiguration;
 
   private _pipelineExecutions = 0;
@@ -76,6 +87,9 @@ export class CommandPipeline implements ICommandPipeline {
     validator?: ICommandValidator,
     permissionManager?: IPermissionManager,
     policyManager?: IPolicyManager,
+    scheduler?: ICommandScheduler,
+    queue?: ICommandQueue,
+    backgroundExecutionManager?: IBackgroundExecutionManager,
   ) {
     this._registry = registry ?? new CommandRegistry();
     this._executor = executor ?? new CommandExecutor(this._registry);
@@ -84,6 +98,9 @@ export class CommandPipeline implements ICommandPipeline {
     this._validator = validator ?? new CommandValidator(this._registry);
     this._permissionManager = permissionManager ?? new PermissionManager();
     this._policyManager = policyManager ?? new PolicyManager();
+    this._scheduler = scheduler ?? new CommandScheduler(this);
+    this._queue = queue ?? new CommandQueue();
+    this._backgroundExecutionManager = backgroundExecutionManager ?? new BackgroundExecutionManager(this);
     this._config = config ?? createPipelineConfiguration();
   }
 
@@ -236,7 +253,102 @@ export class CommandPipeline implements ICommandPipeline {
       });
     }
 
-    // 4. BEFORE Middleware Phase
+    // 4. Scheduler check
+    const isScheduled = request.metadata?.schedule || request.metadata?.delayMs !== undefined || request.metadata?.intervalMs !== undefined;
+    const isScheduledExecution = request.metadata?.isScheduledExecution;
+    if (isScheduled && !isScheduledExecution) {
+      const delayMs = typeof request.metadata?.delayMs === 'number' ? request.metadata.delayMs : undefined;
+      const intervalMs = typeof request.metadata?.intervalMs === 'number' ? request.metadata.intervalMs : undefined;
+
+      if (intervalMs !== undefined && intervalMs > 0) {
+        await this._scheduler.scheduleRecurring(request, intervalMs);
+      } else {
+        await this._scheduler.schedule(request, delayMs);
+      }
+
+      this._activePipelines = Math.max(0, this._activePipelines - 1);
+      const endPerf = performance ? performance.now() : Date.now();
+      const timing = createExecutionTiming({
+        startTime,
+        endTime: new Date().toISOString(),
+        durationMs: Math.max(0, Math.round((endPerf - startPerf) * 100) / 100),
+      });
+
+      const execResult = createCommandExecutionResult<TResult>({
+        commandId: request.commandId,
+        status: CommandExecutionStatus.PENDING,
+        timing,
+        context,
+      });
+
+      return createPipelineExecution<TResult>({
+        commandId: request.commandId,
+        executionResult: execResult,
+        middlewareResult: createMiddlewareResult(),
+        durationMs: timing.durationMs,
+      });
+    }
+
+    // 5. Queue check
+    const isQueued = request.metadata?.queue || request.metadata?.priority !== undefined;
+    const isQueuedExecution = request.metadata?.isQueuedExecution;
+    if (isQueued && !isQueuedExecution) {
+      const priority = typeof request.metadata?.priority === 'number' ? request.metadata.priority : 0;
+      await this._queue.queue(request, priority);
+
+      this._activePipelines = Math.max(0, this._activePipelines - 1);
+      const endPerf = performance ? performance.now() : Date.now();
+      const timing = createExecutionTiming({
+        startTime,
+        endTime: new Date().toISOString(),
+        durationMs: Math.max(0, Math.round((endPerf - startPerf) * 100) / 100),
+      });
+
+      const execResult = createCommandExecutionResult<TResult>({
+        commandId: request.commandId,
+        status: CommandExecutionStatus.PENDING,
+        timing,
+        context,
+      });
+
+      return createPipelineExecution<TResult>({
+        commandId: request.commandId,
+        executionResult: execResult,
+        middlewareResult: createMiddlewareResult(),
+        durationMs: timing.durationMs,
+      });
+    }
+
+    // 6. Background Manager check
+    const isBackground = request.metadata?.background;
+    const isBackgroundExecution = request.metadata?.isBackgroundExecution;
+    if (isBackground && !isBackgroundExecution) {
+      await this._backgroundExecutionManager.submitBackgroundTask(request);
+
+      this._activePipelines = Math.max(0, this._activePipelines - 1);
+      const endPerf = performance ? performance.now() : Date.now();
+      const timing = createExecutionTiming({
+        startTime,
+        endTime: new Date().toISOString(),
+        durationMs: Math.max(0, Math.round((endPerf - startPerf) * 100) / 100),
+      });
+
+      const execResult = createCommandExecutionResult<TResult>({
+        commandId: request.commandId,
+        status: CommandExecutionStatus.PENDING,
+        timing,
+        context,
+      });
+
+      return createPipelineExecution<TResult>({
+        commandId: request.commandId,
+        executionResult: execResult,
+        middlewareResult: createMiddlewareResult(),
+        durationMs: timing.durationMs,
+      });
+    }
+
+    // 7. BEFORE Middleware Phase
     let beforeResult: MiddlewareResult = createMiddlewareResult();
     if (this._config.enableBeforeMiddleware) {
       beforeResult = await this._middlewareManager.executeBefore(context);
@@ -246,7 +358,7 @@ export class CommandPipeline implements ICommandPipeline {
     let interceptorResult = undefined;
 
     try {
-      // 5. Interceptor Chain & Executor Phase
+      // 8. Interceptor Chain & Executor Phase
       if (this._config.enableInterceptors) {
         const intRes = await this._interceptorManager.executeChain<TResult>(
           context,
@@ -294,7 +406,7 @@ export class CommandPipeline implements ICommandPipeline {
       });
     }
 
-    // 6. AFTER Middleware Phase
+    // 9. AFTER Middleware Phase
     let afterResult: MiddlewareResult = createMiddlewareResult();
     if (this._config.enableAfterMiddleware) {
       afterResult = await this._middlewareManager.executeAfter(context, executionResult);

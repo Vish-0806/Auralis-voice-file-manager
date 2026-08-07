@@ -1,5 +1,5 @@
 /**
- * Command Runtime Foundation, Command Registry, Execution, Pipeline, Validation, Permission & Policy Barrel Export (Phase 16.6.5).
+ * Command Runtime Foundation, Command Registry, Execution, Pipeline, Validation, Permission, Policy, Scheduling, Queue & Background Execution Barrel Export (Phase 16.6.6).
  */
 
 export * from './models';
@@ -13,6 +13,9 @@ export * from './command_pipeline';
 export * from './command_validator';
 export * from './permission_manager';
 export * from './policy_manager';
+export * from './command_scheduler';
+export * from './command_queue';
+export * from './background_execution_manager';
 export * from './command_provider';
 export * from './command_runtime';
 export * from './runtime';

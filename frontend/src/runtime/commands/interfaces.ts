@@ -1,12 +1,17 @@
 /**
- * Command Runtime Interfaces (Phase 16.6.5).
+ * Command Runtime Interfaces (Phase 16.6.6).
  *
  * Defines contract specifications for ICommandRegistry, ICommandExecutor,
  * IMiddlewareManager, IInterceptorManager, ICommandPipeline, ICommandValidator,
- * IPermissionManager, IPolicyManager, ICommandProvider, and ICommandRuntime.
+ * IPermissionManager, IPolicyManager, ICommandScheduler, ICommandQueue,
+ * IBackgroundExecutionManager, ICommandProvider, and ICommandRuntime.
  */
 
 import {
+  BackgroundTask,
+  BackgroundDiagnostics,
+  BackgroundHealth,
+  BackgroundStatistics,
   CommandAlias,
   CommandCapabilities,
   CommandCategory,
@@ -51,6 +56,14 @@ import {
   PolicyDiagnostics,
   PolicyHealth,
   PolicyStatistics,
+  QueueEntry,
+  QueueDiagnostics,
+  QueueHealth,
+  QueueStatistics,
+  ScheduledCommand,
+  SchedulingDiagnostics,
+  ScheduleHealth,
+  ScheduleStatistics,
   ValidationDiagnostics,
   ValidationHealth,
   ValidationResult,
@@ -204,6 +217,42 @@ export interface IPolicyManager {
   clear(): void;
 }
 
+export interface ICommandScheduler {
+  schedule(request: CommandExecutionRequest, delayMs?: number): Promise<ScheduledCommand>;
+  scheduleDelayed(request: CommandExecutionRequest, delayMs: number): Promise<ScheduledCommand>;
+  scheduleRecurring(request: CommandExecutionRequest, intervalMs: number): Promise<ScheduledCommand>;
+  cancelScheduled(scheduleId: string): boolean;
+  pauseSchedule(): void;
+  resumeSchedule(): void;
+  listSchedules(): ReadonlyArray<ScheduledCommand>;
+  statistics(): ScheduleStatistics;
+  health(): ScheduleHealth;
+  diagnostics(): SchedulingDiagnostics;
+  clear(): void;
+}
+
+export interface ICommandQueue {
+  queue(request: CommandExecutionRequest, priority?: number): Promise<QueueEntry>;
+  dequeue(): Promise<QueueEntry | undefined>;
+  peek(): QueueEntry | undefined;
+  queueSize(): number;
+  clearQueue(): void;
+  statistics(): QueueStatistics;
+  health(): QueueHealth;
+  diagnostics(): QueueDiagnostics;
+  clear(): void;
+}
+
+export interface IBackgroundExecutionManager {
+  submitBackgroundTask(request: CommandExecutionRequest): Promise<BackgroundTask>;
+  cancelBackgroundTask(taskId: string): boolean;
+  backgroundTasks(): ReadonlyArray<BackgroundTask>;
+  statistics(): BackgroundStatistics;
+  health(): BackgroundHealth;
+  diagnostics(): BackgroundDiagnostics;
+  clear(): void;
+}
+
 export interface ICommandProvider {
   initialize(): CommandHealth;
   shutdown(): CommandHealth;
@@ -307,6 +356,30 @@ export interface ICommandProvider {
   ): Promise<PolicyDecision>;
   policyStatistics(): PolicyStatistics;
   policyHealth(): PolicyHealth;
+
+  schedule(request: CommandExecutionRequest, delayMs?: number): Promise<ScheduledCommand>;
+  scheduleDelayed(request: CommandExecutionRequest, delayMs: number): Promise<ScheduledCommand>;
+  scheduleRecurring(request: CommandExecutionRequest, intervalMs: number): Promise<ScheduledCommand>;
+  cancelScheduled(scheduleId: string): boolean;
+  pauseSchedule(): void;
+  resumeSchedule(): void;
+  listSchedules(): ReadonlyArray<ScheduledCommand>;
+  schedulerStatistics(): ScheduleStatistics;
+  schedulerHealth(): ScheduleHealth;
+
+  queue(request: CommandExecutionRequest, priority?: number): Promise<QueueEntry>;
+  dequeue(): Promise<QueueEntry | undefined>;
+  peek(): QueueEntry | undefined;
+  queueSize(): number;
+  clearQueue(): void;
+  queueStatistics(): QueueStatistics;
+  queueHealth(): QueueHealth;
+
+  submitBackgroundTask(request: CommandExecutionRequest): Promise<BackgroundTask>;
+  cancelBackgroundTask(taskId: string): boolean;
+  backgroundTasks(): ReadonlyArray<BackgroundTask>;
+  backgroundStatistics(): BackgroundStatistics;
+  backgroundHealth(): BackgroundHealth;
 }
 
 export interface ICommandRuntime {
@@ -411,4 +484,28 @@ export interface ICommandRuntime {
   ): Promise<PolicyDecision>;
   policyStatistics(): PolicyStatistics;
   policyHealth(): PolicyHealth;
+
+  schedule(request: CommandExecutionRequest, delayMs?: number): Promise<ScheduledCommand>;
+  scheduleDelayed(request: CommandExecutionRequest, delayMs: number): Promise<ScheduledCommand>;
+  scheduleRecurring(request: CommandExecutionRequest, intervalMs: number): Promise<ScheduledCommand>;
+  cancelScheduled(scheduleId: string): boolean;
+  pauseSchedule(): void;
+  resumeSchedule(): void;
+  listSchedules(): ReadonlyArray<ScheduledCommand>;
+  schedulerStatistics(): ScheduleStatistics;
+  schedulerHealth(): ScheduleHealth;
+
+  queue(request: CommandExecutionRequest, priority?: number): Promise<QueueEntry>;
+  dequeue(): Promise<QueueEntry | undefined>;
+  peek(): QueueEntry | undefined;
+  queueSize(): number;
+  clearQueue(): void;
+  queueStatistics(): QueueStatistics;
+  queueHealth(): QueueHealth;
+
+  submitBackgroundTask(request: CommandExecutionRequest): Promise<BackgroundTask>;
+  cancelBackgroundTask(taskId: string): boolean;
+  backgroundTasks(): ReadonlyArray<BackgroundTask>;
+  backgroundStatistics(): BackgroundStatistics;
+  backgroundHealth(): BackgroundHealth;
 }

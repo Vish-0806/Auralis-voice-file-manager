@@ -1,14 +1,17 @@
 /**
- * Command Provider Implementation (Phase 16.6.5).
+ * Command Provider Implementation (Phase 16.6.6).
  *
  * Implements ICommandProvider owning runtime state transitions,
  * telemetry statistics, health evaluation, context metadata, capabilities
  * reporting, command registration management, execution pipelines, handler management,
  * middleware pipelines, interceptor chains, validation rules, permission authorization,
- * policy evaluation, history tracking, execution health, pipeline statistics, and diagnostics generation.
+ * policy evaluation, scheduling, queues, background execution manager, and diagnostics generation.
  */
 
 import {
+  BackgroundTask,
+  BackgroundHealth,
+  BackgroundStatistics,
   CommandAlias,
   CommandCapabilities,
   CommandCategory,
@@ -44,6 +47,12 @@ import {
   PolicyDecision,
   PolicyHealth,
   PolicyStatistics,
+  QueueEntry,
+  QueueHealth,
+  QueueStatistics,
+  ScheduledCommand,
+  ScheduleHealth,
+  ScheduleStatistics,
   ValidationHealth,
   ValidationResult,
   ValidationRule,
@@ -64,6 +73,9 @@ import {
   ICommandValidator,
   IPermissionManager,
   IPolicyManager,
+  ICommandScheduler,
+  ICommandQueue,
+  IBackgroundExecutionManager,
 } from './interfaces';
 import { CommandRegistry } from './command_registry';
 import { CommandExecutor } from './command_executor';
@@ -71,6 +83,9 @@ import { CommandPipeline } from './command_pipeline';
 import { CommandValidator } from './command_validator';
 import { PermissionManager } from './permission_manager';
 import { PolicyManager } from './policy_manager';
+import { CommandScheduler } from './command_scheduler';
+import { CommandQueue } from './command_queue';
+import { BackgroundExecutionManager } from './background_execution_manager';
 
 export class CommandProvider implements ICommandProvider {
   private _runtimeState: CommandRuntimeState = CommandRuntimeState.UNINITIALIZED;
@@ -82,6 +97,9 @@ export class CommandProvider implements ICommandProvider {
   private readonly _validator: ICommandValidator;
   private readonly _permissionManager: IPermissionManager;
   private readonly _policyManager: IPolicyManager;
+  private readonly _scheduler: ICommandScheduler;
+  private readonly _queue: ICommandQueue;
+  private readonly _backgroundExecutionManager: IBackgroundExecutionManager;
   private readonly _pipeline: ICommandPipeline;
 
   private _startedAt: string | null = null;
@@ -100,6 +118,9 @@ export class CommandProvider implements ICommandProvider {
     validator?: ICommandValidator,
     permissionManager?: IPermissionManager,
     policyManager?: IPolicyManager,
+    scheduler?: ICommandScheduler,
+    queue?: ICommandQueue,
+    backgroundExecutionManager?: IBackgroundExecutionManager,
   ) {
     this._config = config ?? createCommandConfiguration();
     this._capabilities = capabilities ?? createCommandCapabilities();
@@ -109,6 +130,10 @@ export class CommandProvider implements ICommandProvider {
     this._validator = validator ?? new CommandValidator(this._registry);
     this._permissionManager = permissionManager ?? new PermissionManager();
     this._policyManager = policyManager ?? new PolicyManager();
+    this._scheduler = scheduler ?? new CommandScheduler(null as any);
+    this._queue = queue ?? new CommandQueue();
+    this._backgroundExecutionManager = backgroundExecutionManager ?? new BackgroundExecutionManager(null as any);
+
     this._pipeline =
       pipeline ??
       new CommandPipeline(
@@ -120,7 +145,18 @@ export class CommandProvider implements ICommandProvider {
         this._validator,
         this._permissionManager,
         this._policyManager,
+        this._scheduler,
+        this._queue,
+        this._backgroundExecutionManager,
       );
+
+    // Resolve circular references
+    if (this._scheduler instanceof CommandScheduler) {
+      (this._scheduler as any)._pipeline = this._pipeline;
+    }
+    if (this._backgroundExecutionManager instanceof BackgroundExecutionManager) {
+      (this._backgroundExecutionManager as any)._pipeline = this._pipeline;
+    }
   }
 
   public initialize(): CommandHealth {
@@ -148,6 +184,11 @@ export class CommandProvider implements ICommandProvider {
     this._runtimeState = CommandRuntimeState.STOPPED;
     this._startedAt = null;
     this._shutdowns++;
+
+    // Clear all scheduled timers, queues, and background executions
+    this._scheduler.clear();
+    this._queue.clear();
+    this._backgroundExecutionManager.clear();
 
     return this.health();
   }
@@ -220,6 +261,9 @@ export class CommandProvider implements ICommandProvider {
       validationDiagnostics: this._validator.diagnostics(),
       permissionDiagnostics: this._permissionManager.diagnostics(),
       policyDiagnostics: this._policyManager.diagnostics(),
+      schedulingDiagnostics: this._scheduler.diagnostics(),
+      queueDiagnostics: this._queue.diagnostics(),
+      backgroundDiagnostics: this._backgroundExecutionManager.diagnostics(),
       timestamp: new Date().toISOString(),
     });
   }
@@ -479,6 +523,94 @@ export class CommandProvider implements ICommandProvider {
   }
 
   public policyHealth(): PolicyHealth {
+    return this._providerPolicyHealth();
+  }
+
+  private _providerPolicyHealth(): PolicyHealth {
     return this._policyManager.health();
+  }
+
+  public schedule(request: CommandExecutionRequest, delayMs?: number): Promise<ScheduledCommand> {
+    return this._scheduler.schedule(request, delayMs);
+  }
+
+  public scheduleDelayed(request: CommandExecutionRequest, delayMs: number): Promise<ScheduledCommand> {
+    return this._scheduler.scheduleDelayed(request, delayMs);
+  }
+
+  public scheduleRecurring(request: CommandExecutionRequest, intervalMs: number): Promise<ScheduledCommand> {
+    return this._scheduler.scheduleRecurring(request, intervalMs);
+  }
+
+  public cancelScheduled(scheduleId: string): boolean {
+    return this._scheduler.cancelScheduled(scheduleId);
+  }
+
+  public pauseSchedule(): void {
+    this._scheduler.pauseSchedule();
+  }
+
+  public resumeSchedule(): void {
+    this._scheduler.resumeSchedule();
+  }
+
+  public listSchedules(): ReadonlyArray<ScheduledCommand> {
+    return this._scheduler.listSchedules();
+  }
+
+  public schedulerStatistics(): ScheduleStatistics {
+    return this._scheduler.statistics();
+  }
+
+  public schedulerHealth(): ScheduleHealth {
+    return this._scheduler.health();
+  }
+
+  public queue(request: CommandExecutionRequest, priority?: number): Promise<QueueEntry> {
+    return this._queue.queue(request, priority);
+  }
+
+  public dequeue(): Promise<QueueEntry | undefined> {
+    return this._queue.dequeue();
+  }
+
+  public peek(): QueueEntry | undefined {
+    return this._queue.peek();
+  }
+
+  public queueSize(): number {
+    return this._queue.queueSize();
+  }
+
+  public clearQueue(): void {
+    this._queue.clearQueue();
+  }
+
+  public queueStatistics(): QueueStatistics {
+    return this._queue.statistics();
+  }
+
+  public queueHealth(): QueueHealth {
+    return this._queue.health();
+  }
+
+  public submitBackgroundTask(request: CommandExecutionRequest): Promise<BackgroundTask> {
+    return this._backgroundExecutionManager.submitBackgroundTask(request);
+  }
+
+  public cancelBackgroundTask(taskId: string): boolean {
+    return this._backgroundExecutionManager.cancelBackgroundTask(taskId);
+  }
+
+  public backgroundTasks(): ReadonlyArray<BackgroundTask> {
+    return this._backgroundExecutionManager.backgroundTasks();
+  }
+
+  public backgroundStatistics(): BackgroundStatistics {
+    return this._backgroundExecutionManager.statistics();
+  }
+
+  public backgroundHealth(): BackgroundHealth {
+    return this._backgroundExecutionManager.health();
   }
 }

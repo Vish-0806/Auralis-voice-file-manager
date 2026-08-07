@@ -573,6 +573,9 @@ export interface CommandDiagnostics {
   readonly validationDiagnostics?: ValidationDiagnostics;
   readonly permissionDiagnostics?: PermissionDiagnostics;
   readonly policyDiagnostics?: PolicyDiagnostics;
+  readonly schedulingDiagnostics?: SchedulingDiagnostics;
+  readonly queueDiagnostics?: QueueDiagnostics;
+  readonly backgroundDiagnostics?: BackgroundDiagnostics;
   readonly timestamp: string;
 }
 
@@ -1360,6 +1363,359 @@ export function createCommandDiagnostics(
     validationDiagnostics: params.validationDiagnostics,
     permissionDiagnostics: params.permissionDiagnostics,
     policyDiagnostics: params.policyDiagnostics,
+    schedulingDiagnostics: params.schedulingDiagnostics,
+    queueDiagnostics: params.queueDiagnostics,
+    backgroundDiagnostics: params.backgroundDiagnostics,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export type ScheduleType = 'immediate' | 'delayed' | 'timestamp' | 'interval' | 'cron';
+
+export interface RetrySchedule {
+  readonly maxRetries: number;
+  readonly delayMs: number;
+  readonly backoffFactor?: number;
+}
+
+export interface ExecutionWindow {
+  readonly startHour: number; // 0-23
+  readonly endHour: number;   // 0-23
+  readonly daysOfWeek?: ReadonlyArray<number>; // 0 (Sunday) to 6 (Saturday)
+}
+
+export interface CommandSchedule {
+  readonly scheduleId: string;
+  readonly type: ScheduleType;
+  readonly delayMs?: number;
+  readonly timestamp?: string;
+  readonly intervalMs?: number;
+  readonly cronExpression?: string;
+  readonly retrySchedule?: RetrySchedule;
+  readonly executionWindow?: ExecutionWindow;
+}
+
+export interface ScheduledCommand {
+  readonly scheduleId: string;
+  readonly request: CommandExecutionRequest;
+  readonly schedule: CommandSchedule;
+  readonly status: 'pending' | 'running' | 'completed' | 'cancelled' | 'failed';
+  readonly nextRunTime: string | null;
+  readonly lastRunTime: string | null;
+  readonly runCount: number;
+  readonly errorCount: number;
+}
+
+export interface ScheduledExecution {
+  readonly executionId: string;
+  readonly scheduleId: string;
+  readonly commandId: string;
+  readonly status: CommandExecutionStatus;
+  readonly executedAt: string;
+  readonly durationMs: number;
+  readonly error?: string;
+}
+
+export interface ScheduleStatistics {
+  readonly totalScheduled: number;
+  readonly activeSchedules: number;
+  readonly executedSchedules: number;
+  readonly cancelledSchedules: number;
+  readonly recurringSchedules: number;
+  readonly averageScheduleDelayMs: number;
+}
+
+export interface ScheduleHealth {
+  readonly healthy: boolean;
+  readonly activeSchedules: number;
+  readonly failureRate: number;
+  readonly message: string;
+}
+
+export interface QueueEntry {
+  readonly queueId: string;
+  readonly request: CommandExecutionRequest;
+  readonly priority: number;
+  readonly enqueuedAt: string;
+  readonly delayMs?: number;
+}
+
+export interface QueueStatistics {
+  readonly totalInsertions: number;
+  readonly totalRemovals: number;
+  readonly currentSize: number;
+  readonly capacity: number;
+  readonly peakSize: number;
+  readonly averageQueueTimeMs: number;
+}
+
+export interface QueueHealth {
+  readonly healthy: boolean;
+  readonly occupancyRate: number;
+  readonly message: string;
+}
+
+export interface BackgroundTask {
+  readonly taskId: string;
+  readonly commandId: string;
+  readonly request: CommandExecutionRequest;
+  readonly status: 'pending' | 'running' | 'completed' | 'cancelled' | 'failed';
+  readonly submittedAt: string;
+  readonly startedAt: string | null;
+  readonly completedAt: string | null;
+  readonly durationMs: number;
+  readonly retries: number;
+  readonly maxRetries: number;
+  readonly error?: string;
+}
+
+export interface BackgroundExecution {
+  readonly taskId: string;
+  readonly result: CommandExecutionResult;
+  readonly durationMs: number;
+  readonly executedAt: string;
+}
+
+export interface BackgroundStatistics {
+  readonly totalSubmitted: number;
+  readonly activeTasks: number;
+  readonly completedTasks: number;
+  readonly failedTasks: number;
+  readonly cancelledTasks: number;
+  readonly retryAttempts: number;
+}
+
+export interface BackgroundHealth {
+  readonly healthy: boolean;
+  readonly activeTasks: number;
+  readonly failureRate: number;
+  readonly message: string;
+}
+
+export interface SchedulingConfiguration {
+  readonly maxQueueSize: number;
+  readonly enableBackgroundExecution: boolean;
+  readonly checkIntervalMs: number;
+  readonly defaultPriority: number;
+}
+
+export interface SchedulingDiagnostics {
+  readonly statistics: ScheduleStatistics;
+  readonly health: ScheduleHealth;
+  readonly activeSchedulesCount: number;
+  readonly timestamp: string;
+}
+
+export interface QueueDiagnostics {
+  readonly statistics: QueueStatistics;
+  readonly health: QueueHealth;
+  readonly currentSize: number;
+  readonly timestamp: string;
+}
+
+export interface BackgroundDiagnostics {
+  readonly statistics: BackgroundStatistics;
+  readonly health: BackgroundHealth;
+  readonly activeTasksCount: number;
+  readonly timestamp: string;
+}
+
+export function createRetrySchedule(params: Partial<RetrySchedule> = {}): RetrySchedule {
+  return Object.freeze({
+    maxRetries: params.maxRetries ?? 3,
+    delayMs: params.delayMs ?? 1000,
+    backoffFactor: params.backoffFactor ?? 2,
+  });
+}
+
+export function createExecutionWindow(params: Partial<ExecutionWindow> = {}): ExecutionWindow {
+  return Object.freeze({
+    startHour: params.startHour ?? 0,
+    endHour: params.endHour ?? 23,
+    daysOfWeek: params.daysOfWeek ? Object.freeze([...params.daysOfWeek]) : undefined,
+  });
+}
+
+export function createCommandSchedule(params: Partial<CommandSchedule> = {}): CommandSchedule {
+  return Object.freeze({
+    scheduleId: params.scheduleId ?? `sched_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    type: params.type ?? 'immediate',
+    delayMs: params.delayMs,
+    timestamp: params.timestamp,
+    intervalMs: params.intervalMs,
+    cronExpression: params.cronExpression,
+    retrySchedule: params.retrySchedule ? createRetrySchedule(params.retrySchedule) : undefined,
+    executionWindow: params.executionWindow ? createExecutionWindow(params.executionWindow) : undefined,
+  });
+}
+
+export function createScheduledCommand(
+  params: Partial<ScheduledCommand> & { request: CommandExecutionRequest; schedule: CommandSchedule },
+): ScheduledCommand {
+  return Object.freeze({
+    scheduleId: params.scheduleId ?? params.schedule.scheduleId,
+    request: params.request,
+    schedule: params.schedule,
+    status: params.status ?? 'pending',
+    nextRunTime: params.nextRunTime ?? null,
+    lastRunTime: params.lastRunTime ?? null,
+    runCount: params.runCount ?? 0,
+    errorCount: params.errorCount ?? 0,
+  });
+}
+
+export function createScheduledExecution(
+  params: Partial<ScheduledExecution> & { scheduleId: string; commandId: string },
+): ScheduledExecution {
+  return Object.freeze({
+    executionId: params.executionId ?? `schex_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    scheduleId: params.scheduleId,
+    commandId: params.commandId,
+    status: params.status ?? CommandExecutionStatus.PENDING,
+    executedAt: params.executedAt ?? new Date().toISOString(),
+    durationMs: params.durationMs ?? 0,
+    error: params.error,
+  });
+}
+
+export function createScheduleStatistics(params: Partial<ScheduleStatistics> = {}): ScheduleStatistics {
+  return Object.freeze({
+    totalScheduled: params.totalScheduled ?? 0,
+    activeSchedules: params.activeSchedules ?? 0,
+    executedSchedules: params.executedSchedules ?? 0,
+    cancelledSchedules: params.cancelledSchedules ?? 0,
+    recurringSchedules: params.recurringSchedules ?? 0,
+    averageScheduleDelayMs: params.averageScheduleDelayMs ?? 0,
+  });
+}
+
+export function createScheduleHealth(params: Partial<ScheduleHealth> = {}): ScheduleHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    activeSchedules: params.activeSchedules ?? 0,
+    failureRate: params.failureRate ?? 0,
+    message: params.message ?? 'Command scheduler is operational.',
+  });
+}
+
+export function createQueueEntry(
+  params: Partial<QueueEntry> & { request: CommandExecutionRequest },
+): QueueEntry {
+  return Object.freeze({
+    queueId: params.queueId ?? `q_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    request: params.request,
+    priority: params.priority ?? 0,
+    enqueuedAt: params.enqueuedAt ?? new Date().toISOString(),
+    delayMs: params.delayMs,
+  });
+}
+
+export function createQueueStatistics(params: Partial<QueueStatistics> = {}): QueueStatistics {
+  return Object.freeze({
+    totalInsertions: params.totalInsertions ?? 0,
+    totalRemovals: params.totalRemovals ?? 0,
+    currentSize: params.currentSize ?? 0,
+    capacity: params.capacity ?? 1000,
+    peakSize: params.peakSize ?? 0,
+    averageQueueTimeMs: params.averageQueueTimeMs ?? 0,
+  });
+}
+
+export function createQueueHealth(params: Partial<QueueHealth> = {}): QueueHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    occupancyRate: params.occupancyRate ?? 0,
+    message: params.message ?? 'Command queue is operational.',
+  });
+}
+
+export function createBackgroundTask(
+  params: Partial<BackgroundTask> & { commandId: string; request: CommandExecutionRequest },
+): BackgroundTask {
+  return Object.freeze({
+    taskId: params.taskId ?? `bg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    commandId: params.commandId,
+    request: params.request,
+    status: params.status ?? 'pending',
+    submittedAt: params.submittedAt ?? new Date().toISOString(),
+    startedAt: params.startedAt ?? null,
+    completedAt: params.completedAt ?? null,
+    durationMs: params.durationMs ?? 0,
+    retries: params.retries ?? 0,
+    maxRetries: params.maxRetries ?? 3,
+    error: params.error,
+  });
+}
+
+export function createBackgroundExecution(
+  params: Partial<BackgroundExecution> & { taskId: string; result: CommandExecutionResult },
+): BackgroundExecution {
+  return Object.freeze({
+    taskId: params.taskId,
+    result: params.result,
+    durationMs: params.durationMs ?? 0,
+    executedAt: params.executedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createBackgroundStatistics(params: Partial<BackgroundStatistics> = {}): BackgroundStatistics {
+  return Object.freeze({
+    totalSubmitted: params.totalSubmitted ?? 0,
+    activeTasks: params.activeTasks ?? 0,
+    completedTasks: params.completedTasks ?? 0,
+    failedTasks: params.failedTasks ?? 0,
+    cancelledTasks: params.cancelledTasks ?? 0,
+    retryAttempts: params.retryAttempts ?? 0,
+  });
+}
+
+export function createBackgroundHealth(params: Partial<BackgroundHealth> = {}): BackgroundHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    activeTasks: params.activeTasks ?? 0,
+    failureRate: params.failureRate ?? 0,
+    message: params.message ?? 'Background execution manager is operational.',
+  });
+}
+
+export function createSchedulingConfiguration(params: Partial<SchedulingConfiguration> = {}): SchedulingConfiguration {
+  return Object.freeze({
+    maxQueueSize: params.maxQueueSize ?? 1000,
+    enableBackgroundExecution: params.enableBackgroundExecution ?? true,
+    checkIntervalMs: params.checkIntervalMs ?? 1000,
+    defaultPriority: params.defaultPriority ?? 0,
+  });
+}
+
+export function createSchedulingDiagnostics(
+  params: Partial<SchedulingDiagnostics> & { statistics: ScheduleStatistics; health: ScheduleHealth },
+): SchedulingDiagnostics {
+  return Object.freeze({
+    statistics: params.statistics,
+    health: params.health,
+    activeSchedulesCount: params.activeSchedulesCount ?? params.statistics.activeSchedules,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createQueueDiagnostics(
+  params: Partial<QueueDiagnostics> & { statistics: QueueStatistics; health: QueueHealth },
+): QueueDiagnostics {
+  return Object.freeze({
+    statistics: params.statistics,
+    health: params.health,
+    currentSize: params.currentSize ?? params.statistics.currentSize,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createBackgroundDiagnostics(
+  params: Partial<BackgroundDiagnostics> & { statistics: BackgroundStatistics; health: BackgroundHealth },
+): BackgroundDiagnostics {
+  return Object.freeze({
+    statistics: params.statistics,
+    health: params.health,
+    activeTasksCount: params.activeTasksCount ?? params.statistics.activeTasks,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }

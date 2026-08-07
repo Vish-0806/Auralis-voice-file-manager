@@ -1,11 +1,14 @@
 /**
- * Command Runtime Coordinator Implementation (Phase 16.6.5).
+ * Command Runtime Coordinator Implementation (Phase 16.6.6).
  *
  * Implements ICommandRuntime acting as central coordinator delegating to ICommandProvider.
  * Contains no business logic — all operations are forwarded to the provider instance.
  */
 
 import {
+  BackgroundTask,
+  BackgroundHealth,
+  BackgroundStatistics,
   CommandAlias,
   CommandCapabilities,
   CommandCategory,
@@ -39,6 +42,12 @@ import {
   PolicyDecision,
   PolicyHealth,
   PolicyStatistics,
+  QueueEntry,
+  QueueHealth,
+  QueueStatistics,
+  ScheduledCommand,
+  ScheduleHealth,
+  ScheduleStatistics,
   ValidationHealth,
   ValidationResult,
   ValidationRule,
@@ -335,5 +344,89 @@ export class CommandRuntime implements ICommandRuntime {
 
   public policyHealth(): PolicyHealth {
     return this._provider.policyHealth();
+  }
+
+  public schedule(request: CommandExecutionRequest, delayMs?: number): Promise<ScheduledCommand> {
+    return this._provider.schedule(request, delayMs);
+  }
+
+  public scheduleDelayed(request: CommandExecutionRequest, delayMs: number): Promise<ScheduledCommand> {
+    return this._provider.scheduleDelayed(request, delayMs);
+  }
+
+  public scheduleRecurring(request: CommandExecutionRequest, intervalMs: number): Promise<ScheduledCommand> {
+    return this._provider.scheduleRecurring(request, intervalMs);
+  }
+
+  public cancelScheduled(scheduleId: string): boolean {
+    return this._provider.cancelScheduled(scheduleId);
+  }
+
+  public pauseSchedule(): void {
+    this._provider.pauseSchedule();
+  }
+
+  public resumeSchedule(): void {
+    this._provider.resumeSchedule();
+  }
+
+  public listSchedules(): ReadonlyArray<ScheduledCommand> {
+    return this._provider.listSchedules();
+  }
+
+  public schedulerStatistics(): ScheduleStatistics {
+    return this._provider.schedulerStatistics();
+  }
+
+  public schedulerHealth(): ScheduleHealth {
+    return this._provider.schedulerHealth();
+  }
+
+  public queue(request: CommandExecutionRequest, priority?: number): Promise<QueueEntry> {
+    return this._provider.queue(request, priority);
+  }
+
+  public dequeue(): Promise<QueueEntry | undefined> {
+    return this._provider.dequeue();
+  }
+
+  public peek(): QueueEntry | undefined {
+    return this._provider.peek();
+  }
+
+  public queueSize(): number {
+    return this._provider.queueSize();
+  }
+
+  public clearQueue(): void {
+    this._provider.clearQueue();
+  }
+
+  public queueStatistics(): QueueStatistics {
+    return this._provider.queueStatistics();
+  }
+
+  public queueHealth(): QueueHealth {
+    return this._provider.queueHealth();
+  }
+
+  public submitBackgroundTask(request: CommandExecutionRequest): Promise<BackgroundTask> {
+    return this._provider.submitBackgroundTask(request);
+  }
+
+  public cancelBackgroundTask(taskId: string): boolean {
+    return this._provider.cancelBackgroundTask(taskId);
+  }
+
+  public backgroundTasks(): ReadonlyArray<BackgroundTask> {
+    return this._provider.backgroundTasks();
+  }
+
+  public backgroundStatistics(): BackgroundStatistics {
+    return this._provider.backgroundStatistics();
+  }
+
+  public backgroundHealth(): BackgroundHealth {
+    return this._provider.backgroundHealth();
   }
 }
