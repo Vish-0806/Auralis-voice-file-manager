@@ -1,10 +1,11 @@
 /**
- * Command Runtime Domain Models (Phase 16.6.2).
+ * Command Runtime Domain Models (Phase 16.6.3).
  *
  * Provides immutable state models, configuration objects, capabilities telemetry,
  * health evaluation snapshots, statistics metrics, context metadata, command definitions,
  * parameters, registrations, categories, aliases, registry statistics, registry health,
- * and diagnostics telemetry for the Frontend Command Runtime.
+ * execution requests, results, records, pipeline telemetry, execution statistics,
+ * execution health, and diagnostics telemetry for the Frontend Command Runtime.
  */
 
 export enum CommandRuntimeState {
@@ -13,6 +14,17 @@ export enum CommandRuntimeState {
   READY = 'READY',
   STOPPING = 'STOPPING',
   STOPPED = 'STOPPED',
+}
+
+export enum CommandExecutionStatus {
+  PENDING = 'PENDING',
+  RUNNING = 'RUNNING',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+  FAILED = 'FAILED',
+  TIMED_OUT = 'TIMED_OUT',
+  REJECTED = 'REJECTED',
+  VALIDATION_FAILED = 'VALIDATION_FAILED',
 }
 
 export interface CommandState {
@@ -134,6 +146,119 @@ export interface CommandRegistryHealth {
   readonly message: string;
 }
 
+export interface ExecutionTiming {
+  readonly startTime: string;
+  readonly endTime?: string;
+  readonly durationMs: number;
+}
+
+export interface ExecutionError {
+  readonly code: string;
+  readonly message: string;
+  readonly stack?: string;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
+export interface ExecutionWarning {
+  readonly code: string;
+  readonly message: string;
+  readonly timestamp: string;
+}
+
+export interface CommandExecutionContext {
+  readonly executionId: string;
+  readonly commandId: string;
+  readonly timestamp: string;
+  readonly userId?: string;
+  readonly sessionId?: string;
+  readonly correlationId?: string;
+  readonly environment: string;
+  readonly source: string;
+  readonly mode: 'sync' | 'async';
+  readonly args: Readonly<Record<string, unknown>>;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export interface CommandExecutionRequest {
+  readonly commandId: string;
+  readonly args?: Readonly<Record<string, unknown>>;
+  readonly userId?: string;
+  readonly sessionId?: string;
+  readonly correlationId?: string;
+  readonly source?: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export interface CommandExecutionResult<TResult = unknown> {
+  readonly executionId: string;
+  readonly commandId: string;
+  readonly status: CommandExecutionStatus;
+  readonly value?: TResult;
+  readonly error?: ExecutionError;
+  readonly warnings: ReadonlyArray<ExecutionWarning>;
+  readonly timing: ExecutionTiming;
+  readonly context: CommandExecutionContext;
+}
+
+export interface CommandExecutionRecord<TResult = unknown> {
+  readonly result: CommandExecutionResult<TResult>;
+  readonly recordedAt: string;
+}
+
+export interface CommandExecutionStatistics {
+  readonly executions: number;
+  readonly successfulExecutions: number;
+  readonly failedExecutions: number;
+  readonly cancelledExecutions: number;
+  readonly validationFailures: number;
+  readonly averageExecutionTime: number;
+  readonly maximumExecutionTime: number;
+  readonly minimumExecutionTime: number;
+  readonly historySize: number;
+  readonly activeExecutions: number;
+}
+
+export interface CommandExecutionHealth {
+  readonly healthy: boolean;
+  readonly failureRate: number;
+  readonly successRate: number;
+  readonly averageExecutionTime: number;
+  readonly historyCapacity: number;
+  readonly activeExecutions: number;
+  readonly validationFailures: number;
+  readonly executionThroughput: number;
+  readonly message: string;
+}
+
+export interface CommandExecutionConfiguration {
+  readonly maxHistorySize: number;
+  readonly executionTimeoutMs: number;
+  readonly strictParameterValidation: boolean;
+}
+
+export interface ExecutionPipeline {
+  readonly pipelineId: string;
+  readonly steps: ReadonlyArray<string>;
+  readonly createdAt: string;
+}
+
+export interface ExecutionCapabilities {
+  readonly supportsSyncExecution: boolean;
+  readonly supportsAsyncExecution: boolean;
+  readonly supportsCancellation: boolean;
+  readonly supportsHistoryTracking: boolean;
+  readonly supportsParameterValidation: boolean;
+}
+
+export interface ExecutionDiagnostics {
+  readonly statistics: CommandExecutionStatistics;
+  readonly health: CommandExecutionHealth;
+  readonly capabilities: ExecutionCapabilities;
+  readonly historySize: number;
+  readonly activeExecutions: number;
+  readonly timestamp: string;
+}
+
 export interface CommandDiagnostics {
   readonly health: CommandHealth;
   readonly statistics: CommandStatistics;
@@ -144,8 +269,16 @@ export interface CommandDiagnostics {
   readonly registeredAliases?: ReadonlyArray<string>;
   readonly registryStatistics?: CommandRegistryStatistics;
   readonly registryHealth?: CommandRegistryHealth;
+  readonly executionStatistics?: CommandExecutionStatistics;
+  readonly executionHealth?: CommandExecutionHealth;
+  readonly executionHistorySize?: number;
   readonly timestamp: string;
 }
+
+export type CommandHandler<TArgs = Record<string, unknown>, TResult = unknown> = (
+  args: TArgs,
+  context: CommandExecutionContext,
+) => TResult | Promise<TResult>;
 
 export function createCommandState(params: Partial<CommandState> = {}): CommandState {
   return Object.freeze({
@@ -312,6 +445,174 @@ export function createCommandRegistryHealth(
   });
 }
 
+export function createExecutionTiming(params: Partial<ExecutionTiming> = {}): ExecutionTiming {
+  return Object.freeze({
+    startTime: params.startTime ?? new Date().toISOString(),
+    endTime: params.endTime,
+    durationMs: params.durationMs ?? 0,
+  });
+}
+
+export function createExecutionError(
+  params: Partial<ExecutionError> & { message: string },
+): ExecutionError {
+  return Object.freeze({
+    code: params.code ?? 'COMMAND_EXECUTION_ERROR',
+    message: params.message,
+    stack: params.stack,
+    details: params.details ? Object.freeze({ ...params.details }) : undefined,
+  });
+}
+
+export function createExecutionWarning(
+  params: Partial<ExecutionWarning> & { message: string },
+): ExecutionWarning {
+  return Object.freeze({
+    code: params.code ?? 'COMMAND_EXECUTION_WARNING',
+    message: params.message,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createCommandExecutionContext(
+  params: Partial<CommandExecutionContext> & { commandId: string },
+): CommandExecutionContext {
+  return Object.freeze({
+    executionId: params.executionId ?? `exec_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    commandId: params.commandId,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+    userId: params.userId,
+    sessionId: params.sessionId,
+    correlationId: params.correlationId,
+    environment: params.environment ?? 'production',
+    source: params.source ?? 'runtime',
+    mode: params.mode ?? 'sync',
+    args: Object.freeze({ ...(params.args ?? {}) }),
+    metadata: params.metadata ? Object.freeze({ ...params.metadata }) : undefined,
+  });
+}
+
+export function createCommandExecutionRequest(
+  params: Partial<CommandExecutionRequest> & { commandId: string },
+): CommandExecutionRequest {
+  return Object.freeze({
+    commandId: params.commandId,
+    args: params.args ? Object.freeze({ ...params.args }) : Object.freeze({}),
+    userId: params.userId,
+    sessionId: params.sessionId,
+    correlationId: params.correlationId,
+    source: params.source,
+    metadata: params.metadata ? Object.freeze({ ...params.metadata }) : undefined,
+  });
+}
+
+export function createCommandExecutionResult<TResult = unknown>(
+  params: Partial<CommandExecutionResult<TResult>> & { commandId: string; context: CommandExecutionContext },
+): CommandExecutionResult<TResult> {
+  const warnings = params.warnings ?? [];
+  return Object.freeze({
+    executionId: params.executionId ?? params.context.executionId,
+    commandId: params.commandId,
+    status: params.status ?? CommandExecutionStatus.COMPLETED,
+    value: params.value,
+    error: params.error,
+    warnings: Object.freeze([...warnings]),
+    timing: params.timing ?? createExecutionTiming(),
+    context: params.context,
+  });
+}
+
+export function createCommandExecutionRecord<TResult = unknown>(
+  params: Partial<CommandExecutionRecord<TResult>> & { result: CommandExecutionResult<TResult> },
+): CommandExecutionRecord<TResult> {
+  return Object.freeze({
+    result: params.result,
+    recordedAt: params.recordedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createCommandExecutionStatistics(
+  params: Partial<CommandExecutionStatistics> = {},
+): CommandExecutionStatistics {
+  return Object.freeze({
+    executions: params.executions ?? 0,
+    successfulExecutions: params.successfulExecutions ?? 0,
+    failedExecutions: params.failedExecutions ?? 0,
+    cancelledExecutions: params.cancelledExecutions ?? 0,
+    validationFailures: params.validationFailures ?? 0,
+    averageExecutionTime: params.averageExecutionTime ?? 0,
+    maximumExecutionTime: params.maximumExecutionTime ?? 0,
+    minimumExecutionTime: params.minimumExecutionTime ?? 0,
+    historySize: params.historySize ?? 0,
+    activeExecutions: params.activeExecutions ?? 0,
+  });
+}
+
+export function createCommandExecutionHealth(
+  params: Partial<CommandExecutionHealth> = {},
+): CommandExecutionHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    failureRate: params.failureRate ?? 0,
+    successRate: params.successRate ?? 100,
+    averageExecutionTime: params.averageExecutionTime ?? 0,
+    historyCapacity: params.historyCapacity ?? 1000,
+    activeExecutions: params.activeExecutions ?? 0,
+    validationFailures: params.validationFailures ?? 0,
+    executionThroughput: params.executionThroughput ?? 0,
+    message: params.message ?? 'Command execution engine is operational.',
+  });
+}
+
+export function createCommandExecutionConfiguration(
+  params: Partial<CommandExecutionConfiguration> = {},
+): CommandExecutionConfiguration {
+  return Object.freeze({
+    maxHistorySize: params.maxHistorySize ?? 1000,
+    executionTimeoutMs: params.executionTimeoutMs ?? 30000,
+    strictParameterValidation: params.strictParameterValidation ?? true,
+  });
+}
+
+export function createExecutionPipeline(
+  params: Partial<ExecutionPipeline> = {},
+): ExecutionPipeline {
+  const steps = params.steps ?? ['validation', 'lookup', 'parameter_validation', 'context_creation', 'handler_execution', 'telemetry', 'history'];
+  return Object.freeze({
+    pipelineId: params.pipelineId ?? `pipe_${Date.now()}`,
+    steps: Object.freeze([...steps]),
+    createdAt: params.createdAt ?? new Date().toISOString(),
+  });
+}
+
+export function createExecutionCapabilities(
+  params: Partial<ExecutionCapabilities> = {},
+): ExecutionCapabilities {
+  return Object.freeze({
+    supportsSyncExecution: params.supportsSyncExecution ?? true,
+    supportsAsyncExecution: params.supportsAsyncExecution ?? true,
+    supportsCancellation: params.supportsCancellation ?? true,
+    supportsHistoryTracking: params.supportsHistoryTracking ?? true,
+    supportsParameterValidation: params.supportsParameterValidation ?? true,
+  });
+}
+
+export function createExecutionDiagnostics(
+  params: Partial<ExecutionDiagnostics> & {
+    statistics: CommandExecutionStatistics;
+    health: CommandExecutionHealth;
+  },
+): ExecutionDiagnostics {
+  return Object.freeze({
+    statistics: params.statistics,
+    health: params.health,
+    capabilities: params.capabilities ?? createExecutionCapabilities(),
+    historySize: params.historySize ?? params.statistics.historySize,
+    activeExecutions: params.activeExecutions ?? params.statistics.activeExecutions,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
 export function createCommandDiagnostics(
   params: Partial<CommandDiagnostics> = {},
 ): CommandDiagnostics {
@@ -325,6 +626,9 @@ export function createCommandDiagnostics(
     registeredAliases: params.registeredAliases ? Object.freeze([...params.registeredAliases]) : undefined,
     registryStatistics: params.registryStatistics,
     registryHealth: params.registryHealth,
+    executionStatistics: params.executionStatistics,
+    executionHealth: params.executionHealth,
+    executionHistorySize: params.executionHistorySize,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }

@@ -1,7 +1,8 @@
 /**
- * Command Runtime Interfaces (Phase 16.6.2).
+ * Command Runtime Interfaces (Phase 16.6.3).
  *
- * Defines contract specifications for ICommandRegistry, ICommandProvider, and ICommandRuntime.
+ * Defines contract specifications for ICommandRegistry, ICommandExecutor,
+ * ICommandProvider, and ICommandRuntime.
  */
 
 import {
@@ -12,6 +13,12 @@ import {
   CommandContext,
   CommandDefinition,
   CommandDiagnostics,
+  CommandExecutionHealth,
+  CommandExecutionRecord,
+  CommandExecutionRequest,
+  CommandExecutionResult,
+  CommandExecutionStatistics,
+  CommandHandler,
   CommandHealth,
   CommandRegistration,
   CommandRegistryHealth,
@@ -19,6 +26,7 @@ import {
   CommandRuntimeState,
   CommandState,
   CommandStatistics,
+  ExecutionDiagnostics,
 } from './models';
 
 export interface ICommandRegistry {
@@ -36,6 +44,26 @@ export interface ICommandRegistry {
   statistics(): CommandRegistryStatistics;
   health(): CommandRegistryHealth;
   clear(): void;
+}
+
+export interface ICommandExecutor {
+  registerHandler<TArgs = Record<string, unknown>, TResult = unknown>(
+    commandId: string,
+    handler: CommandHandler<TArgs, TResult>,
+  ): void;
+  unregisterHandler(commandId: string): boolean;
+  hasHandler(commandId: string): boolean;
+  execute<TResult = unknown>(request: CommandExecutionRequest): CommandExecutionResult<TResult>;
+  executeAsync<TResult = unknown>(
+    request: CommandExecutionRequest,
+  ): Promise<CommandExecutionResult<TResult>>;
+  validateExecution(request: CommandExecutionRequest): CommandExecutionResult<boolean>;
+  cancelExecution(executionId: string): boolean;
+  executionHistory(): ReadonlyArray<CommandExecutionRecord>;
+  clearExecutionHistory(): void;
+  statistics(): CommandExecutionStatistics;
+  health(): CommandExecutionHealth;
+  diagnostics(): ExecutionDiagnostics;
 }
 
 export interface ICommandProvider {
@@ -64,6 +92,23 @@ export interface ICommandProvider {
   search(query: string): ReadonlyArray<CommandDefinition>;
   registryStatistics(): CommandRegistryStatistics;
   registryHealth(): CommandRegistryHealth;
+
+  registerHandler<TArgs = Record<string, unknown>, TResult = unknown>(
+    commandId: string,
+    handler: CommandHandler<TArgs, TResult>,
+  ): void;
+  unregisterHandler(commandId: string): boolean;
+  hasHandler(commandId: string): boolean;
+  execute<TResult = unknown>(request: CommandExecutionRequest): CommandExecutionResult<TResult>;
+  executeAsync<TResult = unknown>(
+    request: CommandExecutionRequest,
+  ): Promise<CommandExecutionResult<TResult>>;
+  validateExecution(request: CommandExecutionRequest): CommandExecutionResult<boolean>;
+  cancelExecution(executionId: string): boolean;
+  executionHistory(): ReadonlyArray<CommandExecutionRecord>;
+  clearExecutionHistory(): void;
+  executionStatistics(): CommandExecutionStatistics;
+  executionHealth(): CommandExecutionHealth;
 }
 
 export interface ICommandRuntime {
@@ -91,4 +136,21 @@ export interface ICommandRuntime {
   search(query: string): ReadonlyArray<CommandDefinition>;
   registryStatistics(): CommandRegistryStatistics;
   registryHealth(): CommandRegistryHealth;
+
+  registerHandler<TArgs = Record<string, unknown>, TResult = unknown>(
+    commandId: string,
+    handler: CommandHandler<TArgs, TResult>,
+  ): void;
+  unregisterHandler(commandId: string): boolean;
+  hasHandler(commandId: string): boolean;
+  execute<TResult = unknown>(request: CommandExecutionRequest): CommandExecutionResult<TResult>;
+  executeAsync<TResult = unknown>(
+    request: CommandExecutionRequest,
+  ): Promise<CommandExecutionResult<TResult>>;
+  validateExecution(request: CommandExecutionRequest): CommandExecutionResult<boolean>;
+  cancelExecution(executionId: string): boolean;
+  executionHistory(): ReadonlyArray<CommandExecutionRecord>;
+  clearExecutionHistory(): void;
+  executionStatistics(): CommandExecutionStatistics;
+  executionHealth(): CommandExecutionHealth;
 }

@@ -1,10 +1,10 @@
 /**
- * Command Provider Implementation (Phase 16.6.2).
+ * Command Provider Implementation (Phase 16.6.3).
  *
  * Implements ICommandProvider owning runtime state transitions,
  * telemetry statistics, health evaluation, context metadata, capabilities
- * reporting, command registration management, alias resolution, category lookup,
- * search engine evaluation, registry health, and diagnostics generation.
+ * reporting, command registration management, execution pipelines, handler management,
+ * history tracking, execution health, and diagnostics generation.
  */
 
 import {
@@ -15,6 +15,12 @@ import {
   CommandContext,
   CommandDefinition,
   CommandDiagnostics,
+  CommandExecutionHealth,
+  CommandExecutionRecord,
+  CommandExecutionRequest,
+  CommandExecutionResult,
+  CommandExecutionStatistics,
+  CommandHandler,
   CommandHealth,
   CommandRegistration,
   CommandRegistryHealth,
@@ -30,8 +36,9 @@ import {
   createCommandState,
   createCommandStatistics,
 } from './models';
-import { ICommandProvider, ICommandRegistry } from './interfaces';
+import { ICommandExecutor, ICommandProvider, ICommandRegistry } from './interfaces';
 import { CommandRegistry } from './command_registry';
+import { CommandExecutor } from './command_executor';
 
 export class CommandProvider implements ICommandProvider {
   private _runtimeState: CommandRuntimeState = CommandRuntimeState.UNINITIALIZED;
@@ -39,6 +46,7 @@ export class CommandProvider implements ICommandProvider {
   private readonly _capabilities: CommandCapabilities;
   private readonly _context: CommandContext;
   private readonly _registry: ICommandRegistry;
+  private readonly _executor: ICommandExecutor;
 
   private _startedAt: string | null = null;
   private _initializations = 0;
@@ -51,11 +59,13 @@ export class CommandProvider implements ICommandProvider {
     capabilities?: CommandCapabilities,
     context?: CommandContext,
     registry?: ICommandRegistry,
+    executor?: ICommandExecutor,
   ) {
     this._config = config ?? createCommandConfiguration();
     this._capabilities = capabilities ?? createCommandCapabilities();
     this._context = context ?? createCommandContext();
     this._registry = registry ?? new CommandRegistry();
+    this._executor = executor ?? new CommandExecutor(this._registry);
   }
 
   public initialize(): CommandHealth {
@@ -129,6 +139,9 @@ export class CommandProvider implements ICommandProvider {
     const commands = this._registry.listCommands();
     const categories = this._registry.listCategories();
     const aliases = this._registry.listAliases();
+    const execStats = this._executor.statistics();
+    const execHealth = this._executor.health();
+    const execHistory = this._executor.executionHistory();
 
     return createCommandDiagnostics({
       health: this.health(),
@@ -140,6 +153,9 @@ export class CommandProvider implements ICommandProvider {
       registeredAliases: aliases.map((a) => a.alias),
       registryStatistics: this._registry.statistics(),
       registryHealth: this._registry.health(),
+      executionStatistics: execStats,
+      executionHealth: execHealth,
+      executionHistorySize: execHistory.length,
       timestamp: new Date().toISOString(),
     });
   }
@@ -217,5 +233,56 @@ export class CommandProvider implements ICommandProvider {
 
   public registryHealth(): CommandRegistryHealth {
     return this._registry.health();
+  }
+
+  public registerHandler<TArgs = Record<string, unknown>, TResult = unknown>(
+    commandId: string,
+    handler: CommandHandler<TArgs, TResult>,
+  ): void {
+    this._executor.registerHandler(commandId, handler);
+  }
+
+  public unregisterHandler(commandId: string): boolean {
+    return this._executor.unregisterHandler(commandId);
+  }
+
+  public hasHandler(commandId: string): boolean {
+    return this._executor.hasHandler(commandId);
+  }
+
+  public execute<TResult = unknown>(
+    request: CommandExecutionRequest,
+  ): CommandExecutionResult<TResult> {
+    return this._executor.execute<TResult>(request);
+  }
+
+  public executeAsync<TResult = unknown>(
+    request: CommandExecutionRequest,
+  ): Promise<CommandExecutionResult<TResult>> {
+    return this._executor.executeAsync<TResult>(request);
+  }
+
+  public validateExecution(request: CommandExecutionRequest): CommandExecutionResult<boolean> {
+    return this._executor.validateExecution(request);
+  }
+
+  public cancelExecution(executionId: string): boolean {
+    return this._executor.cancelExecution(executionId);
+  }
+
+  public executionHistory(): ReadonlyArray<CommandExecutionRecord> {
+    return this._executor.executionHistory();
+  }
+
+  public clearExecutionHistory(): void {
+    this._executor.clearExecutionHistory();
+  }
+
+  public executionStatistics(): CommandExecutionStatistics {
+    return this._executor.statistics();
+  }
+
+  public executionHealth(): CommandExecutionHealth {
+    return this._executor.health();
   }
 }

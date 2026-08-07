@@ -1,5 +1,5 @@
 /**
- * Command Runtime Coordinator Implementation (Phase 16.6.2).
+ * Command Runtime Coordinator Implementation (Phase 16.6.3).
  *
  * Implements ICommandRuntime acting as central coordinator delegating to ICommandProvider.
  * Contains no business logic — all operations are forwarded to the provider instance.
@@ -11,6 +11,12 @@ import {
   CommandCategory,
   CommandDefinition,
   CommandDiagnostics,
+  CommandExecutionHealth,
+  CommandExecutionRecord,
+  CommandExecutionRequest,
+  CommandExecutionResult,
+  CommandExecutionStatistics,
+  CommandHandler,
   CommandHealth,
   CommandRegistration,
   CommandRegistryHealth,
@@ -122,5 +128,56 @@ export class CommandRuntime implements ICommandRuntime {
 
   public registryHealth(): CommandRegistryHealth {
     return this._provider.registryHealth();
+  }
+
+  public registerHandler<TArgs = Record<string, unknown>, TResult = unknown>(
+    commandId: string,
+    handler: CommandHandler<TArgs, TResult>,
+  ): void {
+    this._provider.registerHandler(commandId, handler);
+  }
+
+  public unregisterHandler(commandId: string): boolean {
+    return this._provider.unregisterHandler(commandId);
+  }
+
+  public hasHandler(commandId: string): boolean {
+    return this._provider.hasHandler(commandId);
+  }
+
+  public execute<TResult = unknown>(
+    request: CommandExecutionRequest,
+  ): CommandExecutionResult<TResult> {
+    return this._provider.execute<TResult>(request);
+  }
+
+  public executeAsync<TResult = unknown>(
+    request: CommandExecutionRequest,
+  ): Promise<CommandExecutionResult<TResult>> {
+    return this._provider.executeAsync<TResult>(request);
+  }
+
+  public validateExecution(request: CommandExecutionRequest): CommandExecutionResult<boolean> {
+    return this._provider.validateExecution(request);
+  }
+
+  public cancelExecution(executionId: string): boolean {
+    return this._provider.cancelExecution(executionId);
+  }
+
+  public executionHistory(): ReadonlyArray<CommandExecutionRecord> {
+    return this._provider.executionHistory();
+  }
+
+  public clearExecutionHistory(): void {
+    this._provider.clearExecutionHistory();
+  }
+
+  public executionStatistics(): CommandExecutionStatistics {
+    return this._provider.executionStatistics();
+  }
+
+  public executionHealth(): CommandExecutionHealth {
+    return this._provider.executionHealth();
   }
 }
