@@ -9,7 +9,6 @@ import {
   resetPluginRuntime,
   resetPluginProvider,
   PluginRuntimeStatus,
-  PluginRuntimeState,
   PluginLifecycleState,
   // Exceptions
   PluginRuntimeException,
