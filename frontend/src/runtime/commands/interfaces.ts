@@ -69,6 +69,11 @@ import {
   ValidationResult,
   ValidationRule,
   ValidationStatistics,
+  CertificationDiagnostics,
+  CertificationHealth,
+  CertificationReport,
+  CertificationStatistics,
+  CommandCertification,
 } from './models';
 
 export interface ICommandRegistry {
@@ -380,6 +385,12 @@ export interface ICommandProvider {
   backgroundTasks(): ReadonlyArray<BackgroundTask>;
   backgroundStatistics(): BackgroundStatistics;
   backgroundHealth(): BackgroundHealth;
+
+  certify(): Promise<CommandCertification>;
+  runCertification(): Promise<CertificationReport>;
+  certificationReport(): Promise<CertificationReport>;
+  certificationStatistics(): CertificationStatistics;
+  certificationHealth(): CertificationHealth;
 }
 
 export interface ICommandRuntime {
@@ -508,4 +519,19 @@ export interface ICommandRuntime {
   backgroundTasks(): ReadonlyArray<BackgroundTask>;
   backgroundStatistics(): BackgroundStatistics;
   backgroundHealth(): BackgroundHealth;
+
+  certify(): Promise<CommandCertification>;
+  runCertification(): Promise<CertificationReport>;
+  certificationReport(): Promise<CertificationReport>;
+  certificationStatistics(): CertificationStatistics;
+  certificationHealth(): CertificationHealth;
+}
+
+export interface ICommandCertifier {
+  certify(provider: ICommandProvider): Promise<CommandCertification>;
+  runCertification(provider: ICommandProvider): Promise<CertificationReport>;
+  certificationReport(provider: ICommandProvider): Promise<CertificationReport>;
+  certificationStatistics(): CertificationStatistics;
+  certificationHealth(): CertificationHealth;
+  diagnostics(): CertificationDiagnostics;
 }

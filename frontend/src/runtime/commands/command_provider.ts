@@ -57,6 +57,10 @@ import {
   ValidationResult,
   ValidationRule,
   ValidationStatistics,
+  CertificationHealth,
+  CertificationReport,
+  CertificationStatistics,
+  CommandCertification,
   createCommandCapabilities,
   createCommandConfiguration,
   createCommandContext,
@@ -76,6 +80,7 @@ import {
   ICommandScheduler,
   ICommandQueue,
   IBackgroundExecutionManager,
+  ICommandCertifier,
 } from './interfaces';
 import { CommandRegistry } from './command_registry';
 import { CommandExecutor } from './command_executor';
@@ -86,6 +91,7 @@ import { PolicyManager } from './policy_manager';
 import { CommandScheduler } from './command_scheduler';
 import { CommandQueue } from './command_queue';
 import { BackgroundExecutionManager } from './background_execution_manager';
+import { CommandCertifier } from './command_certifier';
 
 export class CommandProvider implements ICommandProvider {
   private _runtimeState: CommandRuntimeState = CommandRuntimeState.UNINITIALIZED;
@@ -107,6 +113,7 @@ export class CommandProvider implements ICommandProvider {
   private _shutdowns = 0;
   private _restarts = 0;
   private _errors = 0;
+  private readonly _certifier: ICommandCertifier;
 
   constructor(
     config?: CommandConfiguration,
@@ -133,6 +140,7 @@ export class CommandProvider implements ICommandProvider {
     this._scheduler = scheduler ?? new CommandScheduler(null as any);
     this._queue = queue ?? new CommandQueue();
     this._backgroundExecutionManager = backgroundExecutionManager ?? new BackgroundExecutionManager(null as any);
+    this._certifier = new CommandCertifier();
 
     this._pipeline =
       pipeline ??
@@ -241,6 +249,8 @@ export class CommandProvider implements ICommandProvider {
     const pipeStats = this._pipeline.statistics();
     const pipeHealth = this._pipeline.health();
 
+    const certDiag = this._certifier.diagnostics();
+
     return createCommandDiagnostics({
       health: this.health(),
       statistics: this.statistics(),
@@ -264,6 +274,10 @@ export class CommandProvider implements ICommandProvider {
       schedulingDiagnostics: this._scheduler.diagnostics(),
       queueDiagnostics: this._queue.diagnostics(),
       backgroundDiagnostics: this._backgroundExecutionManager.diagnostics(),
+      certification: certDiag.lastReport?.certification,
+      certificationSummary: certDiag.lastReport?.summary,
+      certificationStatistics: certDiag.statistics,
+      certificationHealth: certDiag.health,
       timestamp: new Date().toISOString(),
     });
   }
@@ -612,5 +626,25 @@ export class CommandProvider implements ICommandProvider {
 
   public backgroundHealth(): BackgroundHealth {
     return this._backgroundExecutionManager.health();
+  }
+
+  public async certify(): Promise<CommandCertification> {
+    return this._certifier.certify(this);
+  }
+
+  public async runCertification(): Promise<CertificationReport> {
+    return this._certifier.runCertification(this);
+  }
+
+  public async certificationReport(): Promise<CertificationReport> {
+    return this._certifier.certificationReport(this);
+  }
+
+  public certificationStatistics(): CertificationStatistics {
+    return this._certifier.certificationStatistics();
+  }
+
+  public certificationHealth(): CertificationHealth {
+    return this._certifier.certificationHealth();
   }
 }

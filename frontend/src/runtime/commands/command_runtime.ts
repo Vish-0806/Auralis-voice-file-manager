@@ -52,6 +52,10 @@ import {
   ValidationResult,
   ValidationRule,
   ValidationStatistics,
+  CertificationHealth,
+  CertificationReport,
+  CertificationStatistics,
+  CommandCertification,
 } from './models';
 import { ICommandProvider, ICommandRuntime } from './interfaces';
 import { CommandProvider } from './command_provider';
@@ -428,5 +432,25 @@ export class CommandRuntime implements ICommandRuntime {
 
   public backgroundHealth(): BackgroundHealth {
     return this._provider.backgroundHealth();
+  }
+
+  public async certify(): Promise<CommandCertification> {
+    return this._provider.certify();
+  }
+
+  public async runCertification(): Promise<CertificationReport> {
+    return this._provider.runCertification();
+  }
+
+  public async certificationReport(): Promise<CertificationReport> {
+    return this._provider.certificationReport();
+  }
+
+  public certificationStatistics(): CertificationStatistics {
+    return this._provider.certificationStatistics();
+  }
+
+  public certificationHealth(): CertificationHealth {
+    return this._provider.certificationHealth();
   }
 }

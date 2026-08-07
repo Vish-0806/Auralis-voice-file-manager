@@ -16,6 +16,7 @@ export * from './policy_manager';
 export * from './command_scheduler';
 export * from './command_queue';
 export * from './background_execution_manager';
+export * from './command_certifier';
 export * from './command_provider';
 export * from './command_runtime';
 export * from './runtime';

@@ -576,6 +576,10 @@ export interface CommandDiagnostics {
   readonly schedulingDiagnostics?: SchedulingDiagnostics;
   readonly queueDiagnostics?: QueueDiagnostics;
   readonly backgroundDiagnostics?: BackgroundDiagnostics;
+  readonly certification?: CommandCertification;
+  readonly certificationSummary?: CommandCertificationSummary;
+  readonly certificationStatistics?: CertificationStatistics;
+  readonly certificationHealth?: CertificationHealth;
   readonly timestamp: string;
 }
 
@@ -1366,6 +1370,10 @@ export function createCommandDiagnostics(
     schedulingDiagnostics: params.schedulingDiagnostics,
     queueDiagnostics: params.queueDiagnostics,
     backgroundDiagnostics: params.backgroundDiagnostics,
+    certification: params.certification,
+    certificationSummary: params.certificationSummary,
+    certificationStatistics: params.certificationStatistics,
+    certificationHealth: params.certificationHealth,
     timestamp: params.timestamp ?? new Date().toISOString(),
   });
 }
@@ -1717,5 +1725,183 @@ export function createBackgroundDiagnostics(
     health: params.health,
     activeTasksCount: params.activeTasksCount ?? params.statistics.activeTasks,
     timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export interface CertificationIssue {
+  readonly issueId: string;
+  readonly severity: 'INFO' | 'WARNING' | 'CRITICAL';
+  readonly category: string;
+  readonly message: string;
+  readonly timestamp: string;
+}
+
+export interface CommandCertification {
+  readonly certified: boolean;
+  readonly score: number;
+  readonly passedChecks: number;
+  readonly failedChecks: number;
+  readonly certifiedAt: string;
+}
+
+export interface CommandCertificationSummary {
+  readonly certified: boolean;
+  readonly score: number;
+  readonly status: 'PASSED' | 'FAILED';
+  readonly certifiedAt: string;
+}
+
+export interface CertificationStatistics {
+  readonly totalCertifications: number;
+  readonly passedCertifications: number;
+  readonly failedCertifications: number;
+  readonly averageScore: number;
+}
+
+export interface CertificationHealth {
+  readonly healthy: boolean;
+  readonly certified: boolean;
+  readonly score: number;
+}
+
+export interface CertificationReport {
+  readonly certification: CommandCertification;
+  readonly summary: CommandCertificationSummary;
+  readonly issues: ReadonlyArray<CertificationIssue>;
+  readonly diagnostics: CommandDiagnostics;
+  readonly generatedAt: string;
+}
+
+export interface CertificationStage {
+  readonly name: string;
+  readonly status: 'PASSED' | 'FAILED';
+  readonly durationMs: number;
+  readonly checks: ReadonlyArray<CertificationCheck>;
+}
+
+export interface CertificationCheck {
+  readonly name: string;
+  readonly status: 'PASSED' | 'FAILED';
+  readonly error?: string;
+}
+
+export interface CertificationScore {
+  readonly value: number;
+  readonly status: 'PASSED' | 'FAILED';
+  readonly totalChecks: number;
+  readonly passedChecks: number;
+  readonly failedChecks: number;
+}
+
+export interface CertificationDiagnostics {
+  readonly lastReport: CertificationReport | null;
+  readonly statistics: CertificationStatistics;
+  readonly health: CertificationHealth;
+  readonly stageResults: ReadonlyArray<CertificationStage>;
+}
+
+export function createCertificationIssue(
+  params: Partial<CertificationIssue> & { category: string; message: string },
+): CertificationIssue {
+  return Object.freeze({
+    issueId: params.issueId ?? `issue_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    severity: params.severity ?? 'INFO',
+    category: params.category,
+    message: params.message,
+    timestamp: params.timestamp ?? new Date().toISOString(),
+  });
+}
+
+export function createCommandCertification(params: Partial<CommandCertification> = {}): CommandCertification {
+  return Object.freeze({
+    certified: params.certified ?? true,
+    score: params.score ?? 100,
+    passedChecks: params.passedChecks ?? 12,
+    failedChecks: params.failedChecks ?? 0,
+    certifiedAt: params.certifiedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createCommandCertificationSummary(params: Partial<CommandCertificationSummary> = {}): CommandCertificationSummary {
+  return Object.freeze({
+    certified: params.certified ?? true,
+    score: params.score ?? 100,
+    status: params.status ?? 'PASSED',
+    certifiedAt: params.certifiedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createCertificationStatistics(params: Partial<CertificationStatistics> = {}): CertificationStatistics {
+  return Object.freeze({
+    totalCertifications: params.totalCertifications ?? 0,
+    passedCertifications: params.passedCertifications ?? 0,
+    failedCertifications: params.failedCertifications ?? 0,
+    averageScore: params.averageScore ?? 100,
+  });
+}
+
+export function createCertificationHealth(params: Partial<CertificationHealth> = {}): CertificationHealth {
+  return Object.freeze({
+    healthy: params.healthy ?? true,
+    certified: params.certified ?? true,
+    score: params.score ?? 100,
+  });
+}
+
+export function createCertificationReport(
+  params: Partial<CertificationReport> & { diagnostics: CommandDiagnostics },
+): CertificationReport {
+  const issues = params.issues ?? [];
+  const cert = params.certification ?? createCommandCertification();
+  const summary = params.summary ?? createCommandCertificationSummary({ certified: cert.certified, score: cert.score });
+
+  return Object.freeze({
+    certification: cert,
+    summary,
+    issues: Object.freeze([...issues]),
+    diagnostics: params.diagnostics,
+    generatedAt: params.generatedAt ?? new Date().toISOString(),
+  });
+}
+
+export function createCertificationStage(
+  params: Partial<CertificationStage> & { name: string; checks: ReadonlyArray<CertificationCheck> },
+): CertificationStage {
+  return Object.freeze({
+    name: params.name,
+    status: params.status ?? 'PASSED',
+    durationMs: params.durationMs ?? 0,
+    checks: Object.freeze([...params.checks]),
+  });
+}
+
+export function createCertificationCheck(
+  params: Partial<CertificationCheck> & { name: string },
+): CertificationCheck {
+  return Object.freeze({
+    name: params.name,
+    status: params.status ?? 'PASSED',
+    error: params.error,
+  });
+}
+
+export function createCertificationScore(params: Partial<CertificationScore> = {}): CertificationScore {
+  return Object.freeze({
+    value: params.value ?? 100,
+    status: params.status ?? 'PASSED',
+    totalChecks: params.totalChecks ?? 12,
+    passedChecks: params.passedChecks ?? 12,
+    failedChecks: params.failedChecks ?? 0,
+  });
+}
+
+export function createCertificationDiagnostics(
+  params: Partial<CertificationDiagnostics> & { statistics: CertificationStatistics; health: CertificationHealth },
+): CertificationDiagnostics {
+  return Object.freeze({
+    lastReport: params.lastReport ?? null,
+    statistics: params.statistics,
+    health: params.health,
+    stageResults: Object.freeze([...(params.stageResults ?? [])]),
   });
 }
