@@ -11,7 +11,7 @@ A clean, scalable, production-oriented React + TypeScript architecture built on 
 ---
 
 ## Current Status
-**Phase 16.1 — Frontend Runtime Foundation** is the current architectural foundation.
+**Phases 16.1 to 16.6 — Core Frontend V2 Stack** is fully complete. This includes the Component Runtime, Layout & Navigation, Theme & Design Tokens system, global Zustand state store boundaries, Axios API client, in-memory AuthService, WebSocket client, and Synchronization bridge.
 
 ---
 

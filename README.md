@@ -122,16 +122,17 @@ Auralis Version 1.9.0 implements the complete **Provider-Independent API Runtime
 
 ---
 
-## Provider-Independent Frontend Architecture & Runtime Platform (v2.0.0 / Phase 16)
+## Rebuilt Lightweight Frontend Architecture & Runtime Platform (v2.0.0 / Phase 16)
 
-Auralis Version 2.0.0 implements the complete **Provider-Independent Frontend Architecture & Runtime Platform** (`frontend/src/runtime/`), establishing an enterprise-grade, framework-decoupled runtime layer across 5 sub-runtimes:
+Auralis Version 2.0.0 implements a complete, clean-slate **Frontend V2 Subsystem** (`frontend/src/`), establishing a modern, responsive, and type-safe architecture:
 
-1. **Frontend Dependency Injection Runtime (Phase 16.1)**: Pure TypeScript IoC Container supporting `SINGLETON`, `TRANSIENT`, `SCOPED` lifetimes, service descriptors, resolution engine, and graph cycle detection (`frontend/src/runtime/di/`).
-2. **Frontend Application Lifecycle & Plugin Runtime (Phase 16.2)**: `RuntimeRegistry`, `BootstrapManager`, `StartupValidator`, `InitializationManager`, plugin registration engine, and `ApplicationRuntime` (`frontend/src/runtime/app/`).
-3. **Frontend Certified Configuration Runtime (Phase 16.3)**: Multi-source priority resolver (`Memory > Environment > DotEnv > Defaults`), type converter, property validator, profiles engine, feature flags, secret store with redaction algorithms, and production certifier (`frontend/src/runtime/config/`).
-4. **Frontend Event Runtime Architecture Platform (Phase 16.4)**: Event Bus, Event Registry, Subscriber Registry, Topic Wildcard Resolver (`*`, `**` / `#`), Priority Dispatcher (`CRITICAL > HIGH > NORMAL > LOW`), Event Queue with `DROP_OLDEST` strategy, Retry Manager, Replay Manager, Dead-Letter Generator, and Production Certifier (`frontend/src/runtime/events/`).
-5. **Frontend State Management Runtime Platform (Phase 16.5)**: Multiple named State Containers with deep immutability (`Object.freeze()`), Action Dispatcher, Pure Reducer Engine with exception isolation, Middleware Pipeline (`BEFORE`, `AFTER`, `ERROR`), Memoized Selector Engine, Undo/Redo History with time travel, Abstract Persistence, State Synchronizer, and Production Certifier (`frontend/src/runtime/state/`).
-6. **End-to-End Production Certification & Verification**: 456 Vitest unit tests passed across 17 test suites, 100% pure TypeScript (zero DOM/React coupling in runtime engines), $4.19\text{ s}$ production build execution, and Grade A certification.
+1. **Frontend Runtime Foundation (Phase 16.1)**: Clean folder infrastructure and package environment mappings.
+2. **Frontend Component Runtime (Phase 16.2)**: Accessible, semantic, presentational components (`src/components/common/`, `src/components/layout/`) with 100% keyboard accessibility and WAI-ARIA validation.
+3. **Layout & Navigation Runtime (Phase 16.3)**: Breadcrumbs, dynamic page headers, mobile off-canvas menus, and collapsible sidebars mapping nested react-router routes (`src/layouts/AppLayout.tsx`).
+4. **Theme & Design System Runtime (Phase 16.4)**: Semantic design tokens system, light/dark/system mode configurations (`src/theme/ThemeToggle.tsx`), local cache persistence, and prefers-reduced-motion animation mitigations.
+5. **State Management Runtime (Phase 16.5)**: Decoupled Zustand state store boundaries (UI, Assistant, Files, Workspace, Settings) and narrow, typed selectors mapping selective local persistence.
+6. **API Client & Synchronization Runtime (Phase 16.6)**: Axios client intercepting bearer headers, error normalizers resolving FastAPI details exceptions, in-memory AuthService, WebSocket client with backoff reconnects, and synchronization bridges dispatching socket updates directly to stores.
+7. **End-to-End Production Verification**: 74 Vitest unit/integration tests passed across 15 test suites, 100% pure TypeScript compiler checks, clean production build bundles, and zero legacy enterprise runtime overhead.
 
 ---
 
@@ -228,16 +229,16 @@ Auralis/
 │   ├── memory/                # Tiered Memory System
 │   ├── voice/                 # Modular Voice Engine subsystems
 │   └── tests/                 # 2,905 unit & integration tests across 162 test modules
-├── frontend/                  # Vite + React + Pure TS Runtime Client App
+├── frontend/                  # Vite + React + TypeScript Frontend V2 App
 │   ├── src/
-│   │   └── runtime/           # Provider-Independent Frontend Runtime Platform (Phase 16)
-│   │       ├── di/            # Dependency Injection Runtime (Phase 16.1)
-│   │       ├── app/           # Application Lifecycle & Plugin Runtime (Phase 16.2)
-│   │       ├── config/        # Certified Configuration Runtime (Phase 16.3)
-│   │       ├── events/        # Event Runtime Architecture Platform (Phase 16.4)
-│   │       └── state/         # State Management Runtime Platform (Phase 16.5)
-│   └── tests/
-│       └── runtime/           # 456 Vitest unit tests across 17 test suites
+│   │   ├── app/               # Application registry, routes, and providers
+│   │   ├── components/        # Reusable presentation widgets (common, layout, navigation)
+│   │   ├── layouts/           # Shell templates (AppLayout, DashboardLayout, WorkspaceLayout)
+│   │   ├── pages/             # Route views (Dashboard, Files, Workspace, Assistant, Settings)
+│   │   ├── services/          # Client layers (apiClient, authService, websocket, sync)
+│   │   ├── state/             # Global Zustand stores, selectors, and models
+│   │   └── theme/             # Styling theme provider templates
+│   └── tests/                 # 74 Vitest tests covering state, views, themes, and service runtimes
 └── docs/                      # Technical documentation and architecture specifications
 ```
 
@@ -264,7 +265,7 @@ Track the development stages of Auralis:
 * [x] **Provider-Independent Assistant Architecture Platform (Phases 13.1 to 13.10):** Assistant Runtime Foundation, Conversation Runtime, Dialogue Management, Decision Coordinator, Assistant Memory Runtime, Response Streaming, Voice Orchestration, Proactive Notifications, Integration Gateway, and End-to-End Production Certification (2,172 tests passed).
 * [x] **Application Container & Infrastructure Platform (Phases 14.1 to 14.3.6):** Application Runtime Platform, Dependency Injection Subsystem, Priority Configuration Source Management, Resolution & Validation Engine, Configuration Profiles & Feature Flags, Secrets & Sensitive Configuration Management, and End-to-End Production Certification (2,487 tests passed).
 * [x] **Provider-Independent API Runtime Architecture Platform (Phases 15.1 to 15.10):** API Runtime Foundation, Request Routing Runtime, Middleware Runtime, Authentication Runtime, Validation Runtime, API Versioning Runtime, WebSocket Runtime, API Protection & Rate Limiting Runtime, API Integration Gateway Runtime, and End-to-End Production Certification (2,905 tests passed).
-* [x] **Provider-Independent Frontend Architecture & Runtime Platform (Phases 16.1 to 16.5):** Frontend Dependency Injection Container, Application Lifecycle & Plugin Runtime, Certified Configuration Subsystem, Provider-Independent Event Runtime Architecture, State Management Runtime Platform, and End-to-End Production Certification (3,361 total tests passed).
+* [x] **Lightweight Rebuilt Frontend Architecture (Phases 16.1 to 16.6):** Component Runtime, Layout & Navigation structures, Theme systems, global Zustand state store boundaries, API Client interfaces, WebSocket synchronization, and End-to-End Production Verification (74 total tests passed).
 * [ ] **Future Objectives:**
   * [ ] Operating System Desktop Packaging (Phase 11 / Electron & Tauri integration).
   * [ ] Document intelligence parser using local PyMuPDF extraction.
