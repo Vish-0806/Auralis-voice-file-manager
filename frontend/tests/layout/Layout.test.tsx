@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect } from 'vitest';
+import { ThemeProvider } from '../../src/theme/ThemeProvider';
 import { AppLayout } from '../../src/layouts/AppLayout';
 import { AppRoutes } from '../../src/app/routes';
 
@@ -8,9 +9,11 @@ describe('Layout Runtime Tests', () => {
   describe('AppLayout Component', () => {
     it('should render the header and sidebar correctly', () => {
       render(
-        <MemoryRouter initialEntries={['/']}>
-          <AppLayout />
-        </MemoryRouter>
+        <ThemeProvider>
+          <MemoryRouter initialEntries={['/']}>
+            <AppLayout />
+          </MemoryRouter>
+        </ThemeProvider>
       );
       
       expect(screen.getByText('Voice File Manager')).toBeInTheDocument();
@@ -21,9 +24,11 @@ describe('Layout Runtime Tests', () => {
 
     it('should toggle mobile menu when clicking menu button', () => {
       render(
-        <MemoryRouter initialEntries={['/']}>
-          <AppLayout />
-        </MemoryRouter>
+        <ThemeProvider>
+          <MemoryRouter initialEntries={['/']}>
+            <AppLayout />
+          </MemoryRouter>
+        </ThemeProvider>
       );
       
       const toggleBtn = screen.getByLabelText('Toggle Navigation Menu');
@@ -36,9 +41,11 @@ describe('Layout Runtime Tests', () => {
 
     it('should toggle desktop collapsed state when clicking collapse button', () => {
       render(
-        <MemoryRouter initialEntries={['/']}>
-          <AppLayout />
-        </MemoryRouter>
+        <ThemeProvider>
+          <MemoryRouter initialEntries={['/']}>
+            <AppLayout />
+          </MemoryRouter>
+        </ThemeProvider>
       );
       
       const collapseBtn = screen.getByLabelText('Collapse Sidebar');
@@ -53,9 +60,11 @@ describe('Layout Runtime Tests', () => {
   describe('DashboardLayout & WorkspaceLayout Outlets', () => {
     it('should render DashboardLayout wrapper and nested outlets', () => {
       render(
-        <MemoryRouter initialEntries={['/dashboard']}>
-          <AppRoutes />
-        </MemoryRouter>
+        <ThemeProvider>
+          <MemoryRouter initialEntries={['/dashboard']}>
+            <AppRoutes />
+          </MemoryRouter>
+        </ThemeProvider>
       );
       
       expect(screen.getByText('Welcome to Auralis V2')).toBeInTheDocument();
@@ -63,9 +72,11 @@ describe('Layout Runtime Tests', () => {
 
     it('should render WorkspaceLayout wrapper and nested outlets', () => {
       render(
-        <MemoryRouter initialEntries={['/workspace']}>
-          <AppRoutes />
-        </MemoryRouter>
+        <ThemeProvider>
+          <MemoryRouter initialEntries={['/workspace']}>
+            <AppRoutes />
+          </MemoryRouter>
+        </ThemeProvider>
       );
       
       expect(screen.getByText('Workspace Operations')).toBeInTheDocument();

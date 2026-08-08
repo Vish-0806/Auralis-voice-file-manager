@@ -1,41 +1,95 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { ThemeMode, ThemeContextType } from './types';
 
-export type Theme = 'light' | 'dark' | 'system';
+export * from './types';
 
-interface ThemeContextType {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
-}
+const STORAGE_KEY = 'auralis.theme';
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    const saved = localStorage.getItem('auralis-theme') as Theme;
-    return saved || 'system';
+  const [theme, setThemeState] = useState<ThemeMode>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode;
+      if (saved === 'light' || saved === 'dark' || saved === 'system') {
+        return saved;
+      }
+    } catch (e) {
+      // Gracefully handle storage errors
+    }
+    return 'system';
   });
 
-  const setTheme = (newTheme: Theme) => {
-    localStorage.setItem('auralis-theme', newTheme);
+  const setTheme = useCallback((newTheme: ThemeMode) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, newTheme);
+    } catch (e) {
+      // Gracefully handle storage errors
+    }
     setThemeState(newTheme);
-  };
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setThemeState((currentTheme) => {
+      let nextTheme: ThemeMode = 'light';
+      if (currentTheme === 'light') {
+        nextTheme = 'dark';
+      } else if (currentTheme === 'dark') {
+        nextTheme = 'system';
+      } else {
+        nextTheme = 'light';
+      }
+      try {
+        localStorage.setItem(STORAGE_KEY, nextTheme);
+      } catch (e) {
+        // Ignore errors
+      }
+      return nextTheme;
+    });
+  }, []);
 
   useEffect(() => {
     const root = window.document.documentElement;
-    root.removeAttribute('data-theme');
-    
-    let activeTheme = theme;
-    if (theme === 'system') {
-      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      activeTheme = systemPrefersDark ? 'dark' : 'light';
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const applyTheme = () => {
+      let activeTheme: 'light' | 'dark' = 'light';
+      
+      if (theme === 'system') {
+        activeTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      } else {
+        activeTheme = theme === 'dark' ? 'dark' : 'light';
+      }
+
+      root.setAttribute('data-theme', activeTheme);
+      root.style.colorScheme = activeTheme;
+    };
+
+    applyTheme();
+
+    const handleSystemChange = () => {
+      if (theme === 'system') {
+        applyTheme();
+      }
+    };
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleSystemChange);
+    } else {
+      mediaQuery.addListener(handleSystemChange);
     }
 
-    root.setAttribute('data-theme', activeTheme);
-    root.style.colorScheme = activeTheme;
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', handleSystemChange);
+      } else {
+        mediaQuery.removeListener(handleSystemChange);
+      }
+    };
   }, [theme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

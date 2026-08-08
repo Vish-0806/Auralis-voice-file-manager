@@ -7,6 +7,7 @@ import { Breadcrumbs } from '../components/navigation/Breadcrumbs';
 import { PageHeader } from '../components/navigation/PageHeader';
 import { Avatar } from '../components/common/Avatar';
 import { IconButton } from '../components/common/IconButton';
+import { ThemeToggle } from '../components/common/ThemeToggle';
 import { navigationConfig, routeMetadataMap, RouteMetadata } from '../app/navigation';
 
 export interface LayoutContextType {
@@ -133,6 +134,7 @@ export const AppLayout: React.FC = () => {
             </div>
 
             <div className="d-flex align-items-center gap-3">
+              <ThemeToggle />
               <IconButton icon="bi-bell" aria-label="Notifications" />
               <Avatar alt="User profile" initials="A" size="sm" />
             </div>

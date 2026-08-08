@@ -1,15 +1,18 @@
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect } from 'vitest';
+import { ThemeProvider } from '../../src/theme/ThemeProvider';
 import { AppRoutes } from '../../src/app/routes';
 import { AppLayout } from '../../src/layouts/AppLayout';
 
 describe('Navigation Runtime Tests', () => {
   it('should render navigation links based on config', () => {
     render(
-      <MemoryRouter initialEntries={['/']}>
-        <AppLayout />
-      </MemoryRouter>
+      <ThemeProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <AppLayout />
+        </MemoryRouter>
+      </ThemeProvider>
     );
 
     expect(screen.getByRole('link', { name: /dashboard/i })).toBeInTheDocument();
@@ -21,9 +24,11 @@ describe('Navigation Runtime Tests', () => {
 
   it('should highlight the active navigation item', () => {
     render(
-      <MemoryRouter initialEntries={['/settings']}>
-        <AppRoutes />
-      </MemoryRouter>
+      <ThemeProvider>
+        <MemoryRouter initialEntries={['/settings']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </ThemeProvider>
     );
 
     const activeLink = screen.getByRole('link', { name: /settings/i });
@@ -32,9 +37,11 @@ describe('Navigation Runtime Tests', () => {
 
   it('should render breadcrumbs matching route metadata hierarchy', () => {
     render(
-      <MemoryRouter initialEntries={['/assistant']}>
-        <AppRoutes />
-      </MemoryRouter>
+      <ThemeProvider>
+        <MemoryRouter initialEntries={['/assistant']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </ThemeProvider>
     );
 
     const breadcrumbNav = screen.getByRole('navigation', { name: /breadcrumb/i });
@@ -50,9 +57,11 @@ describe('Navigation Runtime Tests', () => {
 
   it('should verify keyboard tab navigation index', () => {
     render(
-      <MemoryRouter initialEntries={['/']}>
-        <AppLayout />
-      </MemoryRouter>
+      <ThemeProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <AppLayout />
+        </MemoryRouter>
+      </ThemeProvider>
     );
 
     const links = screen.getAllByRole('link');
