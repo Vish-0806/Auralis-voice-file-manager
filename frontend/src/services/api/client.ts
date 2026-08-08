@@ -1,17 +1,12 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
-
-export interface ApiError {
-  message: string;
-  status?: number;
-  code?: string;
-  details?: unknown;
-}
+import { AuralisApiError } from './errors';
+import { authService } from '../auth/authService';
 
 export class ApiClient {
   private instance: AxiosInstance;
 
   constructor(config?: AxiosRequestConfig) {
-    const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
+    const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
     
     this.instance = axios.create({
       baseURL: defaultBaseUrl,
@@ -26,6 +21,19 @@ export class ApiClient {
   }
 
   private setupInterceptors() {
+    // Request Interceptor: Attach bearer token if user is authenticated
+    this.instance.interceptors.request.use(
+      (config) => {
+        const token = authService.getToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
+    // Response Interceptor: Translate failures into normalized AuralisApiError
     this.instance.interceptors.response.use(
       (response) => response,
       (error: AxiosError) => {
@@ -34,29 +42,34 @@ export class ApiClient {
     );
   }
 
-  private normalizeError(error: AxiosError): ApiError {
+  private normalizeError(error: AxiosError): AuralisApiError {
+    const path = error.config?.url;
+    
     if (error.response) {
-      // The server responded with a status code outside the 2xx range
+      const status = error.response.status;
       const data = error.response.data as Record<string, unknown> | undefined;
-      return {
-        message: (data?.message as string) || error.message || 'An error occurred during communication',
-        status: error.response.status,
-        code: (data?.code as string) || 'SERVER_ERROR',
-        details: data?.details || data,
-      };
-    } else if (error.request) {
-      // The request was made but no response was received
-      return {
-        message: 'No response received from the backend server. Verify your connection.',
-        code: 'NETWORK_ERROR',
-      };
-    } else {
-      // Something happened in setting up the request that triggered an Error
-      return {
-        message: error.message || 'Request setup failure occurred',
-        code: 'REQUEST_SETUP_ERROR',
-      };
+      const message = (data?.detail as string) || (data?.message as string) || error.message || 'Server error';
+      const code = (data?.code as string) || `HTTP_${status}`;
+      return new AuralisApiError(message, status, code, data?.details || data, path);
     }
+    
+    if (error.request) {
+      return new AuralisApiError(
+        'No response received from the backend server. Verify your connection.',
+        undefined,
+        'NETWORK_ERROR',
+        undefined,
+        path
+      );
+    }
+    
+    return new AuralisApiError(
+      error.message || 'Request configuration failure',
+      undefined,
+      'REQUEST_SETUP_ERROR',
+      undefined,
+      path
+    );
   }
 
   public async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
