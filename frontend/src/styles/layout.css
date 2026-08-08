@@ -1,0 +1,82 @@
+/* Application Layout Styling */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.app-sidebar {
+  width: 280px;
+  min-width: 280px;
+  transition: all 0.25s ease-in-out;
+  z-index: 1030;
+}
+
+.app-sidebar.sidebar-collapsed {
+  width: 80px;
+  min-width: 80px;
+}
+
+.app-sidebar.sidebar-collapsed .fs-4 {
+  display: none !important;
+}
+
+.app-sidebar.sidebar-collapsed nav span {
+  display: none !important;
+}
+
+.app-sidebar.sidebar-collapsed nav a {
+  justify-content: center !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.app-sidebar.sidebar-collapsed nav .badge {
+  display: none !important;
+}
+
+.app-sidebar.sidebar-collapsed hr {
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-content {
+  flex-grow: 1;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+/* Mobile Sidebar Styles */
+@media (max-width: 991.98px) {
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    height: 100vh;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  }
+
+  .app-sidebar.mobile-open {
+    left: 0;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1020;
+  }
+}

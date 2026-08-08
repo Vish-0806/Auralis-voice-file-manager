@@ -1,0 +1,149 @@
+/* Design Token CSS Variables */
+:root {
+  /* Spacing */
+  --spacing-none: 0;
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
+  --spacing-4xl: 6rem;
+
+  /* Typography */
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-size-display: 2.5rem;
+  --font-size-h1: 2rem;
+  --font-size-h2: 1.5rem;
+  --font-size-h3: 1.25rem;
+  --font-size-h4: 1.1rem;
+  --font-size-body-large: 1.125rem;
+  --font-size-body: 1rem;
+  --font-size-body-small: 0.875rem;
+  --font-size-caption: 0.75rem;
+  --font-size-label: 0.875rem;
+  --font-size-code: 0.875rem;
+  
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-none: 1;
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-loose: 1.75;
+
+  --letter-spacing-tighter: -0.05em;
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.025em;
+
+  /* Borders */
+  --border-width-none: 0;
+  --border-width-thin: 1px;
+  --border-width-medium: 2px;
+  --border-width-thick: 4px;
+
+  --radius-none: 0;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-pill: 50rem;
+  --radius-circle: 50%;
+
+  /* Shadows */
+  --shadow-none: none;
+  --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  --shadow-md: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+  --shadow-xl: 0 1.5rem 4rem rgba(0, 0, 0, 0.2);
+
+  /* Motion */
+  --motion-duration-fast: 150ms;
+  --motion-duration-normal: 250ms;
+  --motion-duration-slow: 350ms;
+  --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --motion-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --motion-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-linear: linear;
+
+  /* Z-index */
+  --z-base: 0;
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-sidebar: 1040;
+  --z-modal-backdrop: 1050;
+  --z-modal: 1060;
+  --z-toast: 1070;
+  --z-tooltip: 1080;
+
+  /* LIGHT THEME VARIABLES (Default) */
+  --color-background: #f8f9fa;
+  --color-background-subtle: #ffffff;
+  --color-background-elevated: #ffffff;
+  --color-background-muted: #e9ecef;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f1f3f5;
+  --color-surface-active: #e9ecef;
+  --color-surface-elevated: #ffffff;
+  --color-text-primary: #212529;
+  --color-text-secondary: #495057;
+  --color-text-muted: #6c757d;
+  --color-text-disabled: #adb5bd;
+  --color-text-inverse: #ffffff;
+  --color-border: #dee2e6;
+  --color-border-subtle: #f1f3f5;
+  --color-border-strong: #adb5bd;
+  --color-brand: #0d6efd;
+  --color-brand-hover: #0b5ed7;
+  --color-brand-active: #0a58ca;
+  --color-brand-subtle: #e2eafd;
+  --color-brand-contrast: #ffffff;
+  --color-success: #198754;
+  --color-success-subtle: #d1e7dd;
+  --color-warning: #ffc107;
+  --color-warning-subtle: #fff3cd;
+  --color-danger: #dc3545;
+  --color-danger-subtle: #f8d7da;
+  --color-info: #0dcaf0;
+  --color-info-subtle: #cff4fc;
+}
+
+/* DARK THEME VARIABLES */
+[data-theme="dark"] {
+  --color-background: #121212;
+  --color-background-subtle: #1e1e1e;
+  --color-background-elevated: #2d2d2d;
+  --color-background-muted: #252525;
+  --color-surface: #1e1e1e;
+  --color-surface-hover: #2d2d2d;
+  --color-surface-active: #3d3d3d;
+  --color-surface-elevated: #2d2d2d;
+  --color-text-primary: #f8f9fa;
+  --color-text-secondary: #e9ecef;
+  --color-text-muted: #adb5bd;
+  --color-text-disabled: #6c757d;
+  --color-text-inverse: #212529;
+  --color-border: #2d2d2d;
+  --color-border-subtle: #252525;
+  --color-border-strong: #495057;
+  --color-brand: #3b82f6;
+  --color-brand-hover: #60a5fa;
+  --color-brand-active: #2563eb;
+  --color-brand-subtle: #1d4ed8;
+  --color-brand-contrast: #ffffff;
+  --color-success: #22c55e;
+  --color-success-subtle: #052e16;
+  --color-warning: #eab308;
+  --color-warning-subtle: #422006;
+  --color-danger: #ef4444;
+  --color-danger-subtle: #450a0a;
+  --color-info: #3b82f6;
+  --color-info-subtle: #1e3a8a;
+}

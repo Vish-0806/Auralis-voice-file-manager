@@ -1,104 +1,74 @@
-# Auralis Frontend Web Client & Pure TS Runtime Architecture Platform
+# Auralis Frontend V2
 
-This directory contains the Vite + React client application and the **Provider-Independent Frontend Architecture & Runtime Platform** (`frontend/src/runtime/`) for the **Auralis Voice File Manager**.
+A clean, scalable, production-oriented React + TypeScript architecture built on Vite.
 
-The frontend architecture is designed to be 100% provider-independent, framework-decoupled, thread-safe, and ready for desktop packaging (Electron / Tauri / Native container).
-
----
-
-## 1. Directory Structure
-
-```
-frontend/
-├── src/
-│   ├── assets/                # App assets and icons
-│   ├── components/            # React UI components (Dashboard, Controls, File Viewer)
-│   ├── runtime/               # Provider-Independent Frontend Runtime Platform (Phase 16)
-│   │   ├── di/                # Dependency Injection Subsystem (Phase 16.1)
-│   │   ├── app/               # Application Lifecycle & Plugin Architecture (Phase 16.2)
-│   │   ├── config/            # Certified Configuration Runtime Subsystem (Phase 16.3)
-│   │   ├── events/            # Provider-Independent Event Runtime Platform (Phase 16.4)
-│   │   └── state/             # State Management Runtime Platform (Phase 16.5)
-│   ├── App.tsx                # Application root React component
-│   ├── main.tsx               # App entry point
-│   └── index.css              # Global glassmorphic styling system
-├── tests/
-│   └── runtime/               # 456 Vitest unit tests across 17 test suites
-├── index.html                 # Main HTML document
-├── package.json               # Dependencies, scripts, and Vitest configuration
-├── tsconfig.json              # TypeScript compilation rules
-└── vite.config.ts             # Vite build & Vitest proxy configuration
-```
+## Core Stack
+- **UI & Views:** React, React Router, Bootstrap, Bootstrap Icons
+- **HTTP Client:** Axios
+- **Test Runner:** Vitest, jsdom, React Testing Library
+- **Build System:** Vite, TypeScript
 
 ---
 
-## 2. Frontend Subsystem Architecture (Phase 16)
-
-### 2.1 Dependency Injection Subsystem (`frontend/src/runtime/di/`) — Phase 16.1
-* **Service Lifetimes**: `SINGLETON`, `TRANSIENT`, `SCOPED`.
-* **IoC Container**: `ServiceCollection`, `ServiceDescriptor`, `DependencyContainer`, `ContainerScope`.
-* **Dependency Graph Analyzer**: Cycle detection algorithm (`hasCycle()`, `getDependencyGraph()`).
-* **Provider & Runtime**: `DependencyProvider`, `DependencyRuntime`, and lazy singleton accessors (`getDependencyRuntime()`, `getDependencyProvider()`).
-
-### 2.2 Application Lifecycle & Plugin Architecture (`frontend/src/runtime/app/`) — Phase 16.2
-* **Lifecycle State Machine**: `UNINITIALIZED` → `INITIALIZING` → `READY` → `STOPPING` → `STOPPED`.
-* **Bootstrap & Validation**: `RuntimeRegistry`, `BootstrapManager`, `StartupValidator`, `InitializationManager`.
-* **Plugin Platform**: `PluginEngine` supporting dynamic plugin registration, lifecycle hooks, and dependency verification.
-* **App Coordinator**: `ApplicationProvider`, `ApplicationRuntime`, and lazy singleton accessors (`getApplicationRuntime()`, `getApplicationProvider()`).
-
-### 2.3 Certified Configuration Subsystem (`frontend/src/runtime/config/`) — Phase 16.3
-* **Multi-Source Priority Resolver**: `Memory (500) > Environment (400) > DotEnv (300) > Defaults (0)`.
-* **Type Resolver & Validation**: `ConfigurationResolver` (automatic type casting) and `ConfigurationValidator` (constraint verification).
-* **Profiles & Feature Flags**: Profile inheritance (`development`, `testing`, `production`), active profile switching, feature flags, and deterministic MD5 rollout percentages.
-* **Secret Management**: Thread-safe in-memory `SecretStore`, access policies (`allow_read`, `allow_write`, `allow_export`), value redaction algorithms (`redact()`), and audit access logging.
-* **Production Certification**: `ConfigurationCertifier` executing 10 verification checks with 100/100 score.
-
-### 2.4 Provider-Independent Event Runtime Architecture Platform (`frontend/src/runtime/events/`) — Phase 16.4
-* **Event Bus & Registries**: `EventBus`, `EventRegistry` (type validation), `SubscriberRegistry` (sorted subscriptions).
-* **Subscription Management**: `SubscriptionManager` with strict try/catch exception isolation per handler callback.
-* **Topic Routing & Filtering Engine**: `EventRouter` supporting exact match, single-level wildcard `*`, multi-level wildcard `**` / `#`, predicate filtering, and priority rule ordering (`CRITICAL > HIGH > NORMAL > LOW`).
-* **Dispatch Manager & Dead Letters**: `DispatchManager` controlling dispatch execution and dead-letter creation for failed subscribers.
-* **Asynchronous Priority Event Queue**: `EventQueue` bounded priority queue (capacity 1000) with `DROP_OLDEST` overflow strategy.
-* **Retry & Replay Engines**: `RetryManager` (exponential attempt tracking) and `ReplayManager` (historical set and filtered replaying).
-* **Production Certification**: `EventCertifier` executing 10 verification checks with 100/100 score.
-
-### 2.5 State Management Runtime Platform (`frontend/src/runtime/state/`) — Phase 16.5
-* **State Containers & Store**: `StateContainerEngine` providing deep immutability (`Object.freeze()`), container mutation operations (setState, replaceState, mergeState, resetState, cloneState, freezeState), and `StateStore` managing multiple named containers.
-* **State Registry & Actions**: `StateRegistry` (container discovery & duplicate detection) and `ActionDispatcher` (sync/async action pipeline, priorities, history logging).
-* **Reducers & Middleware**: `ReducerEngine` (pure reducers, ordered execution, exception isolation) and `MiddlewareManager` (`BEFORE`, `AFTER`, `ERROR` hooks).
-* **Selectors & Memoization**: `SelectorEngine` supporting memoized and derived selectors, state dependency tracking, and cache invalidation.
-* **Undo / Redo History Engine**: `HistoryManager` and `UndoRedoManager` supporting snapshot timeline logging, history capacity limits, and time travel state restoration.
-* **Persistence & Synchronization**: `PersistenceManager` (abstract versioned saving & loading) and `StateSynchronizer` (conflict detection & version diffing).
-* **Production Certification**: `StateCertifier` executing 10 verification checks with 100/100 score.
+## Current Status
+**Phases 16.1 to 16.6 — Core Frontend V2 Stack** is fully complete. This includes the Component Runtime, Layout & Navigation, Theme & Design Tokens system, global Zustand state store boundaries, Axios API client, in-memory AuthService, WebSocket client, and Synchronization bridge.
 
 ---
 
-## 3. Getting Started
+## Directory Structure & Responsibilities
 
-### Installation
-Ensure Node.js (v18+) is installed:
-```bash
-cd frontend
-npm install
-```
+*   `src/app/` – App boot, global route registry, provider wrappers. No feature logic.
+*   `src/components/` – Presentation-oriented reusable UI widgets.
+*   `src/pages/` – Route-level screen components composing layouts, state, and services.
+*   `src/layouts/` – Shell configurations for overall, workspace, and dashboard views.
+*   `src/features/` – Isolated feature slices containing specific components, hooks, or assets.
+*   `src/services/` – External communications (API, Authentication, WebSockets, State Synchronization).
+*   `src/state/` – Storage boundaries for application state (Stores, Selectors, Types).
+*   `src/theme/` – Structural foundation for light/dark theme providers.
+*   `src/voice/` – Interface layers for future microphone & speech runtimes.
+*   `src/config/` – Typed environmental boundaries.
 
-### Running Development Server
-Launch Vite dev server:
-```bash
-npm run dev
-```
-Access the application dashboard at `http://localhost:5173`.
+---
 
-### Running Tests
-Execute the Vitest unit test suite:
-```bash
-npm test
-```
-Runs all **456 unit tests across 17 test suites** verifying DI, Application Lifecycle, Configuration, Events, State Management, and Production Certification.
+## Component Architecture
 
-### Production Build
-Compile production assets:
-```bash
-npm run build
-```
-Generates production bundle in `dist/` in ~4 seconds.
+Auralis Frontend V2 component architecture is designed to be highly reusable, accessible, type-safe, and visually consistent. Components are structured hierarchically under `@/components/`:
+
+### Reusable Component Groups
+
+1. **Common Components (`src/components/common/`)**
+   - Pure presentational elements that do not contain application state or business logic.
+   - Includes: `Button`, `IconButton`, `Input`, `Textarea`, `Select`, `Checkbox`, `Switch`, `Card`, `Badge`, `Avatar`, `Divider`, `Tooltip`, `Modal`, `Dropdown`, `Tabs`, `Spinner`, `Progress`, `Alert`, `Toast`, `EmptyState`, `ErrorState`, and `Skeleton`.
+
+2. **Layout Components (`src/components/layout/`)**
+   - Flexbox and Grid composition helpers based on Bootstrap structures.
+   - Includes: `Stack` (flex direction alignment), `Row` (grid rows), `Container` (grid layout content centering), `Section` (semantic padding layouts), and `Panel` (bordered/shadowed content sections).
+
+3. **Navigation Components (`src/components/navigation/`)**
+   - Structural navigation primitives integrated with React Router.
+   - Includes: `NavItem` (routing links), `Sidebar` (menu sidebar panels), `TopBar` (nav headers), `Breadcrumbs` (historical context), and `PageHeader` (page headers with descriptions and main actions).
+
+### Component Testing Strategy
+- Tests are organized under `tests/components/` (divided into `common/`, `layout/`, and `navigation/`).
+- Focuses on testing functional behavior, accessibility states, and semantic output:
+  - **Button**: Verify render, click behavior, disabled, and busy loading states.
+  - **Input**: Verify label relationship, validation states (`is-invalid`), and change triggers.
+  - **Modal**: Verify display lifecycle, Esc key and backdrop close handlers, and dialog roles.
+  - **Tabs**: Verify tab selection transitions and active tab panel rendering.
+
+### Accessibility Principles
+- **Semantic HTML**: Proper use of native tags (`button`, `input`, `aside`, `nav`, etc.) to provide natural screen reader indicators.
+- **ARIA Roles & States**: Appropriate mapping of roles (`role="dialog"`, `role="tab"`) and live/invalid states (`aria-invalid`, `aria-describedby`, `aria-busy`, `aria-selected`).
+- **Keyboard Access**: Focus trapping inside modal screens, keyboard Esc key handling, and natural tab focus indexing for all custom controls.
+- **Accessibly Named Elements**: Mandatory labels for form controls (`Input`, `Select`) and explicit `aria-label` definitions for icon-only actions (`IconButton`).
+
+---
+
+## Development Commands
+
+*   `npm run dev` – Launch local hot-reload dev server.
+*   `npm run build` – Run type checking and build production bundle.
+*   `npm test` – Execute test suite once.
+*   `npm run test:watch` – Start Vitest file watcher.
+*   `npm run typecheck` – Run strict TypeScript compiler assertions.
+*   `npm run preview` – Serve production bundle locally.
