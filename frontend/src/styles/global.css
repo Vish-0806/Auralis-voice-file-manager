@@ -1,5 +1,7 @@
 @import "bootstrap/dist/css/bootstrap.min.css";
 @import "bootstrap-icons/font/bootstrap-icons.css";
+@import "./layout.css";
+@import "./navigation.css";
 
 /* Base layout settings */
 body {

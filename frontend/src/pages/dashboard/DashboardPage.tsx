@@ -1,13 +1,15 @@
-import React from 'react';
-import { DashboardLayout } from '../../layouts/DashboardLayout';
+import React, { useEffect } from 'react';
+import { useLayout } from '../../layouts/AppLayout';
 
 export const DashboardPage: React.FC = () => {
-  return (
-    <DashboardLayout>
-      <div className="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 className="h2 text-secondary">Dashboard</h1>
-      </div>
+  const { setDescription } = useLayout();
 
+  useEffect(() => {
+    setDescription('Overview of system status, tasks, and voice file manager metrics.');
+  }, [setDescription]);
+
+  return (
+    <>
       <div className="row g-4 mb-4">
         {/* Card 1 */}
         <div className="col-12 col-md-6 col-lg-3">
@@ -85,6 +87,6 @@ export const DashboardPage: React.FC = () => {
           have been removed, laying down a simple and maintainable foundation for future phases.
         </p>
       </div>
-    </DashboardLayout>
+    </>
   );
 };
