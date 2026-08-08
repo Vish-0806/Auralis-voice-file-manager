@@ -9,6 +9,7 @@ import { Avatar } from '../components/common/Avatar';
 import { IconButton } from '../components/common/IconButton';
 import { ThemeToggle } from '../components/common/ThemeToggle';
 import { navigationConfig, routeMetadataMap, RouteMetadata } from '../app/navigation';
+import { useUIStore, selectSidebarCollapsed } from '../state';
 
 export interface LayoutContextType {
   isMobileOpen: boolean;
@@ -34,7 +35,8 @@ export const useLayout = () => {
 export const AppLayout: React.FC = () => {
   const location = useLocation();
   const [isMobileOpen, setMobileOpen] = useState(false);
-  const [isCollapsed, setCollapsed] = useState(false);
+  const isCollapsed = useUIStore(selectSidebarCollapsed);
+  const setCollapsed = useUIStore((state) => state.setSidebarCollapsed);
   const [actions, setActions] = useState<React.ReactNode | null>(null);
   const [description, setDescription] = useState<string | null>(null);
 
