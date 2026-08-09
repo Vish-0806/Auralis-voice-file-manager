@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../src/app';
+
+
 
 describe('Auralis V2 Smoke Tests', () => {
   it('should render application layout and default to dashboard view', async () => {

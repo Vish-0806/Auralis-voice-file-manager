@@ -52,3 +52,29 @@ vi.mock('../src/services/api/filesService', () => {
     }
   };
 });
+vi.mock('../src/services/websocket/WebSocketClient', () => {
+  class MockWebSocketClient {
+    public listeners = new Set<any>();
+    public stateListeners = new Set<any>();
+    public connectionState = 'DISCONNECTED';
+
+    public connect = vi.fn();
+    public disconnect = vi.fn();
+    
+    public onMessage = vi.fn().mockImplementation((cb) => {
+      this.listeners.add(cb);
+      return () => this.listeners.delete(cb);
+    });
+
+    public onStateChange = vi.fn().mockImplementation((cb) => {
+      this.stateListeners.add(cb);
+      cb('DISCONNECTED');
+      return () => this.stateListeners.delete(cb);
+    });
+  }
+
+  return {
+    WebSocketClient: MockWebSocketClient,
+    default: MockWebSocketClient,
+  };
+});

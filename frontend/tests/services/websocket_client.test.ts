@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+vi.unmock('../../src/services/websocket/WebSocketClient');
 import { WebSocketClient, WebSocketConnectionState } from '../../src/services/websocket/WebSocketClient';
 
 // Setup Mock WebSocket class globally for testing
