@@ -16,6 +16,8 @@ import { PluginDependencyResolver } from '../runtime/PluginDependencyResolver';
 import type { IPluginDependencyResolver } from '../interfaces/plugin-dependency';
 import { PluginLoader } from '../runtime/PluginLoader';
 import type { IPluginLoader } from '../interfaces/plugin-loader';
+import { PluginLifecycleManager } from '../runtime/PluginLifecycleManager';
+import type { IPluginLifecycleManager } from '../interfaces/plugin-lifecycle';
 
 export class PluginProvider implements IPluginProvider {
   private runtimeState: PluginRuntimeStateValue = PluginRuntimeState.UNINITIALIZED;
@@ -24,6 +26,11 @@ export class PluginProvider implements IPluginProvider {
   private readonly discoveryManager: IPluginDiscoveryManager = new PluginDiscoveryManager();
   private readonly dependencyResolver: IPluginDependencyResolver = new PluginDependencyResolver(this.discoveryManager);
   private readonly pluginLoader: IPluginLoader = new PluginLoader(this.discoveryManager, this.dependencyResolver);
+  private readonly lifecycleManager: IPluginLifecycleManager = new PluginLifecycleManager(
+    this.discoveryManager,
+    this.dependencyResolver,
+    this.pluginLoader
+  );
   private initializationCount = 0;
   private shutdownCount = 0;
   private errorCount = 0;
@@ -188,6 +195,7 @@ export class PluginProvider implements IPluginProvider {
       health: Object.freeze(health),
       capabilities: Object.freeze([]),
       loader: this.pluginLoader.diagnostics(),
+      lifecycle: this.lifecycleManager.diagnostics() as any,
     });
   }
 
@@ -235,5 +243,9 @@ export class PluginProvider implements IPluginProvider {
 
   public loader(): IPluginLoader {
     return this.pluginLoader;
+  }
+
+  public lifecycle(): IPluginLifecycleManager {
+    return this.lifecycleManager;
   }
 }

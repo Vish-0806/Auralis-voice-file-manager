@@ -86,3 +86,38 @@ export class PluginUnloadError extends PluginRuntimeError {
     this.name = 'PluginUnloadError';
   }
 }
+
+export class PluginLifecycleError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string, readonly operation?: string) {
+    super(message);
+    this.name = 'PluginLifecycleError';
+  }
+}
+
+export class PluginActivationError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginActivationError';
+  }
+}
+
+export class PluginDeactivationError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginDeactivationError';
+  }
+}
+
+export class PluginDisposalError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginDisposalError';
+  }
+}
+
+export class PluginLifecycleTransitionError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string, readonly fromState?: string, readonly toState?: string) {
+    super(message);
+    this.name = 'PluginLifecycleTransitionError';
+  }
+}

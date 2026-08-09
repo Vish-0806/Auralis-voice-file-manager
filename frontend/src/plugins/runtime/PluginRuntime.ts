@@ -5,6 +5,7 @@ import { PluginProvider } from '../provider/PluginProvider';
 import type { IPluginDiscoveryManager } from '../interfaces/plugin-discovery';
 import type { IPluginDependencyResolver } from '../interfaces/plugin-dependency';
 import type { IPluginLoader } from '../interfaces/plugin-loader';
+import type { IPluginLifecycleManager } from '../interfaces/plugin-lifecycle';
 
 export class PluginRuntime {
   constructor(private readonly runtimeProvider: IPluginProvider = new PluginProvider()) {}
@@ -71,5 +72,9 @@ export class PluginRuntime {
 
   public loader(): IPluginLoader {
     return this.runtimeProvider.loader();
+  }
+
+  public lifecycle(): IPluginLifecycleManager {
+    return this.runtimeProvider.lifecycle();
   }
 }

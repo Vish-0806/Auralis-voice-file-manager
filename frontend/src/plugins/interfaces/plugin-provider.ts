@@ -9,6 +9,7 @@ import type {
 import type { IPluginDiscoveryManager } from './plugin-discovery';
 import type { IPluginDependencyResolver } from './plugin-dependency';
 import type { IPluginLoader } from './plugin-loader';
+import type { IPluginLifecycleManager } from './plugin-lifecycle';
 
 export interface PluginRuntimeLifecycleResult {
   readonly state: PluginRuntimeStateValue;
@@ -46,4 +47,5 @@ export interface IPluginProvider {
   discovery(): IPluginDiscoveryManager;
   resolver(): IPluginDependencyResolver;
   loader(): IPluginLoader;
+  lifecycle(): IPluginLifecycleManager;
 }

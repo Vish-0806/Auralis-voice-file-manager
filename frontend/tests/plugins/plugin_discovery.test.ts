@@ -455,7 +455,8 @@ describe('Plugin Discovery & Manifest Runtime (Phase 17.2)', () => {
         };
       },
       resolver: () => ({} as any),
-      loader: () => ({} as any)
+      loader: () => ({} as any),
+      lifecycle: () => ({} as any)
     };
 
     const runtime = new PluginRuntime(customProvider);

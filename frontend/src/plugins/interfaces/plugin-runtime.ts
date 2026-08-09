@@ -2,6 +2,7 @@ import type { IPluginProvider } from './plugin-provider';
 import type { IPluginDiscoveryManager } from './plugin-discovery';
 import type { IPluginDependencyResolver } from './plugin-dependency';
 import type { IPluginLoader } from './plugin-loader';
+import type { IPluginLifecycleManager } from './plugin-lifecycle';
 
 export interface IPluginRuntime {
   initialize(): { readonly state: string; readonly healthy: boolean; readonly message: string };
@@ -60,4 +61,5 @@ export interface IPluginRuntime {
   discovery(): IPluginDiscoveryManager;
   resolver(): IPluginDependencyResolver;
   loader(): IPluginLoader;
+  lifecycle(): IPluginLifecycleManager;
 }

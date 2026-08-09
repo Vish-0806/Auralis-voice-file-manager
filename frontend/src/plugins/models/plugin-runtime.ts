@@ -47,6 +47,7 @@ export interface PluginRuntimeDiagnostics {
   readonly health: PluginRuntimeHealth;
   readonly capabilities: ReadonlyArray<PluginCapability>;
   readonly loader?: Record<string, any>;
+  readonly lifecycle?: Record<string, any>;
 }
 
 export interface PluginCapability {
