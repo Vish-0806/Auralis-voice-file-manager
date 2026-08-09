@@ -27,6 +27,7 @@ export class PluginLifecycleManager implements IPluginLifecycleManager {
   private readonly inFlightOps = new Map<string, Promise<PluginLifecycleResult>>();
   private readonly historyRecords: PluginLifecycleRecord[] = [];
   private readonly opDurations: number[] = [];
+  private readonly activateListeners: ((pluginId: string) => void)[] = [];
   private readonly deactivateListeners: ((pluginId: string) => void)[] = [];
   private readonly disposeListeners: ((pluginId: string) => void)[] = [];
 
@@ -163,6 +164,9 @@ export class PluginLifecycleManager implements IPluginLifecycleManager {
       }
 
       this.pluginStates.set(pluginId, PluginState.ACTIVE);
+      for (const listener of this.activateListeners) {
+        try { listener(pluginId); } catch {}
+      }
       return PluginState.ACTIVE;
     });
   }
@@ -394,8 +398,13 @@ export class PluginLifecycleManager implements IPluginLifecycleManager {
     this.disposalAttempts = 0;
     this.successOps = 0;
     this.failOps = 0;
+    this.activateListeners.length = 0;
     this.deactivateListeners.length = 0;
     this.disposeListeners.length = 0;
+  }
+
+  public addActivateListener(listener: (pluginId: string) => void): void {
+    this.activateListeners.push(listener);
   }
 
   public addDeactivateListener(listener: (pluginId: string) => void): void {

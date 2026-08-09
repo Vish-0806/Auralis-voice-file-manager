@@ -4,6 +4,8 @@ import type { IPluginDependencyResolver } from './plugin-dependency';
 import type { IPluginLoader } from './plugin-loader';
 import type { IPluginLifecycleManager } from './plugin-lifecycle';
 import type { IPluginCapabilityManager, IPluginExtensionManager } from './plugin-capability';
+import type { IPluginSecurityManager, IPluginSandboxManager } from './plugin-security';
+import { PluginPolicyManager } from '../runtime/PluginPolicyManager';
 
 export interface IPluginRuntime {
   initialize(): { readonly state: string; readonly healthy: boolean; readonly message: string };
@@ -65,4 +67,7 @@ export interface IPluginRuntime {
   lifecycle(): IPluginLifecycleManager;
   capabilities(): IPluginCapabilityManager;
   extensions(): IPluginExtensionManager;
+  security(): IPluginSecurityManager;
+  policies(): PluginPolicyManager;
+  sandbox(): IPluginSandboxManager;
 }

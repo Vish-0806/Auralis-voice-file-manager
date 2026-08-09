@@ -163,3 +163,52 @@ export class PluginExtensionConflictError extends PluginRuntimeError {
     this.name = 'PluginExtensionConflictError';
   }
 }
+
+export class PluginSecurityError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginSecurityError';
+  }
+}
+
+export class PluginPermissionError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginPermissionError';
+  }
+}
+
+export class PluginPolicyError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginPolicyError';
+  }
+}
+
+export class PluginSandboxError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginSandboxError';
+  }
+}
+
+export class PluginSecurityViolationError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginSecurityViolationError';
+  }
+}
+
+export class PluginSecurityProfileError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginSecurityProfileError';
+  }
+}
+
+export class PluginResourceLimitError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginResourceLimitError';
+  }
+}

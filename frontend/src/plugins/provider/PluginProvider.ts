@@ -22,6 +22,11 @@ import { PluginCapabilityManager } from '../runtime/PluginCapabilityManager';
 import type { IPluginCapabilityManager } from '../interfaces/plugin-capability';
 import { PluginExtensionManager } from '../runtime/PluginExtensionManager';
 import type { IPluginExtensionManager } from '../interfaces/plugin-capability';
+import { PluginPolicyManager } from '../runtime/PluginPolicyManager';
+import { PluginSecurityManager } from '../runtime/PluginSecurityManager';
+import type { IPluginSecurityManager } from '../interfaces/plugin-security';
+import { PluginSandboxManager } from '../runtime/PluginSandboxManager';
+import type { IPluginSandboxManager } from '../interfaces/plugin-security';
 
 export class PluginProvider implements IPluginProvider {
   private runtimeState: PluginRuntimeStateValue = PluginRuntimeState.UNINITIALIZED;
@@ -37,6 +42,9 @@ export class PluginProvider implements IPluginProvider {
   );
   private readonly capabilityManager: IPluginCapabilityManager = new PluginCapabilityManager(this.lifecycleManager);
   private readonly extensionManager: IPluginExtensionManager = new PluginExtensionManager(this.lifecycleManager, this.capabilityManager);
+  private readonly policyManager: PluginPolicyManager = new PluginPolicyManager();
+  private readonly securityManager: IPluginSecurityManager = new PluginSecurityManager(this.lifecycleManager, this.policyManager);
+  private readonly sandboxManager: IPluginSandboxManager = new PluginSandboxManager(this.lifecycleManager, this.securityManager);
   private initializationCount = 0;
   private shutdownCount = 0;
   private errorCount = 0;
@@ -204,6 +212,8 @@ export class PluginProvider implements IPluginProvider {
       lifecycle: this.lifecycleManager.diagnostics() as any,
       capabilityManager: this.capabilityManager.diagnostics() as any,
       extensionManager: this.extensionManager.diagnostics() as any,
+      securityManager: this.securityManager.diagnostics() as any,
+      sandboxManager: this.sandboxManager.diagnostics() as any
     });
   }
 
@@ -263,5 +273,17 @@ export class PluginProvider implements IPluginProvider {
 
   public extensions(): IPluginExtensionManager {
     return this.extensionManager;
+  }
+
+  public security(): IPluginSecurityManager {
+    return this.securityManager;
+  }
+
+  public policies(): PluginPolicyManager {
+    return this.policyManager;
+  }
+
+  public sandbox(): IPluginSandboxManager {
+    return this.sandboxManager;
   }
 }
