@@ -251,7 +251,8 @@ describe('plugin runtime foundation', () => {
         health: () => ({ healthy: true, message: 'healthy', issues: [] }),
         reset: () => {}
       }),
-      resolver: () => ({} as any)
+      resolver: () => ({} as any),
+      loader: () => ({} as any)
     };
 
     const runtime = new PluginRuntime(provider);

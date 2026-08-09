@@ -14,6 +14,8 @@ import { PluginDiscoveryManager } from '../runtime/PluginDiscoveryManager';
 import type { IPluginDiscoveryManager } from '../interfaces/plugin-discovery';
 import { PluginDependencyResolver } from '../runtime/PluginDependencyResolver';
 import type { IPluginDependencyResolver } from '../interfaces/plugin-dependency';
+import { PluginLoader } from '../runtime/PluginLoader';
+import type { IPluginLoader } from '../interfaces/plugin-loader';
 
 export class PluginProvider implements IPluginProvider {
   private runtimeState: PluginRuntimeStateValue = PluginRuntimeState.UNINITIALIZED;
@@ -21,6 +23,7 @@ export class PluginProvider implements IPluginProvider {
   private readonly pluginStates = new Map<PluginId, PluginStateValue>();
   private readonly discoveryManager: IPluginDiscoveryManager = new PluginDiscoveryManager();
   private readonly dependencyResolver: IPluginDependencyResolver = new PluginDependencyResolver(this.discoveryManager);
+  private readonly pluginLoader: IPluginLoader = new PluginLoader(this.discoveryManager, this.dependencyResolver);
   private initializationCount = 0;
   private shutdownCount = 0;
   private errorCount = 0;
@@ -184,6 +187,7 @@ export class PluginProvider implements IPluginProvider {
       statistics: Object.freeze(statistics),
       health: Object.freeze(health),
       capabilities: Object.freeze([]),
+      loader: this.pluginLoader.diagnostics(),
     });
   }
 
@@ -227,5 +231,9 @@ export class PluginProvider implements IPluginProvider {
 
   public resolver(): IPluginDependencyResolver {
     return this.dependencyResolver;
+  }
+
+  public loader(): IPluginLoader {
+    return this.pluginLoader;
   }
 }

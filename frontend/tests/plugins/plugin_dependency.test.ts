@@ -493,7 +493,8 @@ describe('Plugin Dependency Resolution Runtime (Phase 17.3)', () => {
           health: () => ({ healthy: true, unresolvedDependencyCount: 0, cycleCount: 0, conflictCount: 0, message: 'injected' }),
           reset: () => {}
         };
-      }
+      },
+      loader: () => ({} as any)
     };
 
     const runtime = new PluginRuntime(customProvider);

@@ -58,3 +58,31 @@ export class PluginDuplicateError extends PluginRuntimeError {
     this.name = 'PluginDuplicateError';
   }
 }
+
+export class PluginLoadError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string, readonly entryPoint?: string) {
+    super(message);
+    this.name = 'PluginLoadError';
+  }
+}
+
+export class PluginModuleValidationError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginModuleValidationError';
+  }
+}
+
+export class PluginDuplicateLoadError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginDuplicateLoadError';
+  }
+}
+
+export class PluginUnloadError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginUnloadError';
+  }
+}

@@ -8,6 +8,7 @@ import type {
 } from '../models/plugin-runtime';
 import type { IPluginDiscoveryManager } from './plugin-discovery';
 import type { IPluginDependencyResolver } from './plugin-dependency';
+import type { IPluginLoader } from './plugin-loader';
 
 export interface PluginRuntimeLifecycleResult {
   readonly state: PluginRuntimeStateValue;
@@ -44,4 +45,5 @@ export interface IPluginProvider {
   diagnostics(): PluginRuntimeDiagnostics;
   discovery(): IPluginDiscoveryManager;
   resolver(): IPluginDependencyResolver;
+  loader(): IPluginLoader;
 }
