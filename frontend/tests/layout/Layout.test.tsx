@@ -67,7 +67,7 @@ describe('Layout Runtime Tests', () => {
         </ThemeProvider>
       );
       
-      expect(screen.getByText('Welcome to Auralis V2')).toBeInTheDocument();
+      expect(screen.getByText('Quick Access Shortcuts')).toBeInTheDocument();
     });
 
     it('should render WorkspaceLayout wrapper and nested outlets', () => {
@@ -79,7 +79,7 @@ describe('Layout Runtime Tests', () => {
         </ThemeProvider>
       );
       
-      expect(screen.getByText('Workspace Operations')).toBeInTheDocument();
+      expect(screen.getByText('Directory Tree')).toBeInTheDocument();
     });
   });
 });

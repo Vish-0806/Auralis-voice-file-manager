@@ -3,16 +3,18 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from '../../src/app';
 
+
+
 describe('Auralis V2 Smoke Tests', () => {
-  it('should render application layout and default to dashboard view', () => {
+  it('should render application layout and default to dashboard view', async () => {
     render(<App />);
     
     // Check main layout header
-    expect(screen.getByText('Voice File Manager')).toBeInTheDocument();
+    expect(await screen.findByText('Voice File Manager')).toBeInTheDocument();
     
     // Check dashboard text
-    expect(screen.getByText('Welcome to Auralis V2')).toBeInTheDocument();
-    expect(screen.getByText('System Status')).toBeInTheDocument();
+    expect(await screen.findByText('Quick Access Shortcuts')).toBeInTheDocument();
+    expect(await screen.findByText('Backend Service Status')).toBeInTheDocument();
   });
 
   it('should allow clicking navigation tabs to navigate to other routes', async () => {
@@ -20,25 +22,25 @@ describe('Auralis V2 Smoke Tests', () => {
     const user = userEvent.setup();
 
     // Verify initial landing on dashboard
-    expect(screen.getByText('Welcome to Auralis V2')).toBeInTheDocument();
+    expect(screen.getByText('Quick Access Shortcuts')).toBeInTheDocument();
 
     // Click on Assistant tab
-    const assistantLink = screen.getByRole('link', { name: /assistant/i });
+    const assistantLink = screen.getAllByRole('link', { name: /assistant/i })[0];
     await user.click(assistantLink);
     expect(screen.getByText('Assistant Hub')).toBeInTheDocument();
 
     // Click on File Manager tab
-    const filesLink = screen.getByRole('link', { name: /file manager/i });
+    const filesLink = screen.getAllByRole('link', { name: /file manager/i })[0];
     await user.click(filesLink);
-    expect(screen.getByText('File Browser')).toBeInTheDocument();
+    expect(screen.getByText('Sort by:')).toBeInTheDocument();
 
     // Click on Workspace tab
-    const workspaceLink = screen.getByRole('link', { name: /workspace/i });
+    const workspaceLink = screen.getAllByRole('link', { name: /workspace/i })[0];
     await user.click(workspaceLink);
-    expect(screen.getByText('Workspace Operations')).toBeInTheDocument();
+    expect(screen.getByText('Directory Tree')).toBeInTheDocument();
 
     // Click on Settings tab
-    const settingsLink = screen.getByRole('link', { name: /settings/i });
+    const settingsLink = screen.getAllByRole('link', { name: /settings/i })[0];
     await user.click(settingsLink);
     expect(screen.getByText('Application Preferences')).toBeInTheDocument();
   });

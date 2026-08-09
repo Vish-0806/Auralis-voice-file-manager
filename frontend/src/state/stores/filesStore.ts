@@ -9,6 +9,7 @@ const initialState = {
   sortMode: 'name' as const,
   sortDirection: 'asc' as const,
   viewMode: 'grid' as const,
+  files: [],
   status: 'idle' as const,
   error: null,
 };
@@ -30,6 +31,7 @@ export const useFilesStore = create<FilesState>()(
       setSortMode: (mode) => set({ sortMode: mode }),
       setSortDirection: (dir) => set({ sortDirection: dir }),
       setViewMode: (mode) => set({ viewMode: mode }),
+      setFiles: (files) => set({ files }),
       setStatus: (status) => set({ status }),
       setError: (error) => set({ error }),
       reset: () => set(initialState),

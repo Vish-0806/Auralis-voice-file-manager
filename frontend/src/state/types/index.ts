@@ -45,6 +45,15 @@ export type FileViewMode = 'grid' | 'list';
 export type FileSortMode = 'name' | 'date' | 'size';
 export type FileSortDirection = 'asc' | 'desc';
 
+export interface FileItem {
+  name: string;
+  path: string;
+  size?: number;
+  modified?: string;
+  is_directory?: boolean;
+  type?: string;
+}
+
 export interface FilesState extends AsyncState {
   currentDirectory: string;
   selectedFileIds: string[];
@@ -52,6 +61,7 @@ export interface FilesState extends AsyncState {
   sortMode: FileSortMode;
   sortDirection: FileSortDirection;
   viewMode: FileViewMode;
+  files: FileItem[];
   
   setCurrentDirectory: (value: string) => void;
   setSelectedFileIds: (ids: string[]) => void;
@@ -60,6 +70,7 @@ export interface FilesState extends AsyncState {
   setSortMode: (mode: FileSortMode) => void;
   setSortDirection: (dir: FileSortDirection) => void;
   setViewMode: (mode: FileViewMode) => void;
+  setFiles: (files: FileItem[]) => void;
   setStatus: (status: AsyncStatus) => void;
   setError: (error: string | null) => void;
   reset: () => void;
@@ -69,11 +80,14 @@ export interface WorkspaceState extends AsyncState {
   activeWorkspaceId: string | null;
   openPanels: string[];
   activeTab: string | null;
+  openTabs: string[];
   
   setActiveWorkspaceId: (value: string | null) => void;
   setOpenPanels: (panels: string[]) => void;
   togglePanel: (panel: string) => void;
   setActiveTab: (tab: string | null) => void;
+  openTab: (tab: string) => void;
+  closeTab: (tab: string) => void;
   setStatus: (status: AsyncStatus) => void;
   setError: (error: string | null) => void;
   reset: () => void;
