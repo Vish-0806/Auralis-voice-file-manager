@@ -2,7 +2,6 @@ import React, { act } from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { App } from '../../src/app';
 import { useWorkspaceStore } from '../../src/state/stores/workspaceStore';
 import { useFilesStore } from '../../src/state/stores/filesStore';
@@ -10,8 +9,6 @@ import { useVoiceStore } from '../../src/voice/state/voiceStore';
 import { syncService } from '../../src/services/synchronization/synchronizationService';
 import { assistantService } from '../../src/services/api/assistantService';
 import { filesService } from '../../src/services/api/filesService';
-import { ErrorBoundary } from '../../src/components/common/ErrorBoundary/ErrorBoundary';
-import { AppLayout } from '../../src/layouts/AppLayout';
 
 // Mock navigator.mediaDevices for JSDOM mic tests
 const mockStream = {

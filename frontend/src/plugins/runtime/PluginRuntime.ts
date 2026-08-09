@@ -1,0 +1,60 @@
+import type { IPluginProvider, PluginRegistrationResult, PluginUnregistrationResult } from '../interfaces/plugin-provider';
+import type { IPlugin, PluginId } from '../models/plugin';
+import type { PluginRuntimeDiagnostics, PluginRuntimeHealth, PluginRuntimeStatistics, PluginRuntimeStatus, PluginRuntimeStateValue } from '../models/plugin-runtime';
+import { PluginProvider } from '../provider/PluginProvider';
+
+export class PluginRuntime {
+  constructor(private readonly runtimeProvider: IPluginProvider = new PluginProvider()) {}
+
+  initialize() {
+    return this.runtimeProvider.initialize();
+  }
+
+  shutdown() {
+    return this.runtimeProvider.shutdown();
+  }
+
+  state(): PluginRuntimeStateValue {
+    return this.runtimeProvider.state();
+  }
+
+  status(): PluginRuntimeStatus {
+    return this.runtimeProvider.status();
+  }
+
+  statistics(): PluginRuntimeStatistics {
+    return this.runtimeProvider.statistics();
+  }
+
+  health(): PluginRuntimeHealth {
+    return this.runtimeProvider.health();
+  }
+
+  registerPlugin(plugin: IPlugin): PluginRegistrationResult {
+    return this.runtimeProvider.registerPlugin(plugin);
+  }
+
+  unregisterPlugin(pluginId: PluginId): PluginUnregistrationResult {
+    return this.runtimeProvider.unregisterPlugin(pluginId);
+  }
+
+  hasPlugin(pluginId: PluginId): boolean {
+    return this.runtimeProvider.hasPlugin(pluginId);
+  }
+
+  getPlugin(pluginId: PluginId): IPlugin | null {
+    return this.runtimeProvider.getPlugin(pluginId);
+  }
+
+  listPlugins(): IPlugin[] {
+    return this.runtimeProvider.listPlugins();
+  }
+
+  diagnostics(): PluginRuntimeDiagnostics {
+    return this.runtimeProvider.diagnostics();
+  }
+
+  provider(): IPluginProvider {
+    return this.runtimeProvider;
+  }
+}
