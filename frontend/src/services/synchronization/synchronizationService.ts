@@ -2,6 +2,7 @@ import { WebSocketClient, WebSocketEnvelope } from '../websocket/WebSocketClient
 import { useUIStore } from '../../state/stores/uiStore';
 import { useAssistantStore } from '../../state/stores/assistantStore';
 import { useFilesStore } from '../../state/stores/filesStore';
+import { useVoiceStore } from '../../voice/state/voiceStore';
 
 export type SyncState = 'IDLE' | 'SYNCING' | 'SYNCED' | 'STALE' | 'ERROR';
 
@@ -30,6 +31,7 @@ export class SynchronizationService {
 
     // Subscribe to WebSocket connection status
     this.unsubscribeState = this.wsClient.onStateChange((wsState) => {
+      useVoiceStore.getState().setConnectionState(wsState);
       if (wsState === 'CONNECTED') {
         this.setSyncState('SYNCED');
       } else if (wsState === 'RECONNECTING' || wsState === 'CONNECTING') {
@@ -100,6 +102,46 @@ export class SynchronizationService {
         if (payload && typeof payload === 'object' && 'status' in payload) {
           const status = (payload as { status: 'idle' | 'loading' | 'success' | 'error' }).status;
           useUIStore.getState().setGlobalLoading(status === 'loading');
+        }
+        break;
+
+      case 'VOICE_TRANSCRIPT_UPDATE':
+        if (payload && typeof payload === 'object') {
+          const { text, partial } = payload as { text: string; partial?: boolean };
+          const voiceState = useVoiceStore.getState();
+          voiceState.setTranscript(text);
+          if (partial) {
+            voiceState.setPartialTranscript(text);
+          } else {
+            voiceState.setPartialTranscript('');
+            voiceState.setFinalTranscript(text);
+          }
+        }
+        break;
+
+      case 'LISTENER_STATUS_CHANGED':
+        if (payload && typeof payload === 'object' && 'running' in payload) {
+          const running = (payload as { running: boolean }).running;
+          const voiceState = useVoiceStore.getState();
+          voiceState.setListenerRunning(running);
+          voiceState.setListenerStatus(running ? 'running' : 'stopped');
+        }
+        break;
+
+      case 'VOICE_PROCESSING_STATUS':
+        if (payload && typeof payload === 'object' && 'status' in payload) {
+          const status = (payload as { status: 'idle' | 'processing' | 'error' }).status;
+          const voiceState = useVoiceStore.getState();
+          if (status === 'processing') {
+            voiceState.setVoiceStatus('PROCESSING');
+            voiceState.setProcessing(true);
+          } else if (status === 'error') {
+            voiceState.setVoiceStatus('ERROR');
+            voiceState.setProcessing(false);
+          } else {
+            voiceState.setVoiceStatus('IDLE');
+            voiceState.setProcessing(false);
+          }
         }
         break;
 
