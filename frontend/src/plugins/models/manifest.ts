@@ -9,6 +9,7 @@ export type PluginEntryPoint = string;
 export interface PluginDependencyDeclaration {
   readonly id: string;
   readonly versionRange: string;
+  readonly optional?: boolean;
 }
 
 export interface PluginCapabilityDeclaration {

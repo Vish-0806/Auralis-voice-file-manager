@@ -12,12 +12,15 @@ import {
 import type { IPluginProvider, PluginRegistrationResult, PluginRuntimeLifecycleResult, PluginUnregistrationResult } from '../interfaces/plugin-provider';
 import { PluginDiscoveryManager } from '../runtime/PluginDiscoveryManager';
 import type { IPluginDiscoveryManager } from '../interfaces/plugin-discovery';
+import { PluginDependencyResolver } from '../runtime/PluginDependencyResolver';
+import type { IPluginDependencyResolver } from '../interfaces/plugin-dependency';
 
 export class PluginProvider implements IPluginProvider {
   private runtimeState: PluginRuntimeStateValue = PluginRuntimeState.UNINITIALIZED;
   private readonly plugins = new Map<PluginId, IPlugin>();
   private readonly pluginStates = new Map<PluginId, PluginStateValue>();
   private readonly discoveryManager: IPluginDiscoveryManager = new PluginDiscoveryManager();
+  private readonly dependencyResolver: IPluginDependencyResolver = new PluginDependencyResolver(this.discoveryManager);
   private initializationCount = 0;
   private shutdownCount = 0;
   private errorCount = 0;
@@ -220,5 +223,9 @@ export class PluginProvider implements IPluginProvider {
 
   public discovery(): IPluginDiscoveryManager {
     return this.discoveryManager;
+  }
+
+  public resolver(): IPluginDependencyResolver {
+    return this.dependencyResolver;
   }
 }

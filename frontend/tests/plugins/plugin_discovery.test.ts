@@ -453,7 +453,8 @@ describe('Plugin Discovery & Manifest Runtime (Phase 17.2)', () => {
           health: () => ({ healthy: true, message: 'Mocked', issues: [] }),
           reset: () => {}
         };
-      }
+      },
+      resolver: () => ({} as any)
     };
 
     const runtime = new PluginRuntime(customProvider);

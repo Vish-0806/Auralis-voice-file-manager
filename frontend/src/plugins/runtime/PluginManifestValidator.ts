@@ -319,6 +319,16 @@ export class PluginManifestValidator {
             validDep = false;
           }
 
+          if (dep.optional !== undefined && typeof dep.optional !== 'boolean') {
+            issues.push({
+              code: 'INVALID_TYPE',
+              path: `dependencies[${index}].optional`,
+              severity: 'error',
+              message: "Dependency 'optional' must be a boolean"
+            });
+            validDep = false;
+          }
+
           if (validDep) {
             if (seenDepIds.has(dep.id)) {
               issues.push({
@@ -331,7 +341,8 @@ export class PluginManifestValidator {
             seenDepIds.add(dep.id);
             dependencies.push({
               id: dep.id,
-              versionRange: dep.versionRange
+              versionRange: dep.versionRange,
+              optional: dep.optional
             });
           }
         });
