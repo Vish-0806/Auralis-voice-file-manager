@@ -253,7 +253,9 @@ describe('plugin runtime foundation', () => {
       }),
       resolver: () => ({} as any),
       loader: () => ({} as any),
-      lifecycle: () => ({} as any)
+      lifecycle: () => ({} as any),
+      capabilities: () => ({} as any),
+      extensions: () => ({} as any)
     };
 
     const runtime = new PluginRuntime(provider);

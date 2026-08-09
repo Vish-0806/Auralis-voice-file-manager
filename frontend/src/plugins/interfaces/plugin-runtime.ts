@@ -3,6 +3,7 @@ import type { IPluginDiscoveryManager } from './plugin-discovery';
 import type { IPluginDependencyResolver } from './plugin-dependency';
 import type { IPluginLoader } from './plugin-loader';
 import type { IPluginLifecycleManager } from './plugin-lifecycle';
+import type { IPluginCapabilityManager, IPluginExtensionManager } from './plugin-capability';
 
 export interface IPluginRuntime {
   initialize(): { readonly state: string; readonly healthy: boolean; readonly message: string };
@@ -62,4 +63,6 @@ export interface IPluginRuntime {
   resolver(): IPluginDependencyResolver;
   loader(): IPluginLoader;
   lifecycle(): IPluginLifecycleManager;
+  capabilities(): IPluginCapabilityManager;
+  extensions(): IPluginExtensionManager;
 }

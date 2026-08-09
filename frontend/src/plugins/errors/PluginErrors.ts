@@ -121,3 +121,45 @@ export class PluginLifecycleTransitionError extends PluginRuntimeError {
     this.name = 'PluginLifecycleTransitionError';
   }
 }
+
+export class PluginCapabilityError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginCapabilityError';
+  }
+}
+
+export class PluginCapabilityRegistrationError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginCapabilityRegistrationError';
+  }
+}
+
+export class PluginCapabilityConflictError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginCapabilityConflictError';
+  }
+}
+
+export class PluginExtensionError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginExtensionError';
+  }
+}
+
+export class PluginExtensionRegistrationError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginExtensionRegistrationError';
+  }
+}
+
+export class PluginExtensionConflictError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginExtensionConflictError';
+  }
+}

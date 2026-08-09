@@ -38,4 +38,7 @@ export interface IPluginLifecycleManager {
   health(): PluginLifecycleHealth;
   diagnostics(): PluginLifecycleDiagnostics;
   reset(): void;
+  
+  addDeactivateListener(listener: (pluginId: string) => void): void;
+  addDisposeListener(listener: (pluginId: string) => void): void;
 }

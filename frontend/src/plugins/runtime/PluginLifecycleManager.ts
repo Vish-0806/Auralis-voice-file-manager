@@ -27,6 +27,8 @@ export class PluginLifecycleManager implements IPluginLifecycleManager {
   private readonly inFlightOps = new Map<string, Promise<PluginLifecycleResult>>();
   private readonly historyRecords: PluginLifecycleRecord[] = [];
   private readonly opDurations: number[] = [];
+  private readonly deactivateListeners: ((pluginId: string) => void)[] = [];
+  private readonly disposeListeners: ((pluginId: string) => void)[] = [];
 
   private initializeAttempts = 0;
   private activationAttempts = 0;
@@ -188,6 +190,9 @@ export class PluginLifecycleManager implements IPluginLifecycleManager {
       }
 
       this.pluginStates.set(pluginId, PluginState.DEACTIVATED);
+      for (const listener of this.deactivateListeners) {
+        try { listener(pluginId); } catch {}
+      }
       return PluginState.DEACTIVATED;
     });
   }
@@ -215,6 +220,9 @@ export class PluginLifecycleManager implements IPluginLifecycleManager {
       }
 
       this.pluginStates.set(pluginId, PluginState.DISPOSED);
+      for (const listener of this.disposeListeners) {
+        try { listener(pluginId); } catch {}
+      }
       return PluginState.DISPOSED;
     });
   }
@@ -386,6 +394,16 @@ export class PluginLifecycleManager implements IPluginLifecycleManager {
     this.disposalAttempts = 0;
     this.successOps = 0;
     this.failOps = 0;
+    this.deactivateListeners.length = 0;
+    this.disposeListeners.length = 0;
+  }
+
+  public addDeactivateListener(listener: (pluginId: string) => void): void {
+    this.deactivateListeners.push(listener);
+  }
+
+  public addDisposeListener(listener: (pluginId: string) => void): void {
+    this.disposeListeners.push(listener);
   }
 
   private async runOperation(

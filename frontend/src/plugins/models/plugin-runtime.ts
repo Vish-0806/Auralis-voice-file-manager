@@ -45,12 +45,14 @@ export interface PluginRuntimeDiagnostics {
   };
   readonly statistics: PluginRuntimeStatistics;
   readonly health: PluginRuntimeHealth;
-  readonly capabilities: ReadonlyArray<PluginCapability>;
+  readonly capabilities: ReadonlyArray<PluginRuntimeCapability>;
   readonly loader?: Record<string, any>;
   readonly lifecycle?: Record<string, any>;
+  readonly capabilityManager?: Record<string, any>;
+  readonly extensionManager?: Record<string, any>;
 }
 
-export interface PluginCapability {
+export interface PluginRuntimeCapability {
   readonly id: PluginCapabilityId;
   readonly description?: string;
 }

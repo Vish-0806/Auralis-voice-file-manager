@@ -495,7 +495,9 @@ describe('Plugin Dependency Resolution Runtime (Phase 17.3)', () => {
         };
       },
       loader: () => ({} as any),
-      lifecycle: () => ({} as any)
+      lifecycle: () => ({} as any),
+      capabilities: () => ({} as any),
+      extensions: () => ({} as any)
     };
 
     const runtime = new PluginRuntime(customProvider);
