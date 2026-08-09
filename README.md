@@ -129,10 +129,13 @@ Auralis Version 2.0.0 implements a complete, clean-slate **Frontend V2 Subsystem
 1. **Frontend Runtime Foundation (Phase 16.1)**: Clean folder infrastructure and package environment mappings.
 2. **Frontend Component Runtime (Phase 16.2)**: Accessible, semantic, presentational components (`src/components/common/`, `src/components/layout/`) with 100% keyboard accessibility and WAI-ARIA validation.
 3. **Layout & Navigation Runtime (Phase 16.3)**: Breadcrumbs, dynamic page headers, mobile off-canvas menus, and collapsible sidebars mapping nested react-router routes (`src/layouts/AppLayout.tsx`).
-4. **Theme & Design System Runtime (Phase 16.4)**: Semantic design tokens system, light/dark/system mode configurations (`src/theme/ThemeToggle.tsx`), local cache persistence, and prefers-reduced-motion animation mitigations.
+4. **Theme & Design System Runtime (Phase 16.4)**: Dynamic styling tokens system, light/dark/system mode configurations (`src/theme/ThemeToggle.tsx`), local cache persistence, and prefers-reduced-motion animation mitigations.
 5. **State Management Runtime (Phase 16.5)**: Decoupled Zustand state store boundaries (UI, Assistant, Files, Workspace, Settings) and narrow, typed selectors mapping selective local persistence.
 6. **API Client & Synchronization Runtime (Phase 16.6)**: Axios client intercepting bearer headers, error normalizers resolving FastAPI details exceptions, in-memory AuthService, WebSocket client with backoff reconnects, and synchronization bridges dispatching socket updates directly to stores.
-7. **End-to-End Production Verification**: 74 Vitest unit/integration tests passed across 15 test suites, 100% pure TypeScript compiler checks, clean production build bundles, and zero legacy enterprise runtime overhead.
+7. **Voice UI Runtime (Phase 16.7)**: Real-time audio waveform visualizers, speech-state coordinators, and push-to-talk button interface widgets.
+8. **Dashboard & Workspace Runtime (Phase 16.8)**: Collapsible sidebar directory explorer, workspace tab management panels, details visualizers, and quick action shortcuts.
+9. **Frontend Integration Runtime (Phase 16.9)**: Localized error boundaries, global rendering crash safe guards, and centralized mock auth bootstrap gateways.
+10. **Frontend Production Certification & Hardening (Phase 16.10)**: Global deterministic mock isolation, warning-free bundle compiles, and 7 comprehensive integration workflows verifying all core UI transitions. Certified with 132 passed Vitest tests.
 
 ---
 
@@ -238,7 +241,7 @@ Auralis/
 │   │   ├── services/          # Client layers (apiClient, authService, websocket, sync)
 │   │   ├── state/             # Global Zustand stores, selectors, and models
 │   │   └── theme/             # Styling theme provider templates
-│   └── tests/                 # 74 Vitest tests covering state, views, themes, and service runtimes
+│   └── tests/                 # 132 Vitest tests covering state, views, themes, and integration workflows
 └── docs/                      # Technical documentation and architecture specifications
 ```
 
@@ -265,7 +268,7 @@ Track the development stages of Auralis:
 * [x] **Provider-Independent Assistant Architecture Platform (Phases 13.1 to 13.10):** Assistant Runtime Foundation, Conversation Runtime, Dialogue Management, Decision Coordinator, Assistant Memory Runtime, Response Streaming, Voice Orchestration, Proactive Notifications, Integration Gateway, and End-to-End Production Certification (2,172 tests passed).
 * [x] **Application Container & Infrastructure Platform (Phases 14.1 to 14.3.6):** Application Runtime Platform, Dependency Injection Subsystem, Priority Configuration Source Management, Resolution & Validation Engine, Configuration Profiles & Feature Flags, Secrets & Sensitive Configuration Management, and End-to-End Production Certification (2,487 tests passed).
 * [x] **Provider-Independent API Runtime Architecture Platform (Phases 15.1 to 15.10):** API Runtime Foundation, Request Routing Runtime, Middleware Runtime, Authentication Runtime, Validation Runtime, API Versioning Runtime, WebSocket Runtime, API Protection & Rate Limiting Runtime, API Integration Gateway Runtime, and End-to-End Production Certification (2,905 tests passed).
-* [x] **Lightweight Rebuilt Frontend Architecture (Phases 16.1 to 16.6):** Component Runtime, Layout & Navigation structures, Theme systems, global Zustand state store boundaries, API Client interfaces, WebSocket synchronization, and End-to-End Production Verification (74 total tests passed).
+* [x] **Lightweight Rebuilt Frontend Architecture (Phases 16.1 to 16.10):** Component Runtime, Layout & Navigation structures, Theme systems, global Zustand state store boundaries, API Client interfaces, WebSocket synchronization, voice and workspace controls, localized error boundaries, production builds, and 132 passed Vitest tests.
 * [ ] **Future Objectives:**
   * [ ] Operating System Desktop Packaging (Phase 11 / Electron & Tauri integration).
   * [ ] Document intelligence parser using local PyMuPDF extraction.
@@ -283,7 +286,7 @@ python -m venv venv
 pip install -r backend/requirements.txt
 pytest backend/tests
 
-# Frontend Setup, Test Suite & Build (456 Vitest tests)
+# Frontend Setup, Test Suite & Build (132 Vitest tests)
 cd frontend
 npm install
 npm test
