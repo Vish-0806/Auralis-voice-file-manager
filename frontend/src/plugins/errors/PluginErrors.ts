@@ -37,3 +37,24 @@ export class PluginStateError extends PluginRuntimeError {
     this.name = 'PluginStateError';
   }
 }
+
+export class PluginManifestError extends PluginRuntimeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PluginManifestError';
+  }
+}
+
+export class PluginDiscoveryError extends PluginRuntimeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PluginDiscoveryError';
+  }
+}
+
+export class PluginDuplicateError extends PluginRuntimeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PluginDuplicateError';
+  }
+}

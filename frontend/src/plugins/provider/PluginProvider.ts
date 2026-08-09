@@ -10,11 +10,14 @@ import {
   type PluginRuntimeStateValue,
 } from '../models/plugin-runtime';
 import type { IPluginProvider, PluginRegistrationResult, PluginRuntimeLifecycleResult, PluginUnregistrationResult } from '../interfaces/plugin-provider';
+import { PluginDiscoveryManager } from '../runtime/PluginDiscoveryManager';
+import type { IPluginDiscoveryManager } from '../interfaces/plugin-discovery';
 
 export class PluginProvider implements IPluginProvider {
   private runtimeState: PluginRuntimeStateValue = PluginRuntimeState.UNINITIALIZED;
   private readonly plugins = new Map<PluginId, IPlugin>();
   private readonly pluginStates = new Map<PluginId, PluginStateValue>();
+  private readonly discoveryManager: IPluginDiscoveryManager = new PluginDiscoveryManager();
   private initializationCount = 0;
   private shutdownCount = 0;
   private errorCount = 0;
@@ -213,5 +216,9 @@ export class PluginProvider implements IPluginProvider {
 
   private freezeLifecycleResult(state: PluginRuntimeStateValue, healthy: boolean, message: string): PluginRuntimeLifecycleResult {
     return Object.freeze({ state, healthy, message });
+  }
+
+  public discovery(): IPluginDiscoveryManager {
+    return this.discoveryManager;
   }
 }

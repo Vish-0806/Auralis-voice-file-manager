@@ -1,4 +1,5 @@
 import type { IPluginProvider } from './plugin-provider';
+import type { IPluginDiscoveryManager } from './plugin-discovery';
 
 export interface IPluginRuntime {
   initialize(): { readonly state: string; readonly healthy: boolean; readonly message: string };
@@ -54,4 +55,5 @@ export interface IPluginRuntime {
     readonly capabilities: ReadonlyArray<{ readonly id: string; readonly description?: string }>;
   };
   provider(): IPluginProvider;
+  discovery(): IPluginDiscoveryManager;
 }

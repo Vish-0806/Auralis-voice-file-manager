@@ -1,9 +1,15 @@
 export * from './models/plugin';
 export * from './models/plugin-state';
 export * from './models/plugin-runtime';
+export * from './models/manifest';
 export * from './interfaces/plugin-provider';
 export * from './interfaces/plugin-runtime';
+export * from './interfaces/plugin-discovery';
 export * from './errors/PluginErrors';
 export { PluginProvider } from './provider/PluginProvider';
 export { PluginRuntime } from './runtime/PluginRuntime';
+export { PluginDiscoveryManager } from './runtime/PluginDiscoveryManager';
+export { InMemoryDiscoverySource } from './runtime/InMemoryDiscoverySource';
+export { SemVerValidator } from './runtime/SemVerValidator';
+export { PluginManifestValidator } from './runtime/PluginManifestValidator';
 export { createPluginProvider, createPluginRuntime } from './factories/pluginFactories';

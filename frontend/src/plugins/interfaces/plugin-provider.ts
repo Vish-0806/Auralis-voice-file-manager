@@ -6,6 +6,7 @@ import type {
   PluginRuntimeStatus,
   PluginRuntimeStateValue,
 } from '../models/plugin-runtime';
+import type { IPluginDiscoveryManager } from './plugin-discovery';
 
 export interface PluginRuntimeLifecycleResult {
   readonly state: PluginRuntimeStateValue;
@@ -40,4 +41,5 @@ export interface IPluginProvider {
   getPlugin(pluginId: PluginId): IPlugin | null;
   listPlugins(): IPlugin[];
   diagnostics(): PluginRuntimeDiagnostics;
+  discovery(): IPluginDiscoveryManager;
 }

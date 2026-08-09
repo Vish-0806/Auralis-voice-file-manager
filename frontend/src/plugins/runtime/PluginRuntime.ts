@@ -2,6 +2,7 @@ import type { IPluginProvider, PluginRegistrationResult, PluginUnregistrationRes
 import type { IPlugin, PluginId } from '../models/plugin';
 import type { PluginRuntimeDiagnostics, PluginRuntimeHealth, PluginRuntimeStatistics, PluginRuntimeStatus, PluginRuntimeStateValue } from '../models/plugin-runtime';
 import { PluginProvider } from '../provider/PluginProvider';
+import type { IPluginDiscoveryManager } from '../interfaces/plugin-discovery';
 
 export class PluginRuntime {
   constructor(private readonly runtimeProvider: IPluginProvider = new PluginProvider()) {}
@@ -56,5 +57,9 @@ export class PluginRuntime {
 
   provider(): IPluginProvider {
     return this.runtimeProvider;
+  }
+
+  public discovery(): IPluginDiscoveryManager {
+    return this.runtimeProvider.discovery();
   }
 }

@@ -236,6 +236,21 @@ describe('plugin runtime foundation', () => {
       getPlugin: () => null,
       listPlugins: () => [],
       diagnostics: () => ({ runtimeState: PluginRuntimeState.READY, pluginCounts: { registered: 0, enabled: 0, disabled: 0 }, statistics: { registeredPlugins: 0, enabledPlugins: 0, disabledPlugins: 0, initializationCount: 0, shutdownCount: 0, errors: 0, uptime: 0 }, health: { healthy: true, state: PluginRuntimeState.READY, registeredPluginCount: 0, enabledPluginCount: 0, errorCount: 0, message: 'ready' }, capabilities: [] }),
+      discovery: () => ({
+        registerSource: () => {},
+        unregisterSource: () => {},
+        getSources: () => [],
+        discover: async () => ({ success: true, manifests: [], invalid: [], duplicates: [], failures: [] }),
+        discoverFromSource: async () => ({ success: true, manifests: [], invalid: [], duplicates: [], failures: [] }),
+        find: () => null,
+        findAll: () => [],
+        contains: () => false,
+        remove: () => false,
+        clear: () => {},
+        statistics: () => ({ discoveryAttempts: 0, discoveredPlugins: 0, validManifests: 0, invalidManifests: 0, duplicateAttempts: 0, discoveryFailures: 0, validationFailures: 0, registeredSources: 0 }),
+        health: () => ({ healthy: true, message: 'healthy', issues: [] }),
+        reset: () => {}
+      }),
     };
 
     const runtime = new PluginRuntime(provider);
