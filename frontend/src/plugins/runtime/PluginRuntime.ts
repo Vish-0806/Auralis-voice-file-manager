@@ -8,6 +8,7 @@ import type { IPluginLoader } from '../interfaces/plugin-loader';
 import type { IPluginLifecycleManager } from '../interfaces/plugin-lifecycle';
 import type { IPluginCapabilityManager, IPluginExtensionManager } from '../interfaces/plugin-capability';
 import type { IPluginSecurityManager, IPluginSandboxManager } from '../interfaces/plugin-security';
+import type { IPluginConfigurationManager } from '../interfaces/plugin-configuration';
 import { PluginPolicyManager } from './PluginPolicyManager';
 
 export class PluginRuntime {
@@ -99,5 +100,9 @@ export class PluginRuntime {
 
   public sandbox(): IPluginSandboxManager {
     return this.runtimeProvider.sandbox();
+  }
+
+  public configuration(): IPluginConfigurationManager {
+    return this.runtimeProvider.configuration();
   }
 }

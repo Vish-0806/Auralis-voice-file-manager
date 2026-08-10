@@ -27,6 +27,8 @@ import { PluginSecurityManager } from '../runtime/PluginSecurityManager';
 import type { IPluginSecurityManager } from '../interfaces/plugin-security';
 import { PluginSandboxManager } from '../runtime/PluginSandboxManager';
 import type { IPluginSandboxManager } from '../interfaces/plugin-security';
+import { PluginConfigurationManager } from '../runtime/PluginConfigurationManager';
+import type { IPluginConfigurationManager } from '../interfaces/plugin-configuration';
 
 export class PluginProvider implements IPluginProvider {
   private runtimeState: PluginRuntimeStateValue = PluginRuntimeState.UNINITIALIZED;
@@ -45,6 +47,7 @@ export class PluginProvider implements IPluginProvider {
   private readonly policyManager: PluginPolicyManager = new PluginPolicyManager();
   private readonly securityManager: IPluginSecurityManager = new PluginSecurityManager(this.lifecycleManager, this.policyManager);
   private readonly sandboxManager: IPluginSandboxManager = new PluginSandboxManager(this.lifecycleManager, this.securityManager);
+  private readonly configManager: IPluginConfigurationManager = new PluginConfigurationManager(this.lifecycleManager, this.securityManager);
   private initializationCount = 0;
   private shutdownCount = 0;
   private errorCount = 0;
@@ -213,7 +216,8 @@ export class PluginProvider implements IPluginProvider {
       capabilityManager: this.capabilityManager.diagnostics() as any,
       extensionManager: this.extensionManager.diagnostics() as any,
       securityManager: this.securityManager.diagnostics() as any,
-      sandboxManager: this.sandboxManager.diagnostics() as any
+      sandboxManager: this.sandboxManager.diagnostics() as any,
+      configurationManager: this.configManager.diagnostics() as any
     });
   }
 
@@ -285,5 +289,9 @@ export class PluginProvider implements IPluginProvider {
 
   public sandbox(): IPluginSandboxManager {
     return this.sandboxManager;
+  }
+
+  public configuration(): IPluginConfigurationManager {
+    return this.configManager;
   }
 }
