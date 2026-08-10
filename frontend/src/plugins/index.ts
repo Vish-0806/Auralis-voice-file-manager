@@ -36,4 +36,7 @@ export { PluginSandboxManager } from './runtime/PluginSandboxManager';
 export { InMemoryPluginConfigurationStore } from './runtime/InMemoryPluginConfigurationStore';
 export { PluginConfigurationValidator } from './runtime/PluginConfigurationValidator';
 export { PluginConfigurationManager } from './runtime/PluginConfigurationManager';
+export * from './models/integration';
+export * from './interfaces/plugin-integration';
+export { PluginIntegrationManager } from './runtime/PluginIntegrationManager';
 export { createPluginProvider, createPluginRuntime } from './factories/pluginFactories';

@@ -9,6 +9,7 @@ import type { IPluginLifecycleManager } from '../interfaces/plugin-lifecycle';
 import type { IPluginCapabilityManager, IPluginExtensionManager } from '../interfaces/plugin-capability';
 import type { IPluginSecurityManager, IPluginSandboxManager } from '../interfaces/plugin-security';
 import type { IPluginConfigurationManager } from '../interfaces/plugin-configuration';
+import type { IPluginIntegrationManager } from '../interfaces/plugin-integration';
 import { PluginPolicyManager } from './PluginPolicyManager';
 
 export class PluginRuntime {
@@ -104,5 +105,9 @@ export class PluginRuntime {
 
   public configuration(): IPluginConfigurationManager {
     return this.runtimeProvider.configuration();
+  }
+
+  public integration(): IPluginIntegrationManager {
+    return this.runtimeProvider.integration();
   }
 }

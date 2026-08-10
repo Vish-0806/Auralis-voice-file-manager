@@ -259,7 +259,8 @@ describe('plugin runtime foundation', () => {
       security: () => ({} as any),
       policies: () => ({} as any),
       sandbox: () => ({} as any),
-      configuration: () => ({} as any)
+      configuration: () => ({} as any),
+      integration: () => ({} as any)
     };
 
     const runtime = new PluginRuntime(provider);

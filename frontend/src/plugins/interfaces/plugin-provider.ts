@@ -13,6 +13,7 @@ import type { IPluginLifecycleManager } from './plugin-lifecycle';
 import type { IPluginCapabilityManager, IPluginExtensionManager } from './plugin-capability';
 import type { IPluginSecurityManager, IPluginSandboxManager } from './plugin-security';
 import type { IPluginConfigurationManager } from './plugin-configuration';
+import type { IPluginIntegrationManager } from './plugin-integration';
 import { PluginPolicyManager } from '../runtime/PluginPolicyManager';
 
 export interface PluginRuntimeLifecycleResult {
@@ -58,4 +59,5 @@ export interface IPluginProvider {
   policies(): PluginPolicyManager;
   sandbox(): IPluginSandboxManager;
   configuration(): IPluginConfigurationManager;
+  integration(): IPluginIntegrationManager;
 }

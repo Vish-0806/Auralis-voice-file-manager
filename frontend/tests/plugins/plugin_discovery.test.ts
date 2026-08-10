@@ -462,7 +462,8 @@ describe('Plugin Discovery & Manifest Runtime (Phase 17.2)', () => {
       security: () => ({} as any),
       policies: () => ({} as any),
       sandbox: () => ({} as any),
-      configuration: () => ({} as any)
+      configuration: () => ({} as any),
+      integration: () => ({} as any)
     };
 
     const runtime = new PluginRuntime(customProvider);
