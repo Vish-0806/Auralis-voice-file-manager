@@ -260,7 +260,8 @@ describe('plugin runtime foundation', () => {
       policies: () => ({} as any),
       sandbox: () => ({} as any),
       configuration: () => ({} as any),
-      integration: () => ({} as any)
+      integration: () => ({} as any),
+      certification: () => ({} as any)
     };
 
     const runtime = new PluginRuntime(provider);

@@ -39,4 +39,7 @@ export { PluginConfigurationManager } from './runtime/PluginConfigurationManager
 export * from './models/integration';
 export * from './interfaces/plugin-integration';
 export { PluginIntegrationManager } from './runtime/PluginIntegrationManager';
+export * from './models/certification';
+export * from './interfaces/plugin-certification';
+export { PluginCertifier } from './runtime/PluginCertifier';
 export { createPluginProvider, createPluginRuntime } from './factories/pluginFactories';

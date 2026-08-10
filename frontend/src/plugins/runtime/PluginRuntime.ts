@@ -10,6 +10,7 @@ import type { IPluginCapabilityManager, IPluginExtensionManager } from '../inter
 import type { IPluginSecurityManager, IPluginSandboxManager } from '../interfaces/plugin-security';
 import type { IPluginConfigurationManager } from '../interfaces/plugin-configuration';
 import type { IPluginIntegrationManager } from '../interfaces/plugin-integration';
+import type { IPluginCertificationManager } from '../interfaces/plugin-certification';
 import { PluginPolicyManager } from './PluginPolicyManager';
 
 export class PluginRuntime {
@@ -109,5 +110,9 @@ export class PluginRuntime {
 
   public integration(): IPluginIntegrationManager {
     return this.runtimeProvider.integration();
+  }
+
+  public certification(): IPluginCertificationManager {
+    return this.runtimeProvider.certification();
   }
 }

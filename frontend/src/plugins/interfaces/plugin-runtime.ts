@@ -7,6 +7,7 @@ import type { IPluginCapabilityManager, IPluginExtensionManager } from './plugin
 import type { IPluginSecurityManager, IPluginSandboxManager } from './plugin-security';
 import type { IPluginConfigurationManager } from './plugin-configuration';
 import type { IPluginIntegrationManager } from './plugin-integration';
+import type { IPluginCertificationManager } from './plugin-certification';
 import { PluginPolicyManager } from '../runtime/PluginPolicyManager';
 
 export interface IPluginRuntime {
@@ -74,4 +75,5 @@ export interface IPluginRuntime {
   sandbox(): IPluginSandboxManager;
   configuration(): IPluginConfigurationManager;
   integration(): IPluginIntegrationManager;
+  certification(): IPluginCertificationManager;
 }

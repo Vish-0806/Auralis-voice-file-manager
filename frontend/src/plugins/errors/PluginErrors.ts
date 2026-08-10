@@ -331,3 +331,10 @@ export class PluginIntegrationRollbackError extends PluginIntegrationError {
     this.name = 'PluginIntegrationRollbackError';
   }
 }
+
+export class PluginCertificationError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginCertificationError';
+  }
+}

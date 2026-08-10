@@ -502,7 +502,8 @@ describe('Plugin Dependency Resolution Runtime (Phase 17.3)', () => {
       policies: () => ({} as any),
       sandbox: () => ({} as any),
       configuration: () => ({} as any),
-      integration: () => ({} as any)
+      integration: () => ({} as any),
+      certification: () => ({} as any)
     };
 
     const runtime = new PluginRuntime(customProvider);
