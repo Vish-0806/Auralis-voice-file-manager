@@ -6,3 +6,4 @@ export { MonitoringRegistry } from './registry/MonitoringRegistry';
 export { MonitoringProvider } from './provider/MonitoringProvider';
 export { MonitoringRuntime } from './runtime/MonitoringRuntime';
 export * from './logging/index';
+export * from './metrics/index';
