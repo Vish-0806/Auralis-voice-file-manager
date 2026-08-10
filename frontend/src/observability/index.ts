@@ -8,3 +8,4 @@ export { MonitoringRuntime } from './runtime/MonitoringRuntime';
 export * from './logging/index';
 export * from './metrics/index';
 export * from './tracing/index';
+export * from './telemetry/index';
