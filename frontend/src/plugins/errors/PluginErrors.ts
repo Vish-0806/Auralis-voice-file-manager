@@ -212,3 +212,129 @@ export class PluginResourceLimitError extends PluginRuntimeError {
     this.name = 'PluginResourceLimitError';
   }
 }
+
+export class PluginConfigurationError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginConfigurationError';
+  }
+}
+
+export class PluginConfigurationSchemaError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginConfigurationSchemaError';
+  }
+}
+
+export class PluginConfigurationValidationError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginConfigurationValidationError';
+  }
+}
+
+export class PluginConfigurationNotFoundError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginConfigurationNotFoundError';
+  }
+}
+
+export class PluginConfigurationConflictError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginConfigurationConflictError';
+  }
+}
+
+export class PluginConfigurationPersistenceError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginConfigurationPersistenceError';
+  }
+}
+
+export class PluginConfigurationPermissionError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginConfigurationPermissionError';
+  }
+}
+
+export class PluginConfigurationProfileError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginConfigurationProfileError';
+  }
+}
+
+export class PluginConfigurationOverrideError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginConfigurationOverrideError';
+  }
+}
+
+export class PluginConfigurationVersionError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginConfigurationVersionError';
+  }
+}
+
+export class PluginIntegrationError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string, readonly phase?: string) {
+    super(message);
+    this.name = 'PluginIntegrationError';
+  }
+}
+
+export class PluginIntegrationValidationError extends PluginIntegrationError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message, pluginId, 'VALIDATION');
+    this.name = 'PluginIntegrationValidationError';
+  }
+}
+
+export class PluginIntegrationDependencyError extends PluginIntegrationError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message, pluginId, 'DEPENDENCY_RESOLUTION');
+    this.name = 'PluginIntegrationDependencyError';
+  }
+}
+
+export class PluginIntegrationSecurityError extends PluginIntegrationError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message, pluginId, 'SECURITY_PREFLIGHT');
+    this.name = 'PluginIntegrationSecurityError';
+  }
+}
+
+export class PluginIntegrationConfigurationError extends PluginIntegrationError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message, pluginId, 'CONFIGURATION_INITIALIZATION');
+    this.name = 'PluginIntegrationConfigurationError';
+  }
+}
+
+export class PluginIntegrationLoadError extends PluginIntegrationError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message, pluginId, 'LOADING');
+    this.name = 'PluginIntegrationLoadError';
+  }
+}
+
+export class PluginIntegrationRollbackError extends PluginIntegrationError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message, pluginId, 'CLEANUP');
+    this.name = 'PluginIntegrationRollbackError';
+  }
+}
+
+export class PluginCertificationError extends PluginRuntimeError {
+  constructor(message: string, readonly pluginId?: string) {
+    super(message);
+    this.name = 'PluginCertificationError';
+  }
+}

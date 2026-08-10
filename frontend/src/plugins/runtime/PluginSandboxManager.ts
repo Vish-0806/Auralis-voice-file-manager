@@ -30,7 +30,9 @@ export class PluginSandboxManager implements IPluginSandboxManager {
       if (!profile) {
         throw new PluginSandboxError(`Cannot activate plugin '${pluginId}': Security profile not defined.`, pluginId);
       }
-      this.createSandbox(pluginId);
+      if (!this.sandboxes.has(pluginId)) {
+        this.createSandbox(pluginId);
+      }
       this.updateSandboxState(pluginId, 'ACTIVE');
     });
 

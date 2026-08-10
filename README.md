@@ -139,6 +139,35 @@ Auralis Version 2.0.0 implements a complete, clean-slate **Frontend V2 Subsystem
 
 ---
 
+## Plugin & Extension Runtime Platform (Phase 17)
+
+Auralis implements a comprehensive, enterprise-ready **Plugin & Extension Runtime Platform** (`frontend/src/plugins/`) providing dynamic extendability with complete safety guarantees:
+
+1. **Plugin Runtime Foundation (Phase 17.1)**: Extensible folder structure, type-safe manifest interfaces, registration events, and baseline mock registries.
+2. **Plugin Discovery & Manifest Runtime (Phase 17.2)**: Scans directories, validates manifest JSON schemas (name, version, entryPoint, permissions, dependencies), and handles validation recovery.
+3. **Plugin Dependency Resolution Runtime (Phase 17.3)**: Directed Acyclic Graph (DAG) sorting, cycles detection, missing dependencies reporting, and version-compatibility checking.
+4. **Plugin Loading Runtime (Phase 17.4)**: Dynamic ES module loading, script tag injections, sandbox isolation bindings, and load timeouts.
+5. **Plugin Lifecycle Runtime (Phase 17.5)**: Lifecycle state transitions (`LOADED` → `INITIALIZED` → `ACTIVATED` → `DEACTIVATED` → `UNLOADED`) with cascading state hooks.
+6. **Plugin Capability & Extension Runtime (Phase 17.6)**: Registers capability handlers (UI elements, theme skins, custom voice commands, file parsers) under a global extension point registry.
+7. **Plugin Security Sandbox Runtime (Phase 17.7)**: Restricts API access using safe proxies, freezing global structures, and sandboxing storage/network modules.
+8. **Plugin Configuration Runtime (Phase 17.8)**: Merges default parameters, validates configurations using schema rules, and supports runtime settings updates.
+9. **Plugin Runtime Integration (Phase 17.9)**: Incorporates plugin actions into main UI views and assistant planners.
+10. **Plugin Runtime Certification (Phase 17.10)**: E2E scenarios verification, mock isolation, certified with 144 passing Vitest tests.
+
+---
+
+## Observability & Operations Runtime Platform (Phase 18)
+
+Auralis implements a clean, provider-independent, strongly-typed **Observability & Operations Runtime Platform** (`frontend/src/observability/`):
+
+1. **Monitoring Foundation (Phase 18.1)**: Unified core registry, custom errors, lifecycle states, diagnostic structures, and deep-freezing immutability rules.
+2. **Logging Runtime (Phase 18.2)**: Structured logging engine with severity levels (`DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`), message formats, custom destination sinks, and credential redactions.
+3. **Metrics Runtime (Phase 18.3)**: Bounded instruments (Counters, Gauges, Histograms) supporting labels, delta aggregations, and statistics.
+4. **Distributed Tracing Runtime (Phase 18.4)**: Cryptographic trace/span generation, hierarchical parent-child linking, diagnostics, and capacity-based trace eviction.
+5. **Telemetry Runtime (Phase 18.5)**: Collection, normalization, batching, buffering (FIFO bounded queues), deterministic sampling, and multi-exporter isolation pipelines.
+
+---
+
 ## Architecture Overview
 
 ```mermaid
@@ -269,6 +298,8 @@ Track the development stages of Auralis:
 * [x] **Application Container & Infrastructure Platform (Phases 14.1 to 14.3.6):** Application Runtime Platform, Dependency Injection Subsystem, Priority Configuration Source Management, Resolution & Validation Engine, Configuration Profiles & Feature Flags, Secrets & Sensitive Configuration Management, and End-to-End Production Certification (2,487 tests passed).
 * [x] **Provider-Independent API Runtime Architecture Platform (Phases 15.1 to 15.10):** API Runtime Foundation, Request Routing Runtime, Middleware Runtime, Authentication Runtime, Validation Runtime, API Versioning Runtime, WebSocket Runtime, API Protection & Rate Limiting Runtime, API Integration Gateway Runtime, and End-to-End Production Certification (2,905 tests passed).
 * [x] **Lightweight Rebuilt Frontend Architecture (Phases 16.1 to 16.10):** Component Runtime, Layout & Navigation structures, Theme systems, global Zustand state store boundaries, API Client interfaces, WebSocket synchronization, voice and workspace controls, localized error boundaries, production builds, and 132 passed Vitest tests.
+* [x] **Plugin & Extension Runtime Platform (Phases 17.1 to 17.10):** Plugin Runtime Foundation, discovery and manifest parsing, dependency resolution, ES module loaders, dynamic lifecycle hook pipelines, capability extension registries, security sandboxing proxies, and integration. Certified with 144 passed Vitest tests.
+* [x] **Observability & Operations Runtime Platform (Phases 18.1 to 18.5):** Monitoring Foundation, structured Logging Runtime with credentials redaction, metrics aggregation instrument systems, hierarchical Trace/Span indexing, and Telemetry buffer pipelines. Certified with 97 passed Vitest tests.
 * [ ] **Future Objectives:**
   * [ ] Operating System Desktop Packaging (Phase 11 / Electron & Tauri integration).
   * [ ] Document intelligence parser using local PyMuPDF extraction.
@@ -286,7 +317,7 @@ python -m venv venv
 pip install -r backend/requirements.txt
 pytest backend/tests
 
-# Frontend Setup, Test Suite & Build (132 Vitest tests)
+# Frontend Setup, Test Suite & Build (520 Vitest tests)
 cd frontend
 npm install
 npm test

@@ -5,6 +5,9 @@ import type { IPluginLoader } from './plugin-loader';
 import type { IPluginLifecycleManager } from './plugin-lifecycle';
 import type { IPluginCapabilityManager, IPluginExtensionManager } from './plugin-capability';
 import type { IPluginSecurityManager, IPluginSandboxManager } from './plugin-security';
+import type { IPluginConfigurationManager } from './plugin-configuration';
+import type { IPluginIntegrationManager } from './plugin-integration';
+import type { IPluginCertificationManager } from './plugin-certification';
 import { PluginPolicyManager } from '../runtime/PluginPolicyManager';
 
 export interface IPluginRuntime {
@@ -70,4 +73,7 @@ export interface IPluginRuntime {
   security(): IPluginSecurityManager;
   policies(): PluginPolicyManager;
   sandbox(): IPluginSandboxManager;
+  configuration(): IPluginConfigurationManager;
+  integration(): IPluginIntegrationManager;
+  certification(): IPluginCertificationManager;
 }

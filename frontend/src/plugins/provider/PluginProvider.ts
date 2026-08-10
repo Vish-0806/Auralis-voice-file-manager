@@ -27,6 +27,12 @@ import { PluginSecurityManager } from '../runtime/PluginSecurityManager';
 import type { IPluginSecurityManager } from '../interfaces/plugin-security';
 import { PluginSandboxManager } from '../runtime/PluginSandboxManager';
 import type { IPluginSandboxManager } from '../interfaces/plugin-security';
+import { PluginConfigurationManager } from '../runtime/PluginConfigurationManager';
+import type { IPluginConfigurationManager } from '../interfaces/plugin-configuration';
+import { PluginIntegrationManager } from '../runtime/PluginIntegrationManager';
+import type { IPluginIntegrationManager } from '../interfaces/plugin-integration';
+import { PluginCertifier } from '../runtime/PluginCertifier';
+import type { IPluginCertificationManager } from '../interfaces/plugin-certification';
 
 export class PluginProvider implements IPluginProvider {
   private runtimeState: PluginRuntimeStateValue = PluginRuntimeState.UNINITIALIZED;
@@ -45,6 +51,19 @@ export class PluginProvider implements IPluginProvider {
   private readonly policyManager: PluginPolicyManager = new PluginPolicyManager();
   private readonly securityManager: IPluginSecurityManager = new PluginSecurityManager(this.lifecycleManager, this.policyManager);
   private readonly sandboxManager: IPluginSandboxManager = new PluginSandboxManager(this.lifecycleManager, this.securityManager);
+  private readonly configManager: IPluginConfigurationManager = new PluginConfigurationManager(this.lifecycleManager, this.securityManager);
+  private readonly certifierManager: IPluginCertificationManager = new PluginCertifier(this);
+  private readonly integrationManager: IPluginIntegrationManager = new PluginIntegrationManager(
+    this.discoveryManager,
+    this.dependencyResolver,
+    this.pluginLoader,
+    this.lifecycleManager,
+    this.capabilityManager,
+    this.extensionManager,
+    this.securityManager,
+    this.sandboxManager,
+    this.configManager
+  );
   private initializationCount = 0;
   private shutdownCount = 0;
   private errorCount = 0;
@@ -191,7 +210,7 @@ export class PluginProvider implements IPluginProvider {
   }
 
   listPlugins(): IPlugin[] {
-    return Array.from(this.plugins.values()).map((plugin) => Object.freeze({ ...plugin }));
+    return Object.freeze(Array.from(this.plugins.values()).map((plugin) => Object.freeze({ ...plugin }))) as IPlugin[];
   }
 
   diagnostics(): PluginRuntimeDiagnostics {
@@ -213,7 +232,10 @@ export class PluginProvider implements IPluginProvider {
       capabilityManager: this.capabilityManager.diagnostics() as any,
       extensionManager: this.extensionManager.diagnostics() as any,
       securityManager: this.securityManager.diagnostics() as any,
-      sandboxManager: this.sandboxManager.diagnostics() as any
+      sandboxManager: this.sandboxManager.diagnostics() as any,
+      configurationManager: this.configManager.diagnostics() as any,
+      integrationManager: this.integrationManager.diagnostics() as any,
+      certificationManager: this.certifierManager.getDiagnostics() as any
     });
   }
 
@@ -285,5 +307,17 @@ export class PluginProvider implements IPluginProvider {
 
   public sandbox(): IPluginSandboxManager {
     return this.sandboxManager;
+  }
+
+  public configuration(): IPluginConfigurationManager {
+    return this.configManager;
+  }
+
+  public integration(): IPluginIntegrationManager {
+    return this.integrationManager;
+  }
+
+  public certification(): IPluginCertificationManager {
+    return this.certifierManager;
   }
 }
