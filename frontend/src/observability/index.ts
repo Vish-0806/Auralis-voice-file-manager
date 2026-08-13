@@ -9,3 +9,5 @@ export * from './logging/index';
 export * from './metrics/index';
 export * from './tracing/index';
 export * from './telemetry/index';
+export * from './diagnostics/index';
+
