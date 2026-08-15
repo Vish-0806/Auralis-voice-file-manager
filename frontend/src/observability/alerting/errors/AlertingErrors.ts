@@ -66,4 +66,12 @@ export class AlertGenerationError extends AlertingRuntimeError {
   }
 }
 
+export class AlertDeduplicationError extends AlertingRuntimeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertDeduplicationError';
+  }
+}
+
+
 

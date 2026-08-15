@@ -12,6 +12,11 @@ import {
   ConditionEvaluationStatus,
   RuleEvaluationStatus
 } from '../models/evaluation';
+import {
+  DeduplicationDecision,
+  DeduplicationRecord,
+  DeduplicationDecisionType
+} from '../models/deduplication';
 import { freezeDeepSafe } from '../../models/monitoring';
 
 export function createAlertRecord(input: {
@@ -249,6 +254,12 @@ export function createAlertingStatistics(input: {
   generationErrors: number;
   totalGenerationDuration: number;
   averageGenerationDuration: number;
+  totalDeduplicationChecks: number;
+  acceptedAlertCount: number;
+  duplicateAlertCount: number;
+  cooldownSuppressedCount: number;
+  activeCooldownCount: number;
+  trackedFingerprintCount: number;
 }): AlertingStatistics {
   const stats: AlertingStatistics = {
     registeredAlertCount: input.registeredAlertCount,
@@ -267,7 +278,13 @@ export function createAlertingStatistics(input: {
     rejectedAlertGenerations: input.rejectedAlertGenerations,
     generationErrors: input.generationErrors,
     totalGenerationDuration: input.totalGenerationDuration,
-    averageGenerationDuration: input.averageGenerationDuration
+    averageGenerationDuration: input.averageGenerationDuration,
+    totalDeduplicationChecks: input.totalDeduplicationChecks,
+    acceptedAlertCount: input.acceptedAlertCount,
+    duplicateAlertCount: input.duplicateAlertCount,
+    cooldownSuppressedCount: input.cooldownSuppressedCount,
+    activeCooldownCount: input.activeCooldownCount,
+    trackedFingerprintCount: input.trackedFingerprintCount
   };
 
   return freezeDeepSafe(stats);
@@ -292,6 +309,12 @@ export function createAlertingDiagnostics(input: {
   generationErrors: number;
   totalGenerationDuration: number;
   averageGenerationDuration: number;
+  totalDeduplicationChecks: number;
+  acceptedAlertCount: number;
+  duplicateAlertCount: number;
+  cooldownSuppressedCount: number;
+  activeCooldownCount: number;
+  trackedFingerprintCount: number;
   generatedAt: number;
 }): AlertingDiagnostics {
   const diag: AlertingDiagnostics = {
@@ -313,10 +336,88 @@ export function createAlertingDiagnostics(input: {
     generationErrors: input.generationErrors,
     totalGenerationDuration: input.totalGenerationDuration,
     averageGenerationDuration: input.averageGenerationDuration,
+    totalDeduplicationChecks: input.totalDeduplicationChecks,
+    acceptedAlertCount: input.acceptedAlertCount,
+    duplicateAlertCount: input.duplicateAlertCount,
+    cooldownSuppressedCount: input.cooldownSuppressedCount,
+    activeCooldownCount: input.activeCooldownCount,
+    trackedFingerprintCount: input.trackedFingerprintCount,
     generatedAt: input.generatedAt
   };
 
   return freezeDeepSafe(diag);
+}
+
+export function createDeduplicationDecision(input: {
+  fingerprint: string;
+  alertId: string;
+  decision: any;
+  duplicate: boolean;
+  cooldownSuppressed: boolean;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  nextEligibleAt: number;
+  occurrenceCount: number;
+  evaluatedAt: number;
+  reason: string;
+}): DeduplicationDecision {
+  if (!input.fingerprint) {
+    throw new AlertRuleValidationError('fingerprint is required in deduplication decision');
+  }
+  if (!input.alertId) {
+    throw new AlertRuleValidationError('alertId is required in deduplication decision');
+  }
+  if (!Object.values(DeduplicationDecisionType).includes(input.decision)) {
+    throw new AlertRuleValidationError(`Invalid deduplication decision: ${input.decision}`);
+  }
+
+  const result: DeduplicationDecision = {
+    fingerprint: input.fingerprint,
+    alertId: input.alertId,
+    decision: input.decision,
+    duplicate: input.duplicate,
+    cooldownSuppressed: input.cooldownSuppressed,
+    firstSeenAt: input.firstSeenAt,
+    lastSeenAt: input.lastSeenAt,
+    nextEligibleAt: input.nextEligibleAt,
+    occurrenceCount: input.occurrenceCount,
+    evaluatedAt: input.evaluatedAt,
+    reason: input.reason
+  };
+
+  return freezeDeepSafe(result);
+}
+
+export function createDeduplicationRecord(input: {
+  fingerprint: string;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  occurrenceCount: number;
+  acceptedCount: number;
+  duplicateCount: number;
+  cooldownSuppressionCount: number;
+  nextEligibleAt: number;
+  ruleId?: string;
+  sourceId?: string;
+}): DeduplicationRecord {
+  if (!input.fingerprint) {
+    throw new AlertRuleValidationError('fingerprint is required in deduplication record');
+  }
+
+  const result: DeduplicationRecord = {
+    fingerprint: input.fingerprint,
+    firstSeenAt: input.firstSeenAt,
+    lastSeenAt: input.lastSeenAt,
+    occurrenceCount: input.occurrenceCount,
+    acceptedCount: input.acceptedCount,
+    duplicateCount: input.duplicateCount,
+    cooldownSuppressionCount: input.cooldownSuppressionCount,
+    nextEligibleAt: input.nextEligibleAt,
+    ruleId: input.ruleId,
+    sourceId: input.sourceId
+  };
+
+  return freezeDeepSafe(result);
 }
 
 export function createConditionEvaluationResult(input: {

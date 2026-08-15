@@ -4,9 +4,11 @@ import type { AlertRule } from '../models/alert-rule';
 import { AlertingRuntimeState, AlertingRuntimeStateValue } from '../models/runtime';
 import type { AlertingStatistics, AlertingDiagnostics } from '../models/statistics';
 import type { AlertEvaluationContext, RuleEvaluationResult } from '../models/evaluation';
+import type { DeduplicationDecision, DeduplicationRecord, DeduplicationPolicy } from '../models/deduplication';
 import { AlertRegistry } from '../registry/AlertRegistry';
 import { AlertEvaluator } from '../evaluator/AlertEvaluator';
 import { AlertGenerator } from '../generator/AlertGenerator';
+import { AlertDeduplicator } from '../deduplication/AlertDeduplicator';
 import { AlertingStateError, AlertGenerationError } from '../errors/AlertingErrors';
 import { createAlertingStatistics, createAlertingDiagnostics } from '../factories/alertingFactories';
 
@@ -15,6 +17,15 @@ export class AlertingProvider implements IAlertingProvider {
   private readonly _registry = new AlertRegistry();
   private readonly _evaluator = new AlertEvaluator();
   private readonly _generator = new AlertGenerator();
+  private readonly _deduplicator = new AlertDeduplicator();
+
+  // Default Policy: scope to PER_RULE and 5s cooldown
+  private readonly _policy: DeduplicationPolicy = {
+    enabled: true,
+    cooldownMs: 5000,
+    scope: 'PER_RULE',
+    maxHistorySize: 1000
+  };
 
   // Evaluation counters
   private _totalEvaluations = 0;
@@ -30,6 +41,12 @@ export class AlertingProvider implements IAlertingProvider {
   private _rejectedAlertGenerations = 0;
   private _generationErrors = 0;
   private _totalGenerationDuration = 0;
+
+  // Deduplication counters
+  private _totalDeduplicationChecks = 0;
+  private _acceptedAlertCount = 0;
+  private _duplicateAlertCount = 0;
+  private _cooldownSuppressedCount = 0;
 
   private ensureReady(action: string): void {
     if (this._state !== AlertingRuntimeState.READY) {
@@ -66,8 +83,10 @@ export class AlertingProvider implements IAlertingProvider {
     try {
       this._registry.clear();
       this._registry.clearRules();
+      this._deduplicator.clear();
       this.clearEvaluationStats();
       this.clearGenerationStats();
+      this.clearDeduplicationStats();
     } finally {
       this._state = AlertingRuntimeState.STOPPED;
     }
@@ -179,7 +198,6 @@ export class AlertingProvider implements IAlertingProvider {
     try {
       const alert = this._generator.generate(rule, evaluationResult);
 
-      // Store in registry
       this._registry.registerAlert(alert);
 
       this._successfulAlertGenerations++;
@@ -199,6 +217,35 @@ export class AlertingProvider implements IAlertingProvider {
     }
   }
 
+  // --- Deduplication API ---
+  public checkDeduplication(alert: AlertRecord, now?: number): DeduplicationDecision {
+    this.ensureReady('checkDeduplication');
+    const timestamp = now !== undefined ? now : Date.now();
+    const decision = this._deduplicator.check(alert, this._policy, timestamp);
+
+    this._totalDeduplicationChecks++;
+    if (decision.decision === 'ACCEPTED') {
+      this._acceptedAlertCount++;
+    } else if (decision.decision === 'DUPLICATE') {
+      this._duplicateAlertCount++;
+    } else if (decision.decision === 'COOLDOWN_SUPPRESSED') {
+      this._cooldownSuppressedCount++;
+      this._duplicateAlertCount++;
+    }
+
+    return decision;
+  }
+
+  public getDeduplicationRecord(identityKey: string): DeduplicationRecord | null {
+    this.ensureReady('getDeduplicationRecord');
+    return this._deduplicator.getRecord(identityKey);
+  }
+
+  public clearDeduplication(): void {
+    this.ensureReady('clearDeduplication');
+    this._deduplicator.clear();
+  }
+
   private clearEvaluationStats(): void {
     this._totalEvaluations = 0;
     this._matchedEvaluations = 0;
@@ -216,6 +263,13 @@ export class AlertingProvider implements IAlertingProvider {
     this._totalGenerationDuration = 0;
   }
 
+  private clearDeduplicationStats(): void {
+    this._totalDeduplicationChecks = 0;
+    this._acceptedAlertCount = 0;
+    this._duplicateAlertCount = 0;
+    this._cooldownSuppressedCount = 0;
+  }
+
   // --- Statistics & Diagnostics ---
   public getStatistics(): AlertingStatistics {
     this.ensureReady('getStatistics');
@@ -226,6 +280,8 @@ export class AlertingProvider implements IAlertingProvider {
     const disabledRuleCount = ruleCount - enabledRuleCount;
     const averageEvaluationDuration = this._totalEvaluations > 0 ? this._totalEvaluationDuration / this._totalEvaluations : 0;
     const averageGenerationDuration = this._totalAlertGenerations > 0 ? this._totalGenerationDuration / this._totalAlertGenerations : 0;
+
+    const dedupDiags = this._deduplicator.getDiagnostics(Date.now());
 
     return createAlertingStatistics({
       registeredAlertCount: alertCount,
@@ -244,7 +300,13 @@ export class AlertingProvider implements IAlertingProvider {
       rejectedAlertGenerations: this._rejectedAlertGenerations,
       generationErrors: this._generationErrors,
       totalGenerationDuration: this._totalGenerationDuration,
-      averageGenerationDuration
+      averageGenerationDuration,
+      totalDeduplicationChecks: this._totalDeduplicationChecks,
+      acceptedAlertCount: this._acceptedAlertCount,
+      duplicateAlertCount: this._duplicateAlertCount,
+      cooldownSuppressedCount: this._cooldownSuppressedCount,
+      activeCooldownCount: dedupDiags.activeCooldownCount,
+      trackedFingerprintCount: dedupDiags.trackedFingerprintCount
     });
   }
 
@@ -257,6 +319,9 @@ export class AlertingProvider implements IAlertingProvider {
     const disabledRuleCount = ruleCount - enabledRuleCount;
     const averageEvaluationDuration = this._totalEvaluations > 0 ? this._totalEvaluationDuration / this._totalEvaluations : 0;
     const averageGenerationDuration = this._totalAlertGenerations > 0 ? this._totalGenerationDuration / this._totalAlertGenerations : 0;
+
+    const now = Date.now();
+    const dedupDiags = this._deduplicator.getDiagnostics(now);
 
     return createAlertingDiagnostics({
       runtimeState: this._state,
@@ -277,7 +342,13 @@ export class AlertingProvider implements IAlertingProvider {
       generationErrors: this._generationErrors,
       totalGenerationDuration: this._totalGenerationDuration,
       averageGenerationDuration,
-      generatedAt: Date.now()
+      totalDeduplicationChecks: this._totalDeduplicationChecks,
+      acceptedAlertCount: this._acceptedAlertCount,
+      duplicateAlertCount: this._duplicateAlertCount,
+      cooldownSuppressedCount: this._cooldownSuppressedCount,
+      activeCooldownCount: dedupDiags.activeCooldownCount,
+      trackedFingerprintCount: dedupDiags.trackedFingerprintCount,
+      generatedAt: now
     });
   }
 }

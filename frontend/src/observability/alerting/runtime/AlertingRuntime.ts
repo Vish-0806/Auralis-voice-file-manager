@@ -6,6 +6,7 @@ import type { AlertRule } from '../models/alert-rule';
 import type { AlertingStatistics, AlertingDiagnostics } from '../models/statistics';
 import type { AlertingRuntimeStateValue } from '../models/runtime';
 import type { AlertEvaluationContext, RuleEvaluationResult } from '../models/evaluation';
+import type { DeduplicationDecision, DeduplicationRecord } from '../models/deduplication';
 
 export class AlertingRuntime implements IAlertingRuntime {
   private readonly _provider: IAlertingProvider;
@@ -96,6 +97,19 @@ export class AlertingRuntime implements IAlertingRuntime {
   // --- Generation API ---
   public generateAlert(rule: AlertRule, evaluationResult: RuleEvaluationResult): AlertRecord {
     return this._provider.generateAlert(rule, evaluationResult);
+  }
+
+  // --- Deduplication API ---
+  public checkDeduplication(alert: AlertRecord, now?: number): DeduplicationDecision {
+    return this._provider.checkDeduplication(alert, now);
+  }
+
+  public getDeduplicationRecord(identityKey: string): DeduplicationRecord | null {
+    return this._provider.getDeduplicationRecord(identityKey);
+  }
+
+  public clearDeduplication(): void {
+    this._provider.clearDeduplication();
   }
 
   // --- Stats & Diags ---

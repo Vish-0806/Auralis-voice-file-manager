@@ -3,6 +3,7 @@ import type { AlertRule } from '../models/alert-rule';
 import type { AlertingStatistics, AlertingDiagnostics } from '../models/statistics';
 import type { AlertingRuntimeStateValue } from '../models/runtime';
 import type { AlertEvaluationContext, RuleEvaluationResult } from '../models/evaluation';
+import type { DeduplicationDecision, DeduplicationRecord } from '../models/deduplication';
 
 export interface IAlertingProvider {
   initialize(): Promise<void>;
@@ -27,6 +28,11 @@ export interface IAlertingProvider {
 
   evaluateRule(rule: AlertRule, context: AlertEvaluationContext): RuleEvaluationResult;
   generateAlert(rule: AlertRule, evaluationResult: RuleEvaluationResult): AlertRecord;
+
+  // Extended for Phase 18.7.5
+  checkDeduplication(alert: AlertRecord, now?: number): DeduplicationDecision;
+  getDeduplicationRecord(identityKey: string): DeduplicationRecord | null;
+  clearDeduplication(): void;
 
   getStatistics(): AlertingStatistics;
   getDiagnostics(): AlertingDiagnostics;
