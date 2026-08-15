@@ -9,3 +9,4 @@ export { AlertEvaluator } from './evaluator/AlertEvaluator';
 export { AlertGenerator } from './generator/AlertGenerator';
 export { createAlertFingerprint } from './factories/fingerprint';
 export { AlertDeduplicator } from './deduplication/AlertDeduplicator';
+export { AlertLifecycleManager } from './lifecycle/AlertLifecycleManager';

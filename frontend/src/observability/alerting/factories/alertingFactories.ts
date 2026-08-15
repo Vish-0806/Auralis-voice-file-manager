@@ -17,6 +17,14 @@ import {
   DeduplicationRecord,
   DeduplicationDecisionType
 } from '../models/deduplication';
+import {
+  AlertLifecycleState,
+  AlertLifecycleStateValue,
+  AlertLifecycleActor,
+  AlertLifecycleActorValue,
+  AlertLifecycleHistoryEntry,
+  AlertLifecycleRecord
+} from '../models/lifecycle';
 import { freezeDeepSafe } from '../../models/monitoring';
 
 export function createAlertRecord(input: {
@@ -260,6 +268,15 @@ export function createAlertingStatistics(input: {
   cooldownSuppressedCount: number;
   activeCooldownCount: number;
   trackedFingerprintCount: number;
+  lifecycleTransitions: number;
+  acknowledgements: number;
+  resolutions: number;
+  closures: number;
+  invalidTransitions: number;
+  activeAlerts: number;
+  acknowledgedAlerts: number;
+  resolvedAlerts: number;
+  closedAlerts: number;
 }): AlertingStatistics {
   const stats: AlertingStatistics = {
     registeredAlertCount: input.registeredAlertCount,
@@ -284,7 +301,16 @@ export function createAlertingStatistics(input: {
     duplicateAlertCount: input.duplicateAlertCount,
     cooldownSuppressedCount: input.cooldownSuppressedCount,
     activeCooldownCount: input.activeCooldownCount,
-    trackedFingerprintCount: input.trackedFingerprintCount
+    trackedFingerprintCount: input.trackedFingerprintCount,
+    lifecycleTransitions: input.lifecycleTransitions,
+    acknowledgements: input.acknowledgements,
+    resolutions: input.resolutions,
+    closures: input.closures,
+    invalidTransitions: input.invalidTransitions,
+    activeAlerts: input.activeAlerts,
+    acknowledgedAlerts: input.acknowledgedAlerts,
+    resolvedAlerts: input.resolvedAlerts,
+    closedAlerts: input.closedAlerts
   };
 
   return freezeDeepSafe(stats);
@@ -315,6 +341,15 @@ export function createAlertingDiagnostics(input: {
   cooldownSuppressedCount: number;
   activeCooldownCount: number;
   trackedFingerprintCount: number;
+  lifecycleTransitions: number;
+  acknowledgements: number;
+  resolutions: number;
+  closures: number;
+  invalidTransitions: number;
+  activeAlerts: number;
+  acknowledgedAlerts: number;
+  resolvedAlerts: number;
+  closedAlerts: number;
   generatedAt: number;
 }): AlertingDiagnostics {
   const diag: AlertingDiagnostics = {
@@ -342,6 +377,15 @@ export function createAlertingDiagnostics(input: {
     cooldownSuppressedCount: input.cooldownSuppressedCount,
     activeCooldownCount: input.activeCooldownCount,
     trackedFingerprintCount: input.trackedFingerprintCount,
+    lifecycleTransitions: input.lifecycleTransitions,
+    acknowledgements: input.acknowledgements,
+    resolutions: input.resolutions,
+    closures: input.closures,
+    invalidTransitions: input.invalidTransitions,
+    activeAlerts: input.activeAlerts,
+    acknowledgedAlerts: input.acknowledgedAlerts,
+    resolvedAlerts: input.resolvedAlerts,
+    closedAlerts: input.closedAlerts,
     generatedAt: input.generatedAt
   };
 
@@ -525,4 +569,82 @@ export function createRuleEvaluationResult(input: {
   };
 
   return freezeDeepSafe(result);
+}
+
+export function createAlertLifecycleHistoryEntry(input: {
+  alertId: string;
+  fingerprint?: string;
+  previousState: AlertLifecycleStateValue | null;
+  nextState: AlertLifecycleStateValue;
+  timestamp: number;
+  actor: AlertLifecycleActorValue;
+  operation: string;
+  reason?: string;
+  metadata?: Record<string, unknown>;
+}): AlertLifecycleHistoryEntry {
+  if (!input.alertId) {
+    throw new AlertRuleValidationError('alertId is required in lifecycle history entry');
+  }
+  if (!Object.values(AlertLifecycleState).includes(input.nextState)) {
+    throw new AlertRuleValidationError(`Invalid lifecycle nextState: ${input.nextState}`);
+  }
+  if (input.previousState !== null && !Object.values(AlertLifecycleState).includes(input.previousState)) {
+    throw new AlertRuleValidationError(`Invalid lifecycle previousState: ${input.previousState}`);
+  }
+  if (!Object.values(AlertLifecycleActor).includes(input.actor)) {
+    throw new AlertRuleValidationError(`Invalid lifecycle actor: ${input.actor}`);
+  }
+  if (!input.operation) {
+    throw new AlertRuleValidationError('operation is required in lifecycle history entry');
+  }
+
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const entry: AlertLifecycleHistoryEntry = {
+    alertId: input.alertId,
+    fingerprint: input.fingerprint,
+    previousState: input.previousState,
+    nextState: input.nextState,
+    timestamp: input.timestamp,
+    actor: input.actor,
+    operation: input.operation,
+    reason: input.reason,
+    metadata
+  };
+
+  return freezeDeepSafe(entry);
+}
+
+export function createAlertLifecycleRecord(input: {
+  alertId: string;
+  fingerprint?: string;
+  state: AlertLifecycleStateValue;
+  createdAt: number;
+  updatedAt: number;
+  history: ReadonlyArray<AlertLifecycleHistoryEntry>;
+  metadata?: Record<string, unknown>;
+}): AlertLifecycleRecord {
+  if (!input.alertId) {
+    throw new AlertRuleValidationError('alertId is required in lifecycle record');
+  }
+  if (!Object.values(AlertLifecycleState).includes(input.state)) {
+    throw new AlertRuleValidationError(`Invalid lifecycle state: ${input.state}`);
+  }
+  if (!Array.isArray(input.history)) {
+    throw new AlertRuleValidationError('history array is required in lifecycle record');
+  }
+
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const record: AlertLifecycleRecord = {
+    alertId: input.alertId,
+    fingerprint: input.fingerprint,
+    state: input.state,
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt,
+    history: input.history,
+    metadata
+  };
+
+  return freezeDeepSafe(record);
 }

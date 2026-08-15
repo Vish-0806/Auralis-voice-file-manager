@@ -7,6 +7,7 @@ import type { AlertingStatistics, AlertingDiagnostics } from '../models/statisti
 import type { AlertingRuntimeStateValue } from '../models/runtime';
 import type { AlertEvaluationContext, RuleEvaluationResult } from '../models/evaluation';
 import type { DeduplicationDecision, DeduplicationRecord } from '../models/deduplication';
+import type { AlertLifecycleRecord, AlertLifecycleHistoryEntry, AlertLifecycleActorValue } from '../models/lifecycle';
 
 export class AlertingRuntime implements IAlertingRuntime {
   private readonly _provider: IAlertingProvider;
@@ -110,6 +111,49 @@ export class AlertingRuntime implements IAlertingRuntime {
 
   public clearDeduplication(): void {
     this._provider.clearDeduplication();
+  }
+
+  // --- Lifecycle API ---
+  public initializeAlertLifecycle(alertId: string, fingerprint?: string, now?: number): AlertLifecycleRecord {
+    return this._provider.initializeAlertLifecycle(alertId, fingerprint, now);
+  }
+
+  public getAlertLifecycle(alertId: string): AlertLifecycleRecord | null {
+    return this._provider.getAlertLifecycle(alertId);
+  }
+
+  public acknowledgeAlert(
+    alertId: string,
+    actor: AlertLifecycleActorValue,
+    reason?: string,
+    metadata?: Record<string, unknown>,
+    now?: number
+  ): AlertLifecycleRecord {
+    return this._provider.acknowledgeAlert(alertId, actor, reason, metadata, now);
+  }
+
+  public resolveAlert(
+    alertId: string,
+    actor: AlertLifecycleActorValue,
+    reason?: string,
+    metadata?: Record<string, unknown>,
+    now?: number
+  ): AlertLifecycleRecord {
+    return this._provider.resolveAlert(alertId, actor, reason, metadata, now);
+  }
+
+  public closeAlert(
+    alertId: string,
+    actor: AlertLifecycleActorValue,
+    reason?: string,
+    metadata?: Record<string, unknown>,
+    now?: number
+  ): AlertLifecycleRecord {
+    return this._provider.closeAlert(alertId, actor, reason, metadata, now);
+  }
+
+  public getAlertLifecycleHistory(alertId: string): ReadonlyArray<AlertLifecycleHistoryEntry> {
+    return this._provider.getAlertLifecycleHistory(alertId);
   }
 
   // --- Stats & Diags ---

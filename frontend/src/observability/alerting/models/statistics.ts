@@ -17,13 +17,23 @@ export interface AlertingStatistics extends AlertRuleStatistics {
   readonly totalGenerationDuration: number;
   readonly averageGenerationDuration: number;
 
-  // Extended for Phase 18.7.5
   readonly totalDeduplicationChecks: number;
   readonly acceptedAlertCount: number;
   readonly duplicateAlertCount: number;
   readonly cooldownSuppressedCount: number;
   readonly activeCooldownCount: number;
   readonly trackedFingerprintCount: number;
+
+  // Extended for Phase 18.7.6
+  readonly lifecycleTransitions: number;
+  readonly acknowledgements: number;
+  readonly resolutions: number;
+  readonly closures: number;
+  readonly invalidTransitions: number;
+  readonly activeAlerts: number;
+  readonly acknowledgedAlerts: number;
+  readonly resolvedAlerts: number;
+  readonly closedAlerts: number;
 }
 
 export interface AlertingDiagnostics extends AlertRuleStatistics {
@@ -44,13 +54,23 @@ export interface AlertingDiagnostics extends AlertRuleStatistics {
   readonly totalGenerationDuration: number;
   readonly averageGenerationDuration: number;
 
-  // Extended for Phase 18.7.5
   readonly totalDeduplicationChecks: number;
   readonly acceptedAlertCount: number;
   readonly duplicateAlertCount: number;
   readonly cooldownSuppressedCount: number;
   readonly activeCooldownCount: number;
   readonly trackedFingerprintCount: number;
+
+  // Extended for Phase 18.7.6
+  readonly lifecycleTransitions: number;
+  readonly acknowledgements: number;
+  readonly resolutions: number;
+  readonly closures: number;
+  readonly invalidTransitions: number;
+  readonly activeAlerts: number;
+  readonly acknowledgedAlerts: number;
+  readonly resolvedAlerts: number;
+  readonly closedAlerts: number;
 
   readonly generatedAt: number;
 }

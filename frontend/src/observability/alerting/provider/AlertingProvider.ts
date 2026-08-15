@@ -5,10 +5,12 @@ import { AlertingRuntimeState, AlertingRuntimeStateValue } from '../models/runti
 import type { AlertingStatistics, AlertingDiagnostics } from '../models/statistics';
 import type { AlertEvaluationContext, RuleEvaluationResult } from '../models/evaluation';
 import type { DeduplicationDecision, DeduplicationRecord, DeduplicationPolicy } from '../models/deduplication';
+import type { AlertLifecycleRecord, AlertLifecycleHistoryEntry, AlertLifecycleActorValue } from '../models/lifecycle';
 import { AlertRegistry } from '../registry/AlertRegistry';
 import { AlertEvaluator } from '../evaluator/AlertEvaluator';
 import { AlertGenerator } from '../generator/AlertGenerator';
 import { AlertDeduplicator } from '../deduplication/AlertDeduplicator';
+import { AlertLifecycleManager } from '../lifecycle/AlertLifecycleManager';
 import { AlertingStateError, AlertGenerationError } from '../errors/AlertingErrors';
 import { createAlertingStatistics, createAlertingDiagnostics } from '../factories/alertingFactories';
 
@@ -18,8 +20,8 @@ export class AlertingProvider implements IAlertingProvider {
   private readonly _evaluator = new AlertEvaluator();
   private readonly _generator = new AlertGenerator();
   private readonly _deduplicator = new AlertDeduplicator();
+  private readonly _lifecycleManager = new AlertLifecycleManager();
 
-  // Default Policy: scope to PER_RULE and 5s cooldown
   private readonly _policy: DeduplicationPolicy = {
     enabled: true,
     cooldownMs: 5000,
@@ -56,7 +58,7 @@ export class AlertingProvider implements IAlertingProvider {
 
   public async initialize(): Promise<void> {
     if (this._state === AlertingRuntimeState.READY) {
-      return; // idempotent
+      return;
     }
     if (this._state === AlertingRuntimeState.INITIALIZING || this._state === AlertingRuntimeState.STOPPING || this._state === AlertingRuntimeState.STOPPED) {
       throw new AlertingStateError(`Cannot initialize alerting provider from state: ${this._state}`);
@@ -73,7 +75,7 @@ export class AlertingProvider implements IAlertingProvider {
 
   public async shutdown(): Promise<void> {
     if (this._state === AlertingRuntimeState.STOPPED) {
-      return; // idempotent
+      return;
     }
     if (this._state === AlertingRuntimeState.UNINITIALIZED) {
       throw new AlertingStateError('Cannot shutdown alerting provider: it is not initialized.');
@@ -84,6 +86,7 @@ export class AlertingProvider implements IAlertingProvider {
       this._registry.clear();
       this._registry.clearRules();
       this._deduplicator.clear();
+      this._lifecycleManager.clearAll();
       this.clearEvaluationStats();
       this.clearGenerationStats();
       this.clearDeduplicationStats();
@@ -104,6 +107,8 @@ export class AlertingProvider implements IAlertingProvider {
   public registerAlert(alert: AlertRecord): void {
     this.ensureReady('registerAlert');
     this._registry.registerAlert(alert);
+    // Initialize lifecycle state as ACTIVE if not already present
+    this._lifecycleManager.initializeRecord(alert.id, alert.fingerprint, alert.triggeredAt || alert.generatedAt || Date.now());
   }
 
   public getAlert(alertId: string): AlertRecord | null {
@@ -118,7 +123,8 @@ export class AlertingProvider implements IAlertingProvider {
 
   public removeAlert(alertId: string): void {
     this.ensureReady('removeAlert');
-    return this._registry.removeAlert(alertId);
+    this._registry.removeAlert(alertId);
+    this._lifecycleManager.clear(alertId);
   }
 
   public listAlerts(): ReadonlyArray<AlertRecord> {
@@ -129,6 +135,7 @@ export class AlertingProvider implements IAlertingProvider {
   public clearAlerts(): void {
     this.ensureReady('clearAlerts');
     this._registry.clear();
+    this._lifecycleManager.clearAll();
   }
 
   // --- Rule API ---
@@ -172,7 +179,6 @@ export class AlertingProvider implements IAlertingProvider {
     this.ensureReady('evaluateRule');
     const result = this._evaluator.evaluateRule(rule, context);
 
-    // Track stats
     this._totalEvaluations++;
     this._totalEvaluationDuration += result.durationMs;
 
@@ -199,6 +205,10 @@ export class AlertingProvider implements IAlertingProvider {
       const alert = this._generator.generate(rule, evaluationResult);
 
       this._registry.registerAlert(alert);
+
+      // Automatically initialize alert lifecycle as ACTIVE
+      const generatedAt = alert.generatedAt || Date.now();
+      this._lifecycleManager.initializeRecord(alert.id, alert.fingerprint, generatedAt);
 
       this._successfulAlertGenerations++;
       const duration = performance.now() - startTime;
@@ -246,6 +256,55 @@ export class AlertingProvider implements IAlertingProvider {
     this._deduplicator.clear();
   }
 
+  // --- Lifecycle API ---
+  public initializeAlertLifecycle(alertId: string, fingerprint?: string, now?: number): AlertLifecycleRecord {
+    this.ensureReady('initializeAlertLifecycle');
+    return this._lifecycleManager.initializeRecord(alertId, fingerprint, now);
+  }
+
+  public getAlertLifecycle(alertId: string): AlertLifecycleRecord | null {
+    this.ensureReady('getAlertLifecycle');
+    return this._lifecycleManager.getRecord(alertId);
+  }
+
+  public acknowledgeAlert(
+    alertId: string,
+    actor: AlertLifecycleActorValue,
+    reason?: string,
+    metadata?: Record<string, unknown>,
+    now?: number
+  ): AlertLifecycleRecord {
+    this.ensureReady('acknowledgeAlert');
+    return this._lifecycleManager.transition(alertId, 'ACKNOWLEDGED', actor, 'ACKNOWLEDGE', reason, metadata, now);
+  }
+
+  public resolveAlert(
+    alertId: string,
+    actor: AlertLifecycleActorValue,
+    reason?: string,
+    metadata?: Record<string, unknown>,
+    now?: number
+  ): AlertLifecycleRecord {
+    this.ensureReady('resolveAlert');
+    return this._lifecycleManager.transition(alertId, 'RESOLVED', actor, 'RESOLVE', reason, metadata, now);
+  }
+
+  public closeAlert(
+    alertId: string,
+    actor: AlertLifecycleActorValue,
+    reason?: string,
+    metadata?: Record<string, unknown>,
+    now?: number
+  ): AlertLifecycleRecord {
+    this.ensureReady('closeAlert');
+    return this._lifecycleManager.transition(alertId, 'CLOSED', actor, 'CLOSE', reason, metadata, now);
+  }
+
+  public getAlertLifecycleHistory(alertId: string): ReadonlyArray<AlertLifecycleHistoryEntry> {
+    this.ensureReady('getAlertLifecycleHistory');
+    return this._lifecycleManager.getHistory(alertId);
+  }
+
   private clearEvaluationStats(): void {
     this._totalEvaluations = 0;
     this._matchedEvaluations = 0;
@@ -282,6 +341,7 @@ export class AlertingProvider implements IAlertingProvider {
     const averageGenerationDuration = this._totalAlertGenerations > 0 ? this._totalGenerationDuration / this._totalAlertGenerations : 0;
 
     const dedupDiags = this._deduplicator.getDiagnostics(Date.now());
+    const lifecycleStats = this._lifecycleManager.getTransitionStats();
 
     return createAlertingStatistics({
       registeredAlertCount: alertCount,
@@ -306,7 +366,16 @@ export class AlertingProvider implements IAlertingProvider {
       duplicateAlertCount: this._duplicateAlertCount,
       cooldownSuppressedCount: this._cooldownSuppressedCount,
       activeCooldownCount: dedupDiags.activeCooldownCount,
-      trackedFingerprintCount: dedupDiags.trackedFingerprintCount
+      trackedFingerprintCount: dedupDiags.trackedFingerprintCount,
+      lifecycleTransitions: lifecycleStats.lifecycleTransitions,
+      acknowledgements: lifecycleStats.acknowledgements,
+      resolutions: lifecycleStats.resolutions,
+      closures: lifecycleStats.closures,
+      invalidTransitions: lifecycleStats.invalidTransitions,
+      activeAlerts: lifecycleStats.activeAlerts,
+      acknowledgedAlerts: lifecycleStats.acknowledgedAlerts,
+      resolvedAlerts: lifecycleStats.resolvedAlerts,
+      closedAlerts: lifecycleStats.closedAlerts
     });
   }
 
@@ -322,6 +391,7 @@ export class AlertingProvider implements IAlertingProvider {
 
     const now = Date.now();
     const dedupDiags = this._deduplicator.getDiagnostics(now);
+    const lifecycleStats = this._lifecycleManager.getTransitionStats();
 
     return createAlertingDiagnostics({
       runtimeState: this._state,
@@ -348,6 +418,15 @@ export class AlertingProvider implements IAlertingProvider {
       cooldownSuppressedCount: this._cooldownSuppressedCount,
       activeCooldownCount: dedupDiags.activeCooldownCount,
       trackedFingerprintCount: dedupDiags.trackedFingerprintCount,
+      lifecycleTransitions: lifecycleStats.lifecycleTransitions,
+      acknowledgements: lifecycleStats.acknowledgements,
+      resolutions: lifecycleStats.resolutions,
+      closures: lifecycleStats.closures,
+      invalidTransitions: lifecycleStats.invalidTransitions,
+      activeAlerts: lifecycleStats.activeAlerts,
+      acknowledgedAlerts: lifecycleStats.acknowledgedAlerts,
+      resolvedAlerts: lifecycleStats.resolvedAlerts,
+      closedAlerts: lifecycleStats.closedAlerts,
       generatedAt: now
     });
   }

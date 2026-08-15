@@ -8,3 +8,4 @@ export * from './alert-rule';
 export * from './rule-statistics';
 export * from './evaluation';
 export * from './deduplication';
+export * from './lifecycle';

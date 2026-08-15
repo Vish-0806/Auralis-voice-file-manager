@@ -4,12 +4,13 @@ import type { AlertingStatistics, AlertingDiagnostics } from '../models/statisti
 import type { AlertingRuntimeStateValue } from '../models/runtime';
 import type { AlertEvaluationContext, RuleEvaluationResult } from '../models/evaluation';
 import type { DeduplicationDecision, DeduplicationRecord } from '../models/deduplication';
+import type { AlertLifecycleRecord, AlertLifecycleHistoryEntry, AlertLifecycleActorValue } from '../models/lifecycle';
 
 export interface IAlertingProvider {
   initialize(): Promise<void>;
   shutdown(): Promise<void>;
   getRuntimeState(): AlertingRuntimeStateValue;
-  getState(): AlertingRuntimeStateValue; // for backwards/system-wide state checking compatibility
+  getState(): AlertingRuntimeStateValue;
 
   registerAlert(alert: AlertRecord): void;
   getAlert(alertId: string): AlertRecord | null;
@@ -29,10 +30,35 @@ export interface IAlertingProvider {
   evaluateRule(rule: AlertRule, context: AlertEvaluationContext): RuleEvaluationResult;
   generateAlert(rule: AlertRule, evaluationResult: RuleEvaluationResult): AlertRecord;
 
-  // Extended for Phase 18.7.5
   checkDeduplication(alert: AlertRecord, now?: number): DeduplicationDecision;
   getDeduplicationRecord(identityKey: string): DeduplicationRecord | null;
   clearDeduplication(): void;
+
+  // Extended for Phase 18.7.6
+  initializeAlertLifecycle(alertId: string, fingerprint?: string, now?: number): AlertLifecycleRecord;
+  getAlertLifecycle(alertId: string): AlertLifecycleRecord | null;
+  acknowledgeAlert(
+    alertId: string,
+    actor: AlertLifecycleActorValue,
+    reason?: string,
+    metadata?: Record<string, unknown>,
+    now?: number
+  ): AlertLifecycleRecord;
+  resolveAlert(
+    alertId: string,
+    actor: AlertLifecycleActorValue,
+    reason?: string,
+    metadata?: Record<string, unknown>,
+    now?: number
+  ): AlertLifecycleRecord;
+  closeAlert(
+    alertId: string,
+    actor: AlertLifecycleActorValue,
+    reason?: string,
+    metadata?: Record<string, unknown>,
+    now?: number
+  ): AlertLifecycleRecord;
+  getAlertLifecycleHistory(alertId: string): ReadonlyArray<AlertLifecycleHistoryEntry>;
 
   getStatistics(): AlertingStatistics;
   getDiagnostics(): AlertingDiagnostics;

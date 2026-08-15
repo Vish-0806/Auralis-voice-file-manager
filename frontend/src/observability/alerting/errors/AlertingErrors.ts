@@ -73,5 +73,34 @@ export class AlertDeduplicationError extends AlertingRuntimeError {
   }
 }
 
+export class AlertLifecycleError extends AlertingRuntimeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertLifecycleError';
+  }
+}
+
+export class AlertLifecycleStateError extends AlertLifecycleError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertLifecycleStateError';
+  }
+}
+
+export class AlertLifecycleTransitionError extends AlertLifecycleError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertLifecycleTransitionError';
+  }
+}
+
+export class AlertLifecycleNotFoundError extends AlertLifecycleError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertLifecycleNotFoundError';
+  }
+}
+
+
 
 
