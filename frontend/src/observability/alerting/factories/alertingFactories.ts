@@ -1,328 +1,1231 @@
-import { AlertValidationError } from '../errors/AlertingErrors';
+import { AlertValidationError, AlertRuleValidationError } from '../errors/AlertingErrors';
+import { AlertSeverity, AlertSeverityValue } from '../models/severity';
+import { AlertState, AlertStateValue, AlertRecord } from '../models/alert';
+import { AlertingStatistics, AlertingDiagnostics } from '../models/statistics';
+import { AlertOperator, AlertOperatorValue, RuleCondition } from '../models/rule-condition';
+import { ConditionGroup } from '../models/condition-group';
+import { AlertRule } from '../models/alert-rule';
 import {
-  AlertSeverity,
-  AlertSeverityValue,
-  AlertState,
-  AlertStateValue,
-  AlertRecord
-} from '../models/alert';
-import { AlertRule } from '../models/rule';
-import { AlertOperator, AlertCondition, AlertConditionGroup } from '../models/condition';
-import { AlertEvaluationResult, AlertConditionResult } from '../models/evaluation';
-import { AlertStatistics } from '../models/statistics';
-
-// Implement freezeDeepSafe locally to ensure provider-independent immutability
-function freezeDeepSafe<T>(value: T): T {
-  if (Object.isFrozen(value)) {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    const arrayValue = value.map((item) => freezeDeepSafe(item));
-    return Object.freeze(arrayValue) as T;
-  }
-
-  if (value instanceof Map) {
-    const newMap = new Map();
-    value.forEach((v, k) => {
-      newMap.set(freezeDeepSafe(k), freezeDeepSafe(v));
-    });
-    return Object.freeze(newMap) as unknown as T;
-  }
-
-  if (value instanceof Set) {
-    const newSet = new Set();
-    value.forEach((v) => {
-      newSet.add(freezeDeepSafe(v));
-    });
-    return Object.freeze(newSet) as unknown as T;
-  }
-
-  if (value && typeof value === 'object') {
-    if (value instanceof Error || value instanceof RegExp || value instanceof Date) {
-      return Object.freeze(value);
-    }
-    const objectValue = value as Record<string, unknown>;
-    const copy: Record<string, unknown> = {};
-    Object.keys(objectValue).forEach((key) => {
-      copy[key] = freezeDeepSafe(objectValue[key]);
-    });
-    return Object.freeze(copy) as unknown as T;
-  }
-
-  return value;
-}
-
-export function createAlertCondition(input: {
-  field: string;
-  operator: string;
-  expectedValue?: unknown;
-  threshold?: number;
-  metadata?: Record<string, unknown>;
-}): AlertCondition {
-  if (!input.field || typeof input.field !== 'string') {
-    throw new AlertValidationError('Alert condition field must be a non-empty string');
-  }
-  if (!Object.values(AlertOperator).includes(input.operator as any)) {
-    throw new AlertValidationError(`Invalid alert condition operator: ${input.operator}`);
-  }
-  if (input.threshold !== undefined && typeof input.threshold !== 'number') {
-    throw new AlertValidationError('Alert condition threshold must be a number');
-  }
-
-  const cond: AlertCondition = {
-    field: input.field,
-    operator: input.operator as any,
-    expectedValue: input.expectedValue,
-    threshold: input.threshold,
-    metadata: input.metadata ? { ...input.metadata } : {}
-  };
-
-  return freezeDeepSafe(cond);
-}
-
-export function createAlertRule(input: {
-  id: string;
-  name: string;
-  description: string;
-  enabled?: boolean;
-  severity: AlertSeverityValue;
-  sourceId: string;
-  priority?: number;
-  cooldownMs?: number;
-  suppressionMs?: number;
-  expirationMs?: number;
-  conditions: AlertConditionGroup | ReadonlyArray<AlertCondition>;
-  metadata?: Record<string, unknown>;
-}): AlertRule {
-  if (!input.id || typeof input.id !== 'string') {
-    throw new AlertValidationError('Alert rule id must be a non-empty string');
-  }
-  if (!input.name || typeof input.name !== 'string') {
-    throw new AlertValidationError('Alert rule name must be a non-empty string');
-  }
-  if (!input.description || typeof input.description !== 'string') {
-    throw new AlertValidationError('Alert rule description must be a non-empty string');
-  }
-  if (!Object.values(AlertSeverity).includes(input.severity)) {
-    throw new AlertValidationError(`Invalid alert rule severity: ${input.severity}`);
-  }
-  if (!input.sourceId || typeof input.sourceId !== 'string') {
-    throw new AlertValidationError('Alert rule sourceId must be a non-empty string');
-  }
-  if (input.cooldownMs !== undefined && (typeof input.cooldownMs !== 'number' || input.cooldownMs < 0)) {
-    throw new AlertValidationError('Alert rule cooldownMs must be a non-negative number');
-  }
-  if (input.suppressionMs !== undefined && (typeof input.suppressionMs !== 'number' || input.suppressionMs < 0)) {
-    throw new AlertValidationError('Alert rule suppressionMs must be a non-negative number');
-  }
-  if (input.expirationMs !== undefined && (typeof input.expirationMs !== 'number' || input.expirationMs < 0)) {
-    throw new AlertValidationError('Alert rule expirationMs must be a non-negative number');
-  }
-
-  // Validate conditions
-  if (!input.conditions) {
-    throw new AlertValidationError('Alert rule conditions must be provided');
-  }
-
-  const rule: AlertRule = {
-    id: input.id,
-    name: input.name,
-    description: input.description,
-    enabled: input.enabled !== false,
-    severity: input.severity,
-    sourceId: input.sourceId,
-    priority: typeof input.priority === 'number' ? input.priority : 0,
-    cooldownMs: input.cooldownMs,
-    suppressionMs: input.suppressionMs,
-    expirationMs: input.expirationMs,
-    conditions: input.conditions,
-    metadata: input.metadata ? { ...input.metadata } : {}
-  };
-
-  return freezeDeepSafe(rule);
-}
+  ConditionEvaluationResult,
+  GroupEvaluationResult,
+  RuleEvaluationResult,
+  ConditionEvaluationStatus,
+  RuleEvaluationStatus
+} from '../models/evaluation';
+import {
+  DeduplicationDecision,
+  DeduplicationRecord,
+  DeduplicationDecisionType
+} from '../models/deduplication';
+import {
+  AlertLifecycleState,
+  AlertLifecycleStateValue,
+  AlertLifecycleActor,
+  AlertLifecycleActorValue,
+  AlertLifecycleHistoryEntry,
+  AlertLifecycleRecord
+} from '../models/lifecycle';
+import {
+  AlertSuppressionReason,
+  AlertSuppressionReasonValue,
+  AlertSuppressionScope,
+  AlertSuppressionScopeValue,
+  AlertSuppressionPolicy,
+  AlertMaintenanceWindow,
+  AlertSnoozeRecord,
+  AlertSuppressionDecision
+} from '../models/suppression';
+import {
+  NotificationChannelType,
+  NotificationChannelTypeValue,
+  NotificationPriority,
+  NotificationPriorityValue,
+  NotificationDeliveryStatus,
+  NotificationDeliveryStatusValue,
+  NotificationRecipient,
+  NotificationPayload,
+  NotificationRequest,
+  NotificationDeliveryAttempt,
+  NotificationDeliveryResult
+} from '../models/notification';
+import {
+  AlertOrchestrationStage,
+  AlertOrchestrationStageValue,
+  AlertOrchestrationStatus,
+  AlertOrchestrationStatusValue,
+  AlertOrchestrationStageResult,
+  AlertOrchestrationResult
+} from '../models/orchestration';
+import { freezeDeepSafe } from '../../models/monitoring';
 
 export function createAlertRecord(input: {
   id: string;
-  ruleId: string;
   sourceId: string;
-  fingerprint: string;
   severity: AlertSeverityValue;
   state: AlertStateValue;
   title: string;
   message: string;
   createdAt: number;
   updatedAt: number;
-  acknowledgedAt?: number | null;
-  acknowledgedBy?: string | null;
-  resolvedAt?: number | null;
-  resolvedBy?: string | null;
-  suppressedUntil?: number | null;
-  expiresAt?: number | null;
   metadata?: Record<string, unknown>;
 }): AlertRecord {
-  if (!input.id || typeof input.id !== 'string') {
-    throw new AlertValidationError('Alert record id must be a non-empty string');
+  if (!input.id || typeof input.id !== 'string' || input.id.trim() === '') {
+    throw new AlertValidationError('Alert ID must be a non-empty string');
   }
-  if (!input.ruleId || typeof input.ruleId !== 'string') {
-    throw new AlertValidationError('Alert record ruleId must be a non-empty string');
-  }
-  if (!input.sourceId || typeof input.sourceId !== 'string') {
-    throw new AlertValidationError('Alert record sourceId must be a non-empty string');
-  }
-  if (!input.fingerprint || typeof input.fingerprint !== 'string') {
-    throw new AlertValidationError('Alert record fingerprint must be a non-empty string');
+  if (!input.sourceId || typeof input.sourceId !== 'string' || input.sourceId.trim() === '') {
+    throw new AlertValidationError('Alert sourceId must be a non-empty string');
   }
   if (!Object.values(AlertSeverity).includes(input.severity)) {
-    throw new AlertValidationError(`Invalid alert record severity: ${input.severity}`);
+    throw new AlertValidationError(`Invalid alert severity: ${input.severity}`);
   }
   if (!Object.values(AlertState).includes(input.state)) {
-    throw new AlertValidationError(`Invalid alert record state: ${input.state}`);
+    throw new AlertValidationError(`Invalid alert state: ${input.state}`);
   }
-  if (typeof input.createdAt !== 'number' || input.createdAt < 0) {
-    throw new AlertValidationError('Alert record createdAt must be a valid timestamp');
+  if (!input.title || typeof input.title !== 'string' || input.title.trim() === '') {
+    throw new AlertValidationError('Alert title must be a non-empty string');
   }
-  if (typeof input.updatedAt !== 'number' || input.updatedAt < 0) {
-    throw new AlertValidationError('Alert record updatedAt must be a valid timestamp');
+  if (!input.message || typeof input.message !== 'string' || input.message.trim() === '') {
+    throw new AlertValidationError('Alert message must be a non-empty string');
+  }
+  if (typeof input.createdAt !== 'number' || isNaN(input.createdAt) || input.createdAt < 0) {
+    throw new AlertValidationError('Alert createdAt must be a valid timestamp');
+  }
+  if (typeof input.updatedAt !== 'number' || isNaN(input.updatedAt) || input.updatedAt < 0) {
+    throw new AlertValidationError('Alert updatedAt must be a valid timestamp');
   }
 
-  const alert: AlertRecord = {
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const record: AlertRecord = {
     id: input.id,
-    ruleId: input.ruleId,
     sourceId: input.sourceId,
-    fingerprint: input.fingerprint,
     severity: input.severity,
     state: input.state,
-    title: input.title || '',
-    message: input.message || '',
+    title: input.title,
+    message: input.message,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
-    acknowledgedAt: input.acknowledgedAt || null,
-    acknowledgedBy: input.acknowledgedBy || null,
-    resolvedAt: input.resolvedAt || null,
-    resolvedBy: input.resolvedBy || null,
-    suppressedUntil: input.suppressedUntil || null,
-    expiresAt: input.expiresAt || null,
-    metadata: input.metadata ? { ...input.metadata } : {}
+    metadata
   };
 
-  return freezeDeepSafe(alert);
+  return freezeDeepSafe(record);
 }
 
-export function createAlertEvaluationResult(input: {
-  ruleId: string;
-  matched: boolean;
-  evaluatedAt: number;
-  duration: number;
-  conditionResults: ReadonlyArray<AlertConditionResult>;
-  reason?: string | null;
-  error?: {
-    name: string;
-    message: string;
-    stack?: string;
-  } | null;
+export function createRuleCondition(input: {
+  id: string;
+  field: string;
+  operator: AlertOperatorValue;
+  expectedValue?: unknown;
   metadata?: Record<string, unknown>;
-}): AlertEvaluationResult {
-  if (!input.ruleId || typeof input.ruleId !== 'string') {
-    throw new AlertValidationError('Alert evaluation result ruleId must be a non-empty string');
+}): RuleCondition {
+  if (!input.id || typeof input.id !== 'string' || input.id.trim() === '') {
+    throw new AlertRuleValidationError('Condition ID must be a non-empty string');
   }
-  if (typeof input.evaluatedAt !== 'number' || input.evaluatedAt < 0) {
-    throw new AlertValidationError('Alert evaluation result evaluatedAt must be a valid timestamp');
+  if (!input.field || typeof input.field !== 'string' || input.field.trim() === '') {
+    throw new AlertRuleValidationError('Condition field must be a non-empty string');
   }
-  if (typeof input.duration !== 'number' || input.duration < 0) {
-    throw new AlertValidationError('Alert evaluation result duration must be a non-negative number');
+  if (!Object.values(AlertOperator).includes(input.operator)) {
+    throw new AlertRuleValidationError(`Invalid condition operator: ${input.operator}`);
   }
 
-  const evalResult: AlertEvaluationResult = {
-    ruleId: input.ruleId,
-    matched: input.matched,
-    evaluatedAt: input.evaluatedAt,
-    duration: input.duration,
-    conditionResults: input.conditionResults,
-    reason: input.reason || null,
-    error: input.error ? { ...input.error } : null,
-    metadata: input.metadata ? { ...input.metadata } : {}
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const condition: RuleCondition = {
+    id: input.id,
+    field: input.field,
+    operator: input.operator,
+    expectedValue: input.expectedValue,
+    metadata
   };
 
-  return freezeDeepSafe(evalResult);
+  return freezeDeepSafe(condition);
 }
 
-export function createAlertStatistics(input: {
+export function createConditionGroup(input: {
+  operator: 'ALL' | 'ANY' | 'NOT';
+  conditions: ReadonlyArray<RuleCondition | ConditionGroup>;
+}): ConditionGroup {
+  if (!['ALL', 'ANY', 'NOT'].includes(input.operator)) {
+    throw new AlertRuleValidationError(`Invalid condition group operator: ${input.operator}`);
+  }
+  if (!Array.isArray(input.conditions) || input.conditions.length === 0) {
+    throw new AlertRuleValidationError('Condition group must contain a non-empty array of conditions');
+  }
+
+  // Deep clone to prevent external mutation
+  const conditions = input.conditions.map(c => {
+    if ('operator' in c && ['ALL', 'ANY', 'NOT'].includes(c.operator)) {
+      return createConditionGroup(c as ConditionGroup);
+    } else {
+      return createRuleCondition(c as RuleCondition);
+    }
+  });
+
+  const group: ConditionGroup = {
+    operator: input.operator,
+    conditions
+  };
+
+  return freezeDeepSafe(group);
+}
+
+function validateConditionGroup(group: ConditionGroup, depth: number, seenConditionIds: Set<string>): void {
+  if (depth > 10) {
+    throw new AlertRuleValidationError('Exceeded maximum nesting depth for condition groups');
+  }
+  if (!group || typeof group !== 'object') {
+    throw new AlertRuleValidationError('Condition group must be a valid object');
+  }
+  if (!['ALL', 'ANY', 'NOT'].includes(group.operator)) {
+    throw new AlertRuleValidationError(`Invalid condition group operator: ${group.operator}`);
+  }
+  if (!Array.isArray(group.conditions) || group.conditions.length === 0) {
+    throw new AlertRuleValidationError('Condition group must contain a non-empty array of conditions');
+  }
+
+  for (const c of group.conditions) {
+    if ('operator' in c && ['ALL', 'ANY', 'NOT'].includes(c.operator)) {
+      validateConditionGroup(c as ConditionGroup, depth + 1, seenConditionIds);
+    } else {
+      const cond = c as RuleCondition;
+      if (!cond.id || typeof cond.id !== 'string' || cond.id.trim() === '') {
+        throw new AlertRuleValidationError('Condition ID must be a non-empty string');
+      }
+      if (!cond.field || typeof cond.field !== 'string' || cond.field.trim() === '') {
+        throw new AlertRuleValidationError('Condition field must be a non-empty string');
+      }
+      if (!Object.values(AlertOperator).includes(cond.operator)) {
+        throw new AlertRuleValidationError(`Invalid condition operator: ${cond.operator}`);
+      }
+      if (seenConditionIds.has(cond.id)) {
+        throw new AlertRuleValidationError(`Duplicate condition ID '${cond.id}' within the rule`);
+      }
+      seenConditionIds.add(cond.id);
+    }
+  }
+}
+
+export function createAlertRule(input: {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  severity: AlertSeverityValue;
+  conditions: ConditionGroup;
+  sourceId: string;
+  tags?: ReadonlyArray<string>;
+  createdAt: number;
+  updatedAt: number;
+  version?: number;
+  metadata?: Record<string, unknown>;
+}): AlertRule {
+  if (!input.id || typeof input.id !== 'string' || input.id.trim() === '') {
+    throw new AlertRuleValidationError('Rule ID must be a non-empty string');
+  }
+  if (!input.name || typeof input.name !== 'string' || input.name.trim() === '') {
+    throw new AlertRuleValidationError('Rule name must be a non-empty string');
+  }
+  if (typeof input.description !== 'string') {
+    throw new AlertRuleValidationError('Rule description must be a string');
+  }
+  if (typeof input.enabled !== 'boolean') {
+    throw new AlertRuleValidationError('Rule enabled state must be a boolean');
+  }
+  if (!Object.values(AlertSeverity).includes(input.severity)) {
+    throw new AlertRuleValidationError(`Invalid rule severity: ${input.severity}`);
+  }
+  if (!input.sourceId || typeof input.sourceId !== 'string' || input.sourceId.trim() === '') {
+    throw new AlertRuleValidationError('Rule sourceId must be a non-empty string');
+  }
+  if (typeof input.createdAt !== 'number' || isNaN(input.createdAt) || input.createdAt < 0) {
+    throw new AlertRuleValidationError('Rule createdAt must be a valid timestamp');
+  }
+  if (typeof input.updatedAt !== 'number' || isNaN(input.updatedAt) || input.updatedAt < 0) {
+    throw new AlertRuleValidationError('Rule updatedAt must be a valid timestamp');
+  }
+  if (input.version !== undefined && (typeof input.version !== 'number' || isNaN(input.version) || input.version < 0)) {
+    throw new AlertRuleValidationError('Rule version must be a non-negative number');
+  }
+
+  // Validate condition group and check for duplicates recursively
+  const seenConditionIds = new Set<string>();
+  validateConditionGroup(input.conditions, 0, seenConditionIds);
+
+  const tags = Array.isArray(input.tags) ? input.tags.map(t => String(t)) : [];
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  // Deep copy condition group structure using createConditionGroup to ensure it's validated, frozen and copied
+  const conditions = createConditionGroup(input.conditions);
+
+  const rule: AlertRule = {
+    id: input.id,
+    name: input.name,
+    description: input.description,
+    enabled: input.enabled,
+    severity: input.severity,
+    conditions,
+    sourceId: input.sourceId,
+    tags,
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt,
+    version: input.version,
+    metadata
+  };
+
+  return freezeDeepSafe(rule);
+}
+
+export function createAlertingStatistics(input: {
+  registeredAlertCount: number;
+  registeredRuleCount: number;
+  enabledRuleCount: number;
+  disabledRuleCount: number;
   totalEvaluations: number;
-  matchedRules: number;
-  unmatchedRules: number;
-  alertsCreated: number;
-  alertsDeduplicated: number;
-  alertsAcknowledged: number;
-  alertsSuppressed: number;
-  alertsResumed: number;
-  alertsResolved: number;
-  alertsExpired: number;
-  evaluationFailures: number;
+  matchedEvaluations: number;
+  unmatchedEvaluations: number;
+  errorEvaluations: number;
+  skippedEvaluations: number;
   totalEvaluationDuration: number;
   averageEvaluationDuration: number;
-  activeAlertCount: number;
-  registeredRuleCount: number;
-}): AlertStatistics {
-  const stats: AlertStatistics = {
-    totalEvaluations: typeof input.totalEvaluations === 'number' ? input.totalEvaluations : 0,
-    matchedRules: typeof input.matchedRules === 'number' ? input.matchedRules : 0,
-    unmatchedRules: typeof input.unmatchedRules === 'number' ? input.unmatchedRules : 0,
-    alertsCreated: typeof input.alertsCreated === 'number' ? input.alertsCreated : 0,
-    alertsDeduplicated: typeof input.alertsDeduplicated === 'number' ? input.alertsDeduplicated : 0,
-    alertsAcknowledged: typeof input.alertsAcknowledged === 'number' ? input.alertsAcknowledged : 0,
-    alertsSuppressed: typeof input.alertsSuppressed === 'number' ? input.alertsSuppressed : 0,
-    alertsResumed: typeof input.alertsResumed === 'number' ? input.alertsResumed : 0,
-    alertsResolved: typeof input.alertsResolved === 'number' ? input.alertsResolved : 0,
-    alertsExpired: typeof input.alertsExpired === 'number' ? input.alertsExpired : 0,
-    evaluationFailures: typeof input.evaluationFailures === 'number' ? input.evaluationFailures : 0,
-    totalEvaluationDuration: typeof input.totalEvaluationDuration === 'number' ? input.totalEvaluationDuration : 0,
-    averageEvaluationDuration: typeof input.averageEvaluationDuration === 'number' ? input.averageEvaluationDuration : 0,
-    activeAlertCount: typeof input.activeAlertCount === 'number' ? input.activeAlertCount : 0,
-    registeredRuleCount: typeof input.registeredRuleCount === 'number' ? input.registeredRuleCount : 0
+  totalAlertGenerations: number;
+  successfulAlertGenerations: number;
+  rejectedAlertGenerations: number;
+  generationErrors: number;
+  totalGenerationDuration: number;
+  averageGenerationDuration: number;
+  totalDeduplicationChecks: number;
+  acceptedAlertCount: number;
+  duplicateAlertCount: number;
+  cooldownSuppressedCount: number;
+  activeCooldownCount: number;
+  trackedFingerprintCount: number;
+  lifecycleTransitions: number;
+  acknowledgements: number;
+  resolutions: number;
+  closures: number;
+  invalidTransitions: number;
+  activeAlerts: number;
+  acknowledgedAlerts: number;
+  resolvedAlerts: number;
+  closedAlerts: number;
+  suppressionEvaluations: number;
+  suppressedAlerts: number;
+  allowedAlerts: number;
+  policyMatches: number;
+  maintenanceMatches: number;
+  snoozedMatches: number;
+  evaluationFailures: number;
+  activePolicies: number;
+  activeMaintenanceWindows: number;
+  activeSnoozes: number;
+  notificationRequests: number;
+  validationFailures: number;
+  dispatchedNotifications: number;
+  deliveredNotifications: number;
+  failedNotifications: number;
+  skippedNotifications: number;
+  cancelledNotifications: number;
+  retryAttempts: number;
+  registeredChannels: number;
+  enabledChannels: number;
+  disabledChannels: number;
+  averageDeliveryDuration: number;
+  orchestrationsTotal: number;
+  orchestrationsSuccessful: number;
+  orchestrationsSkipped: number;
+  orchestrationsDuplicate: number;
+  orchestrationsSuppressed: number;
+  orchestrationsFailed: number;
+  averageOrchestrationDuration: number;
+  activeOrchestrations: number;
+}): AlertingStatistics {
+  const stats: AlertingStatistics = {
+    registeredAlertCount: input.registeredAlertCount,
+    registeredRuleCount: input.registeredRuleCount,
+    enabledRuleCount: input.enabledRuleCount,
+    disabledRuleCount: input.disabledRuleCount,
+    totalEvaluations: input.totalEvaluations,
+    matchedEvaluations: input.matchedEvaluations,
+    unmatchedEvaluations: input.unmatchedEvaluations,
+    errorEvaluations: input.errorEvaluations,
+    skippedEvaluations: input.skippedEvaluations,
+    totalEvaluationDuration: input.totalEvaluationDuration,
+    averageEvaluationDuration: input.averageEvaluationDuration,
+    totalAlertGenerations: input.totalAlertGenerations,
+    successfulAlertGenerations: input.successfulAlertGenerations,
+    rejectedAlertGenerations: input.rejectedAlertGenerations,
+    generationErrors: input.generationErrors,
+    totalGenerationDuration: input.totalGenerationDuration,
+    averageGenerationDuration: input.averageGenerationDuration,
+    totalDeduplicationChecks: input.totalDeduplicationChecks,
+    acceptedAlertCount: input.acceptedAlertCount,
+    duplicateAlertCount: input.duplicateAlertCount,
+    cooldownSuppressedCount: input.cooldownSuppressedCount,
+    activeCooldownCount: input.activeCooldownCount,
+    trackedFingerprintCount: input.trackedFingerprintCount,
+    lifecycleTransitions: input.lifecycleTransitions,
+    acknowledgements: input.acknowledgements,
+    resolutions: input.resolutions,
+    closures: input.closures,
+    invalidTransitions: input.invalidTransitions,
+    activeAlerts: input.activeAlerts,
+    acknowledgedAlerts: input.acknowledgedAlerts,
+    resolvedAlerts: input.resolvedAlerts,
+    closedAlerts: input.closedAlerts,
+    suppressionEvaluations: input.suppressionEvaluations,
+    suppressedAlerts: input.suppressedAlerts,
+    allowedAlerts: input.allowedAlerts,
+    policyMatches: input.policyMatches,
+    maintenanceMatches: input.maintenanceMatches,
+    snoozedMatches: input.snoozedMatches,
+    evaluationFailures: input.evaluationFailures,
+    activePolicies: input.activePolicies,
+    activeMaintenanceWindows: input.activeMaintenanceWindows,
+    activeSnoozes: input.activeSnoozes,
+    notificationRequests: input.notificationRequests,
+    validationFailures: input.validationFailures,
+    dispatchedNotifications: input.dispatchedNotifications,
+    deliveredNotifications: input.deliveredNotifications,
+    failedNotifications: input.failedNotifications,
+    skippedNotifications: input.skippedNotifications,
+    cancelledNotifications: input.cancelledNotifications,
+    retryAttempts: input.retryAttempts,
+    registeredChannels: input.registeredChannels,
+    enabledChannels: input.enabledChannels,
+    disabledChannels: input.disabledChannels,
+    averageDeliveryDuration: input.averageDeliveryDuration,
+    orchestrationsTotal: input.orchestrationsTotal,
+    orchestrationsSuccessful: input.orchestrationsSuccessful,
+    orchestrationsSkipped: input.orchestrationsSkipped,
+    orchestrationsDuplicate: input.orchestrationsDuplicate,
+    orchestrationsSuppressed: input.orchestrationsSuppressed,
+    orchestrationsFailed: input.orchestrationsFailed,
+    averageOrchestrationDuration: input.averageOrchestrationDuration,
+    activeOrchestrations: input.activeOrchestrations
   };
 
   return freezeDeepSafe(stats);
 }
 
-export function createAlertDiagnostics(input: {
+export function createAlertingDiagnostics(input: {
   runtimeState: string;
-  ruleCount: number;
+  registeredAlertCount: number;
+  registeredRuleCount: number;
   enabledRuleCount: number;
-  activeAlertCount: number;
-  historySize: number;
-  statistics: AlertStatistics;
+  disabledRuleCount: number;
+  totalEvaluations: number;
+  matchedEvaluations: number;
+  unmatchedEvaluations: number;
+  errorEvaluations: number;
+  skippedEvaluations: number;
+  totalEvaluationDuration: number;
+  averageEvaluationDuration: number;
+  totalAlertGenerations: number;
+  successfulAlertGenerations: number;
+  rejectedAlertGenerations: number;
+  generationErrors: number;
+  totalGenerationDuration: number;
+  averageGenerationDuration: number;
+  totalDeduplicationChecks: number;
+  acceptedAlertCount: number;
+  duplicateAlertCount: number;
+  cooldownSuppressedCount: number;
+  activeCooldownCount: number;
+  trackedFingerprintCount: number;
+  lifecycleTransitions: number;
+  acknowledgements: number;
+  resolutions: number;
+  closures: number;
+  invalidTransitions: number;
+  activeAlerts: number;
+  acknowledgedAlerts: number;
+  resolvedAlerts: number;
+  closedAlerts: number;
+  suppressionEvaluations: number;
+  suppressedAlerts: number;
+  allowedAlerts: number;
+  policyMatches: number;
+  maintenanceMatches: number;
+  snoozedMatches: number;
+  evaluationFailures: number;
+  activePolicies: number;
+  activeMaintenanceWindows: number;
+  activeSnoozes: number;
+  notificationRequests: number;
+  validationFailures: number;
+  dispatchedNotifications: number;
+  deliveredNotifications: number;
+  failedNotifications: number;
+  skippedNotifications: number;
+  cancelledNotifications: number;
+  retryAttempts: number;
+  registeredChannels: number;
+  enabledChannels: number;
+  disabledChannels: number;
+  averageDeliveryDuration: number;
+  orchestrationsTotal: number;
+  orchestrationsSuccessful: number;
+  orchestrationsSkipped: number;
+  orchestrationsDuplicate: number;
+  orchestrationsSuppressed: number;
+  orchestrationsFailed: number;
+  averageOrchestrationDuration: number;
+  activeOrchestrations: number;
   generatedAt: number;
-}) {
-  const diag = {
+}): AlertingDiagnostics {
+  const diag: AlertingDiagnostics = {
     runtimeState: input.runtimeState,
-    ruleCount: input.ruleCount,
+    registeredAlertCount: input.registeredAlertCount,
+    registeredRuleCount: input.registeredRuleCount,
     enabledRuleCount: input.enabledRuleCount,
-    activeAlertCount: input.activeAlertCount,
-    historySize: input.historySize,
-    statistics: input.statistics,
+    disabledRuleCount: input.disabledRuleCount,
+    totalEvaluations: input.totalEvaluations,
+    matchedEvaluations: input.matchedEvaluations,
+    unmatchedEvaluations: input.unmatchedEvaluations,
+    errorEvaluations: input.errorEvaluations,
+    skippedEvaluations: input.skippedEvaluations,
+    totalEvaluationDuration: input.totalEvaluationDuration,
+    averageEvaluationDuration: input.averageEvaluationDuration,
+    totalAlertGenerations: input.totalAlertGenerations,
+    successfulAlertGenerations: input.successfulAlertGenerations,
+    rejectedAlertGenerations: input.rejectedAlertGenerations,
+    generationErrors: input.generationErrors,
+    totalGenerationDuration: input.totalGenerationDuration,
+    averageGenerationDuration: input.averageGenerationDuration,
+    totalDeduplicationChecks: input.totalDeduplicationChecks,
+    acceptedAlertCount: input.acceptedAlertCount,
+    duplicateAlertCount: input.duplicateAlertCount,
+    cooldownSuppressedCount: input.cooldownSuppressedCount,
+    activeCooldownCount: input.activeCooldownCount,
+    trackedFingerprintCount: input.trackedFingerprintCount,
+    lifecycleTransitions: input.lifecycleTransitions,
+    acknowledgements: input.acknowledgements,
+    resolutions: input.resolutions,
+    closures: input.closures,
+    invalidTransitions: input.invalidTransitions,
+    activeAlerts: input.activeAlerts,
+    acknowledgedAlerts: input.acknowledgedAlerts,
+    resolvedAlerts: input.resolvedAlerts,
+    closedAlerts: input.closedAlerts,
+    suppressionEvaluations: input.suppressionEvaluations,
+    suppressedAlerts: input.suppressedAlerts,
+    allowedAlerts: input.allowedAlerts,
+    policyMatches: input.policyMatches,
+    maintenanceMatches: input.maintenanceMatches,
+    snoozedMatches: input.snoozedMatches,
+    evaluationFailures: input.evaluationFailures,
+    activePolicies: input.activePolicies,
+    activeMaintenanceWindows: input.activeMaintenanceWindows,
+    activeSnoozes: input.activeSnoozes,
+    notificationRequests: input.notificationRequests,
+    validationFailures: input.validationFailures,
+    dispatchedNotifications: input.dispatchedNotifications,
+    deliveredNotifications: input.deliveredNotifications,
+    failedNotifications: input.failedNotifications,
+    skippedNotifications: input.skippedNotifications,
+    cancelledNotifications: input.cancelledNotifications,
+    retryAttempts: input.retryAttempts,
+    registeredChannels: input.registeredChannels,
+    enabledChannels: input.enabledChannels,
+    disabledChannels: input.disabledChannels,
+    averageDeliveryDuration: input.averageDeliveryDuration,
+    orchestrationsTotal: input.orchestrationsTotal,
+    orchestrationsSuccessful: input.orchestrationsSuccessful,
+    orchestrationsSkipped: input.orchestrationsSkipped,
+    orchestrationsDuplicate: input.orchestrationsDuplicate,
+    orchestrationsSuppressed: input.orchestrationsSuppressed,
+    orchestrationsFailed: input.orchestrationsFailed,
+    averageOrchestrationDuration: input.averageOrchestrationDuration,
+    activeOrchestrations: input.activeOrchestrations,
     generatedAt: input.generatedAt
   };
 
   return freezeDeepSafe(diag);
 }
 
-export function generateFingerprint(ruleId: string, sourceId: string, context?: Record<string, unknown>): string {
-  let base = `${ruleId}:${sourceId}`;
-  if (context) {
-    const keys = Object.keys(context).sort();
-    const parts = keys.map((k) => {
-      const v = context[k];
-      if (v !== null && typeof v === 'object') {
-        return `${k}=${JSON.stringify(v)}`;
-      }
-      return `${k}=${v}`;
-    });
-    if (parts.length > 0) {
-      base += `:${parts.join(',')}`;
-    }
+export function createDeduplicationDecision(input: {
+  fingerprint: string;
+  alertId: string;
+  decision: any;
+  duplicate: boolean;
+  cooldownSuppressed: boolean;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  nextEligibleAt: number;
+  occurrenceCount: number;
+  evaluatedAt: number;
+  reason: string;
+}): DeduplicationDecision {
+  if (!input.fingerprint) {
+    throw new AlertRuleValidationError('fingerprint is required in deduplication decision');
   }
-  return base;
+  if (!input.alertId) {
+    throw new AlertRuleValidationError('alertId is required in deduplication decision');
+  }
+  if (!Object.values(DeduplicationDecisionType).includes(input.decision)) {
+    throw new AlertRuleValidationError(`Invalid deduplication decision: ${input.decision}`);
+  }
+
+  const result: DeduplicationDecision = {
+    fingerprint: input.fingerprint,
+    alertId: input.alertId,
+    decision: input.decision,
+    duplicate: input.duplicate,
+    cooldownSuppressed: input.cooldownSuppressed,
+    firstSeenAt: input.firstSeenAt,
+    lastSeenAt: input.lastSeenAt,
+    nextEligibleAt: input.nextEligibleAt,
+    occurrenceCount: input.occurrenceCount,
+    evaluatedAt: input.evaluatedAt,
+    reason: input.reason
+  };
+
+  return freezeDeepSafe(result);
 }
 
+export function createDeduplicationRecord(input: {
+  fingerprint: string;
+  firstSeenAt: number;
+  lastSeenAt: number;
+  occurrenceCount: number;
+  acceptedCount: number;
+  duplicateCount: number;
+  cooldownSuppressionCount: number;
+  nextEligibleAt: number;
+  ruleId?: string;
+  sourceId?: string;
+}): DeduplicationRecord {
+  if (!input.fingerprint) {
+    throw new AlertRuleValidationError('fingerprint is required in deduplication record');
+  }
+
+  const result: DeduplicationRecord = {
+    fingerprint: input.fingerprint,
+    firstSeenAt: input.firstSeenAt,
+    lastSeenAt: input.lastSeenAt,
+    occurrenceCount: input.occurrenceCount,
+    acceptedCount: input.acceptedCount,
+    duplicateCount: input.duplicateCount,
+    cooldownSuppressionCount: input.cooldownSuppressionCount,
+    nextEligibleAt: input.nextEligibleAt,
+    ruleId: input.ruleId,
+    sourceId: input.sourceId
+  };
+
+  return freezeDeepSafe(result);
+}
+
+export function createConditionEvaluationResult(input: {
+  conditionId: string;
+  matched: boolean;
+  status: any;
+  actualValue: unknown;
+  expectedValue: unknown;
+  operator: string;
+  field: string;
+  reason?: string;
+  error?: { name: string; message: string; stack?: string };
+  durationMs?: number;
+}): ConditionEvaluationResult {
+  if (!input.conditionId) {
+    throw new AlertRuleValidationError('Condition ID is required in evaluation result');
+  }
+  if (!input.field) {
+    throw new AlertRuleValidationError('Field is required in evaluation result');
+  }
+  if (!input.operator) {
+    throw new AlertRuleValidationError('Operator is required in evaluation result');
+  }
+  if (!Object.values(ConditionEvaluationStatus).includes(input.status)) {
+    throw new AlertRuleValidationError(`Invalid condition evaluation status: ${input.status}`);
+  }
+
+  const result: ConditionEvaluationResult = {
+    conditionId: input.conditionId,
+    matched: input.matched,
+    status: input.status,
+    actualValue: input.actualValue,
+    expectedValue: input.expectedValue,
+    operator: input.operator,
+    field: input.field,
+    reason: input.reason,
+    error: input.error,
+    durationMs: input.durationMs
+  };
+
+  return freezeDeepSafe(result);
+}
+
+export function createGroupEvaluationResult(input: {
+  operator: 'ALL' | 'ANY' | 'NOT';
+  matched: boolean;
+  conditions: ReadonlyArray<ConditionEvaluationResult | GroupEvaluationResult>;
+  reason?: string;
+  durationMs?: number;
+}): GroupEvaluationResult {
+  if (!['ALL', 'ANY', 'NOT'].includes(input.operator)) {
+    throw new AlertRuleValidationError(`Invalid group operator: ${input.operator}`);
+  }
+  if (!Array.isArray(input.conditions)) {
+    throw new AlertRuleValidationError('Conditions array is required in group evaluation result');
+  }
+
+  const result: GroupEvaluationResult = {
+    operator: input.operator,
+    matched: input.matched,
+    conditions: input.conditions,
+    reason: input.reason,
+    durationMs: input.durationMs
+  };
+
+  return freezeDeepSafe(result);
+}
+
+export function createRuleEvaluationResult(input: {
+  ruleId: string;
+  ruleVersion?: number;
+  matched: boolean;
+  status: any;
+  results: GroupEvaluationResult;
+  evaluatedAt: number;
+  durationMs: number;
+  error?: { name: string; message: string; stack?: string };
+  metadata?: Record<string, unknown>;
+}): RuleEvaluationResult {
+  if (!input.ruleId) {
+    throw new AlertRuleValidationError('Rule ID is required in rule evaluation result');
+  }
+  if (!Object.values(RuleEvaluationStatus).includes(input.status)) {
+    throw new AlertRuleValidationError(`Invalid rule evaluation status: ${input.status}`);
+  }
+  if (typeof input.evaluatedAt !== 'number' || input.evaluatedAt < 0) {
+    throw new AlertRuleValidationError('EvaluatedAt timestamp is required');
+  }
+  if (typeof input.durationMs !== 'number' || input.durationMs < 0) {
+    throw new AlertRuleValidationError('DurationMs must be a non-negative number');
+  }
+
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const result: RuleEvaluationResult = {
+    ruleId: input.ruleId,
+    ruleVersion: input.ruleVersion,
+    matched: input.matched,
+    status: input.status,
+    results: input.results,
+    evaluatedAt: input.evaluatedAt,
+    durationMs: input.durationMs,
+    error: input.error,
+    metadata
+  };
+
+  return freezeDeepSafe(result);
+}
+
+export function createAlertLifecycleHistoryEntry(input: {
+  alertId: string;
+  fingerprint?: string;
+  previousState: AlertLifecycleStateValue | null;
+  nextState: AlertLifecycleStateValue;
+  timestamp: number;
+  actor: AlertLifecycleActorValue;
+  operation: string;
+  reason?: string;
+  metadata?: Record<string, unknown>;
+}): AlertLifecycleHistoryEntry {
+  if (!input.alertId) {
+    throw new AlertRuleValidationError('alertId is required in lifecycle history entry');
+  }
+  if (!Object.values(AlertLifecycleState).includes(input.nextState)) {
+    throw new AlertRuleValidationError(`Invalid lifecycle nextState: ${input.nextState}`);
+  }
+  if (input.previousState !== null && !Object.values(AlertLifecycleState).includes(input.previousState)) {
+    throw new AlertRuleValidationError(`Invalid lifecycle previousState: ${input.previousState}`);
+  }
+  if (!Object.values(AlertLifecycleActor).includes(input.actor)) {
+    throw new AlertRuleValidationError(`Invalid lifecycle actor: ${input.actor}`);
+  }
+  if (!input.operation) {
+    throw new AlertRuleValidationError('operation is required in lifecycle history entry');
+  }
+
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const entry: AlertLifecycleHistoryEntry = {
+    alertId: input.alertId,
+    fingerprint: input.fingerprint,
+    previousState: input.previousState,
+    nextState: input.nextState,
+    timestamp: input.timestamp,
+    actor: input.actor,
+    operation: input.operation,
+    reason: input.reason,
+    metadata
+  };
+
+  return freezeDeepSafe(entry);
+}
+
+export function createAlertLifecycleRecord(input: {
+  alertId: string;
+  fingerprint?: string;
+  state: AlertLifecycleStateValue;
+  createdAt: number;
+  updatedAt: number;
+  history: ReadonlyArray<AlertLifecycleHistoryEntry>;
+  metadata?: Record<string, unknown>;
+}): AlertLifecycleRecord {
+  if (!input.alertId) {
+    throw new AlertRuleValidationError('alertId is required in lifecycle record');
+  }
+  if (!Object.values(AlertLifecycleState).includes(input.state)) {
+    throw new AlertRuleValidationError(`Invalid lifecycle state: ${input.state}`);
+  }
+  if (!Array.isArray(input.history)) {
+    throw new AlertRuleValidationError('history array is required in lifecycle record');
+  }
+
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const record: AlertLifecycleRecord = {
+    alertId: input.alertId,
+    fingerprint: input.fingerprint,
+    state: input.state,
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt,
+    history: input.history,
+    metadata
+  };
+
+  return freezeDeepSafe(record);
+}
+
+export function createAlertSuppressionPolicy(input: {
+  id: string;
+  name: string;
+  enabled: boolean;
+  priority: number;
+  scope: AlertSuppressionScopeValue;
+  ruleId?: string;
+  alertId?: string;
+  fingerprint?: string;
+  sourceId?: string;
+  startTime?: number;
+  endTime?: number;
+  reason: AlertSuppressionReasonValue;
+  metadata?: Record<string, unknown>;
+}): AlertSuppressionPolicy {
+  if (!input.id) {
+    throw new AlertRuleValidationError('Policy ID is required');
+  }
+  if (!input.name) {
+    throw new AlertRuleValidationError('Policy name is required');
+  }
+  if (typeof input.priority !== 'number' || isNaN(input.priority)) {
+    throw new AlertRuleValidationError('Policy priority must be a valid number');
+  }
+  if (!Object.values(AlertSuppressionScope).includes(input.scope)) {
+    throw new AlertRuleValidationError(`Invalid policy scope: ${input.scope}`);
+  }
+  if (!Object.values(AlertSuppressionReason).includes(input.reason)) {
+    throw new AlertRuleValidationError(`Invalid policy reason: ${input.reason}`);
+  }
+  if (input.startTime !== undefined && (typeof input.startTime !== 'number' || input.startTime < 0)) {
+    throw new AlertRuleValidationError('Invalid policy startTime');
+  }
+  if (input.endTime !== undefined && (typeof input.endTime !== 'number' || input.endTime < 0)) {
+    throw new AlertRuleValidationError('Invalid policy endTime');
+  }
+  if (input.startTime !== undefined && input.endTime !== undefined && input.startTime >= input.endTime) {
+    throw new AlertRuleValidationError('Policy startTime must be less than endTime');
+  }
+
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const policy: AlertSuppressionPolicy = {
+    id: input.id,
+    name: input.name,
+    enabled: input.enabled,
+    priority: input.priority,
+    scope: input.scope,
+    ruleId: input.ruleId,
+    alertId: input.alertId,
+    fingerprint: input.fingerprint,
+    sourceId: input.sourceId,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    reason: input.reason,
+    metadata
+  };
+
+  return freezeDeepSafe(policy);
+}
+
+export function createAlertMaintenanceWindow(input: {
+  id: string;
+  name: string;
+  enabled: boolean;
+  startTime: number;
+  endTime: number;
+  scope?: AlertSuppressionScopeValue;
+  reason: string;
+  metadata?: Record<string, unknown>;
+}): AlertMaintenanceWindow {
+  if (!input.id) {
+    throw new AlertRuleValidationError('Maintenance Window ID is required');
+  }
+  if (!input.name) {
+    throw new AlertRuleValidationError('Maintenance Window name is required');
+  }
+  if (typeof input.startTime !== 'number' || isNaN(input.startTime) || input.startTime < 0) {
+    throw new AlertRuleValidationError('Invalid maintenance window startTime');
+  }
+  if (typeof input.endTime !== 'number' || isNaN(input.endTime) || input.endTime < 0) {
+    throw new AlertRuleValidationError('Invalid maintenance window endTime');
+  }
+  if (input.startTime >= input.endTime) {
+    throw new AlertRuleValidationError('Maintenance window startTime must be less than endTime');
+  }
+  if (input.scope !== undefined && !Object.values(AlertSuppressionScope).includes(input.scope)) {
+    throw new AlertRuleValidationError(`Invalid maintenance window scope: ${input.scope}`);
+  }
+
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const window: AlertMaintenanceWindow = {
+    id: input.id,
+    name: input.name,
+    enabled: input.enabled,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    scope: input.scope,
+    reason: input.reason,
+    metadata
+  };
+
+  return freezeDeepSafe(window);
+}
+
+export function createAlertSnoozeRecord(input: {
+  alertId: string;
+  fingerprint?: string;
+  startTime: number;
+  endTime: number;
+  actor: string;
+  reason?: string;
+  metadata?: Record<string, unknown>;
+}): AlertSnoozeRecord {
+  if (!input.alertId) {
+    throw new AlertRuleValidationError('Snooze Alert ID is required');
+  }
+  if (typeof input.startTime !== 'number' || isNaN(input.startTime) || input.startTime < 0) {
+    throw new AlertRuleValidationError('Invalid snooze startTime');
+  }
+  if (typeof input.endTime !== 'number' || isNaN(input.endTime) || input.endTime < 0) {
+    throw new AlertRuleValidationError('Invalid snooze endTime');
+  }
+  if (input.startTime >= input.endTime) {
+    throw new AlertRuleValidationError('Snooze startTime must be less than endTime');
+  }
+  if (!input.actor) {
+    throw new AlertRuleValidationError('Snooze actor is required');
+  }
+
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const snooze: AlertSnoozeRecord = {
+    alertId: input.alertId,
+    fingerprint: input.fingerprint,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    actor: input.actor,
+    reason: input.reason,
+    metadata
+  };
+
+  return freezeDeepSafe(snooze);
+}
+
+export function createAlertSuppressionDecision(input: {
+  suppressed: boolean;
+  reason: AlertSuppressionReasonValue | null;
+  policyId?: string;
+  windowId?: string;
+  evaluatedAt: number;
+  metadata?: Record<string, unknown>;
+}): AlertSuppressionDecision {
+  if (input.suppressed && !input.reason) {
+    throw new AlertRuleValidationError('reason is required when alert is suppressed');
+  }
+  if (input.reason !== null && !Object.values(AlertSuppressionReason).includes(input.reason)) {
+    throw new AlertRuleValidationError(`Invalid suppression reason: ${input.reason}`);
+  }
+  if (typeof input.evaluatedAt !== 'number' || isNaN(input.evaluatedAt) || input.evaluatedAt < 0) {
+    throw new AlertRuleValidationError('Invalid suppression evaluatedAt timestamp');
+  }
+
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const decision: AlertSuppressionDecision = {
+    suppressed: input.suppressed,
+    reason: input.reason,
+    policyId: input.policyId,
+    windowId: input.windowId,
+    evaluatedAt: input.evaluatedAt,
+    metadata
+  };
+
+  return freezeDeepSafe(decision);
+}
+
+export function createNotificationRequest(input: {
+  id: string;
+  alertId: string;
+  fingerprint?: string;
+  channelId: string;
+  payload: NotificationPayload;
+  priority: NotificationPriorityValue;
+  channelType: NotificationChannelTypeValue;
+  recipient: NotificationRecipient;
+  createdAt: number;
+  correlationId?: string;
+}): NotificationRequest {
+  if (!input.id) {
+    throw new AlertRuleValidationError('Notification ID is required');
+  }
+  if (!input.alertId) {
+    throw new AlertRuleValidationError('Alert ID is required');
+  }
+  if (!input.channelId) {
+    throw new AlertRuleValidationError('Channel ID is required');
+  }
+  if (!input.payload) {
+    throw new AlertRuleValidationError('Payload is required');
+  }
+  if (!input.payload.title) {
+    throw new AlertRuleValidationError('Payload title is required');
+  }
+  if (!input.payload.message) {
+    throw new AlertRuleValidationError('Payload message is required');
+  }
+  if (!input.recipient) {
+    throw new AlertRuleValidationError('Recipient info is required');
+  }
+  if (!input.recipient.id) {
+    throw new AlertRuleValidationError('Recipient ID is required');
+  }
+  if (!input.recipient.name) {
+    throw new AlertRuleValidationError('Recipient name is required');
+  }
+  if (typeof input.createdAt !== 'number' || isNaN(input.createdAt) || input.createdAt < 0) {
+    throw new AlertRuleValidationError('Invalid notification createdAt timestamp');
+  }
+  if (!Object.values(NotificationPriority).includes(input.priority)) {
+    throw new AlertRuleValidationError(`Invalid priority: ${input.priority}`);
+  }
+  if (!Object.values(NotificationChannelType).includes(input.channelType)) {
+    throw new AlertRuleValidationError(`Invalid channelType: ${input.channelType}`);
+  }
+
+  const payload = freezeDeepSafe(input.payload);
+  const recipient = freezeDeepSafe(input.recipient);
+
+  const request: NotificationRequest = {
+    id: input.id,
+    alertId: input.alertId,
+    fingerprint: input.fingerprint,
+    channelId: input.channelId,
+    payload,
+    priority: input.priority,
+    channelType: input.channelType,
+    recipient,
+    createdAt: input.createdAt,
+    correlationId: input.correlationId
+  };
+
+  return freezeDeepSafe(request);
+}
+
+export function createNotificationDeliveryAttempt(input: {
+  notificationId: string;
+  attempt: number;
+  status: NotificationDeliveryStatusValue;
+  timestamp: number;
+  duration: number;
+  error?: { name: string; message: string; stack?: string };
+}): NotificationDeliveryAttempt {
+  if (!input.notificationId) {
+    throw new AlertRuleValidationError('Notification ID is required for delivery attempt');
+  }
+  if (typeof input.attempt !== 'number' || isNaN(input.attempt) || input.attempt <= 0) {
+    throw new AlertRuleValidationError('Invalid attempt number');
+  }
+  if (!Object.values(NotificationDeliveryStatus).includes(input.status)) {
+    throw new AlertRuleValidationError(`Invalid delivery attempt status: ${input.status}`);
+  }
+  if (typeof input.timestamp !== 'number' || isNaN(input.timestamp) || input.timestamp < 0) {
+    throw new AlertRuleValidationError('Invalid timestamp');
+  }
+  if (typeof input.duration !== 'number' || isNaN(input.duration) || input.duration < 0) {
+    throw new AlertRuleValidationError('Invalid duration');
+  }
+
+  const error = input.error ? freezeDeepSafe(input.error) : undefined;
+
+  const attempt: NotificationDeliveryAttempt = {
+    notificationId: input.notificationId,
+    attempt: input.attempt,
+    status: input.status,
+    timestamp: input.timestamp,
+    duration: input.duration,
+    error
+  };
+
+  return freezeDeepSafe(attempt);
+}
+
+export function createNotificationDeliveryResult(input: {
+  notificationId: string;
+  channelId: string;
+  status: NotificationDeliveryStatusValue;
+  error?: { name: string; message: string; stack?: string };
+  attemptedAt: number;
+  completedAt: number;
+  duration: number;
+  attempts: number;
+  history: ReadonlyArray<NotificationDeliveryAttempt>;
+}): NotificationDeliveryResult {
+  if (!input.notificationId) {
+    throw new AlertRuleValidationError('Notification ID is required for delivery result');
+  }
+  if (!input.channelId) {
+    throw new AlertRuleValidationError('Channel ID is required for delivery result');
+  }
+  if (!Object.values(NotificationDeliveryStatus).includes(input.status)) {
+    throw new AlertRuleValidationError(`Invalid delivery result status: ${input.status}`);
+  }
+  if (typeof input.attemptedAt !== 'number' || isNaN(input.attemptedAt) || input.attemptedAt < 0) {
+    throw new AlertRuleValidationError('Invalid attemptedAt');
+  }
+  if (typeof input.completedAt !== 'number' || isNaN(input.completedAt) || input.completedAt < 0) {
+    throw new AlertRuleValidationError('Invalid completedAt');
+  }
+  if (typeof input.duration !== 'number' || isNaN(input.duration) || input.duration < 0) {
+    throw new AlertRuleValidationError('Invalid duration');
+  }
+  if (typeof input.attempts !== 'number' || isNaN(input.attempts) || input.attempts < 0) {
+    throw new AlertRuleValidationError('Invalid attempts count');
+  }
+  if (!Array.isArray(input.history)) {
+    throw new AlertRuleValidationError('History array is required');
+  }
+
+  const error = input.error ? freezeDeepSafe(input.error) : undefined;
+  const history = freezeDeepSafe(input.history);
+
+  const result: NotificationDeliveryResult = {
+    notificationId: input.notificationId,
+    channelId: input.channelId,
+    status: input.status,
+    error,
+    attemptedAt: input.attemptedAt,
+    completedAt: input.completedAt,
+    duration: input.duration,
+    attempts: input.attempts,
+    history
+  };
+
+  return freezeDeepSafe(result);
+}
+
+export function createAlertOrchestrationStageResult(input: {
+  stage: AlertOrchestrationStageValue;
+  status: AlertOrchestrationStatusValue;
+  timestamp: number;
+  duration: number;
+  error?: { name: string; message: string; stack?: string };
+}): AlertOrchestrationStageResult {
+  if (!Object.values(AlertOrchestrationStage).includes(input.stage)) {
+    throw new AlertRuleValidationError(`Invalid stage: ${input.stage}`);
+  }
+  if (!Object.values(AlertOrchestrationStatus).includes(input.status)) {
+    throw new AlertRuleValidationError(`Invalid status: ${input.status}`);
+  }
+  if (typeof input.timestamp !== 'number' || isNaN(input.timestamp) || input.timestamp < 0) {
+    throw new AlertRuleValidationError('Invalid stage timestamp');
+  }
+  if (typeof input.duration !== 'number' || isNaN(input.duration) || input.duration < 0) {
+    throw new AlertRuleValidationError('Invalid stage duration');
+  }
+
+  const error = input.error ? freezeDeepSafe(input.error) : undefined;
+
+  const result: AlertOrchestrationStageResult = {
+    stage: input.stage,
+    status: input.status,
+    timestamp: input.timestamp,
+    duration: input.duration,
+    error
+  };
+
+  return freezeDeepSafe(result);
+}
+
+export function createAlertOrchestrationResult(input: {
+  orchestrationId: string;
+  alertId?: string;
+  ruleId: string;
+  fingerprint?: string;
+  status: AlertOrchestrationStatusValue;
+  stageResults: ReadonlyArray<AlertOrchestrationStageResult>;
+  evaluationResult?: RuleEvaluationResult;
+  generationResult?: AlertRecord;
+  deduplicationDecision?: DeduplicationDecision;
+  suppressionDecision?: AlertSuppressionDecision;
+  lifecycleResult?: AlertLifecycleRecord;
+  notificationResult?: NotificationDeliveryResult;
+  attemptedAt: number;
+  completedAt: number;
+  duration: number;
+}): AlertOrchestrationResult {
+  if (!input.orchestrationId) {
+    throw new AlertRuleValidationError('Orchestration ID is required');
+  }
+  if (!input.ruleId) {
+    throw new AlertRuleValidationError('Rule ID is required');
+  }
+  if (!Object.values(AlertOrchestrationStatus).includes(input.status)) {
+    throw new AlertRuleValidationError(`Invalid orchestration status: ${input.status}`);
+  }
+  if (!Array.isArray(input.stageResults)) {
+    throw new AlertRuleValidationError('Stage results array is required');
+  }
+
+  const stageResults = freezeDeepSafe(input.stageResults);
+  const evaluationResult = input.evaluationResult ? freezeDeepSafe(input.evaluationResult) : undefined;
+  const generationResult = input.generationResult ? freezeDeepSafe(input.generationResult) : undefined;
+  const deduplicationDecision = input.deduplicationDecision ? freezeDeepSafe(input.deduplicationDecision) : undefined;
+  const suppressionDecision = input.suppressionDecision ? freezeDeepSafe(input.suppressionDecision) : undefined;
+  const lifecycleResult = input.lifecycleResult ? freezeDeepSafe(input.lifecycleResult) : undefined;
+  const notificationResult = input.notificationResult ? freezeDeepSafe(input.notificationResult) : undefined;
+
+  const result: AlertOrchestrationResult = {
+    orchestrationId: input.orchestrationId,
+    alertId: input.alertId,
+    ruleId: input.ruleId,
+    fingerprint: input.fingerprint,
+    status: input.status,
+    stageResults,
+    evaluationResult,
+    generationResult,
+    deduplicationDecision,
+    suppressionDecision,
+    lifecycleResult,
+    notificationResult,
+    attemptedAt: input.attemptedAt,
+    completedAt: input.completedAt,
+    duration: input.duration
+  };
+
+  return freezeDeepSafe(result);
+}

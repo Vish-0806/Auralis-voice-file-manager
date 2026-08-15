@@ -20,4 +20,14 @@ export interface AlertRecord {
   readonly createdAt: number;
   readonly updatedAt: number;
   readonly metadata: Record<string, unknown>;
+
+  // Extended for Phase 18.7.4
+  readonly ruleId?: string;
+  readonly ruleVersion?: number;
+  readonly fingerprint?: string;
+  readonly status?: string;
+  readonly triggeredAt?: number;
+  readonly generatedAt?: number;
+  readonly tags?: ReadonlyArray<string>;
+  readonly evaluationResult?: unknown; // RuleEvaluationResult snapshot
 }
