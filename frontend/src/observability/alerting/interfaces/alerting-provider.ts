@@ -13,8 +13,9 @@ import type {
 } from '../models/suppression';
 import type { INotificationChannel } from './notification-channel';
 import type { NotificationRequest, NotificationDeliveryResult } from '../models/notification';
+import type { IAlertOrchestrationManager } from './alert-orchestration';
 
-export interface IAlertingProvider {
+export interface IAlertingProvider extends IAlertOrchestrationManager {
   initialize(): Promise<void>;
   shutdown(): Promise<void>;
   getRuntimeState(): AlertingRuntimeStateValue;
@@ -86,7 +87,6 @@ export interface IAlertingProvider {
   getSnooze(alertId: string): AlertSnoozeRecord | null;
   evaluateSuppression(alert: AlertRecord, now?: number): AlertSuppressionDecision;
 
-  // Extended for Phase 18.7.8
   registerNotificationChannel(channel: INotificationChannel): void;
   unregisterNotificationChannel(channelId: string): void;
   getNotificationChannel(channelId: string): INotificationChannel | null;

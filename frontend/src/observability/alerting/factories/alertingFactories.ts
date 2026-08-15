@@ -48,6 +48,14 @@ import {
   NotificationDeliveryAttempt,
   NotificationDeliveryResult
 } from '../models/notification';
+import {
+  AlertOrchestrationStage,
+  AlertOrchestrationStageValue,
+  AlertOrchestrationStatus,
+  AlertOrchestrationStatusValue,
+  AlertOrchestrationStageResult,
+  AlertOrchestrationResult
+} from '../models/orchestration';
 import { freezeDeepSafe } from '../../models/monitoring';
 
 export function createAlertRecord(input: {
@@ -322,6 +330,14 @@ export function createAlertingStatistics(input: {
   enabledChannels: number;
   disabledChannels: number;
   averageDeliveryDuration: number;
+  orchestrationsTotal: number;
+  orchestrationsSuccessful: number;
+  orchestrationsSkipped: number;
+  orchestrationsDuplicate: number;
+  orchestrationsSuppressed: number;
+  orchestrationsFailed: number;
+  averageOrchestrationDuration: number;
+  activeOrchestrations: number;
 }): AlertingStatistics {
   const stats: AlertingStatistics = {
     registeredAlertCount: input.registeredAlertCount,
@@ -377,7 +393,15 @@ export function createAlertingStatistics(input: {
     registeredChannels: input.registeredChannels,
     enabledChannels: input.enabledChannels,
     disabledChannels: input.disabledChannels,
-    averageDeliveryDuration: input.averageDeliveryDuration
+    averageDeliveryDuration: input.averageDeliveryDuration,
+    orchestrationsTotal: input.orchestrationsTotal,
+    orchestrationsSuccessful: input.orchestrationsSuccessful,
+    orchestrationsSkipped: input.orchestrationsSkipped,
+    orchestrationsDuplicate: input.orchestrationsDuplicate,
+    orchestrationsSuppressed: input.orchestrationsSuppressed,
+    orchestrationsFailed: input.orchestrationsFailed,
+    averageOrchestrationDuration: input.averageOrchestrationDuration,
+    activeOrchestrations: input.activeOrchestrations
   };
 
   return freezeDeepSafe(stats);
@@ -439,6 +463,14 @@ export function createAlertingDiagnostics(input: {
   enabledChannels: number;
   disabledChannels: number;
   averageDeliveryDuration: number;
+  orchestrationsTotal: number;
+  orchestrationsSuccessful: number;
+  orchestrationsSkipped: number;
+  orchestrationsDuplicate: number;
+  orchestrationsSuppressed: number;
+  orchestrationsFailed: number;
+  averageOrchestrationDuration: number;
+  activeOrchestrations: number;
   generatedAt: number;
 }): AlertingDiagnostics {
   const diag: AlertingDiagnostics = {
@@ -497,6 +529,14 @@ export function createAlertingDiagnostics(input: {
     enabledChannels: input.enabledChannels,
     disabledChannels: input.disabledChannels,
     averageDeliveryDuration: input.averageDeliveryDuration,
+    orchestrationsTotal: input.orchestrationsTotal,
+    orchestrationsSuccessful: input.orchestrationsSuccessful,
+    orchestrationsSkipped: input.orchestrationsSkipped,
+    orchestrationsDuplicate: input.orchestrationsDuplicate,
+    orchestrationsSuppressed: input.orchestrationsSuppressed,
+    orchestrationsFailed: input.orchestrationsFailed,
+    averageOrchestrationDuration: input.averageOrchestrationDuration,
+    activeOrchestrations: input.activeOrchestrations,
     generatedAt: input.generatedAt
   };
 
@@ -1093,6 +1133,98 @@ export function createNotificationDeliveryResult(input: {
     duration: input.duration,
     attempts: input.attempts,
     history
+  };
+
+  return freezeDeepSafe(result);
+}
+
+export function createAlertOrchestrationStageResult(input: {
+  stage: AlertOrchestrationStageValue;
+  status: AlertOrchestrationStatusValue;
+  timestamp: number;
+  duration: number;
+  error?: { name: string; message: string; stack?: string };
+}): AlertOrchestrationStageResult {
+  if (!Object.values(AlertOrchestrationStage).includes(input.stage)) {
+    throw new AlertRuleValidationError(`Invalid stage: ${input.stage}`);
+  }
+  if (!Object.values(AlertOrchestrationStatus).includes(input.status)) {
+    throw new AlertRuleValidationError(`Invalid status: ${input.status}`);
+  }
+  if (typeof input.timestamp !== 'number' || isNaN(input.timestamp) || input.timestamp < 0) {
+    throw new AlertRuleValidationError('Invalid stage timestamp');
+  }
+  if (typeof input.duration !== 'number' || isNaN(input.duration) || input.duration < 0) {
+    throw new AlertRuleValidationError('Invalid stage duration');
+  }
+
+  const error = input.error ? freezeDeepSafe(input.error) : undefined;
+
+  const result: AlertOrchestrationStageResult = {
+    stage: input.stage,
+    status: input.status,
+    timestamp: input.timestamp,
+    duration: input.duration,
+    error
+  };
+
+  return freezeDeepSafe(result);
+}
+
+export function createAlertOrchestrationResult(input: {
+  orchestrationId: string;
+  alertId?: string;
+  ruleId: string;
+  fingerprint?: string;
+  status: AlertOrchestrationStatusValue;
+  stageResults: ReadonlyArray<AlertOrchestrationStageResult>;
+  evaluationResult?: RuleEvaluationResult;
+  generationResult?: AlertRecord;
+  deduplicationDecision?: DeduplicationDecision;
+  suppressionDecision?: AlertSuppressionDecision;
+  lifecycleResult?: AlertLifecycleRecord;
+  notificationResult?: NotificationDeliveryResult;
+  attemptedAt: number;
+  completedAt: number;
+  duration: number;
+}): AlertOrchestrationResult {
+  if (!input.orchestrationId) {
+    throw new AlertRuleValidationError('Orchestration ID is required');
+  }
+  if (!input.ruleId) {
+    throw new AlertRuleValidationError('Rule ID is required');
+  }
+  if (!Object.values(AlertOrchestrationStatus).includes(input.status)) {
+    throw new AlertRuleValidationError(`Invalid orchestration status: ${input.status}`);
+  }
+  if (!Array.isArray(input.stageResults)) {
+    throw new AlertRuleValidationError('Stage results array is required');
+  }
+
+  const stageResults = freezeDeepSafe(input.stageResults);
+  const evaluationResult = input.evaluationResult ? freezeDeepSafe(input.evaluationResult) : undefined;
+  const generationResult = input.generationResult ? freezeDeepSafe(input.generationResult) : undefined;
+  const deduplicationDecision = input.deduplicationDecision ? freezeDeepSafe(input.deduplicationDecision) : undefined;
+  const suppressionDecision = input.suppressionDecision ? freezeDeepSafe(input.suppressionDecision) : undefined;
+  const lifecycleResult = input.lifecycleResult ? freezeDeepSafe(input.lifecycleResult) : undefined;
+  const notificationResult = input.notificationResult ? freezeDeepSafe(input.notificationResult) : undefined;
+
+  const result: AlertOrchestrationResult = {
+    orchestrationId: input.orchestrationId,
+    alertId: input.alertId,
+    ruleId: input.ruleId,
+    fingerprint: input.fingerprint,
+    status: input.status,
+    stageResults,
+    evaluationResult,
+    generationResult,
+    deduplicationDecision,
+    suppressionDecision,
+    lifecycleResult,
+    notificationResult,
+    attemptedAt: input.attemptedAt,
+    completedAt: input.completedAt,
+    duration: input.duration
   };
 
   return freezeDeepSafe(result);

@@ -14,6 +14,7 @@ import type {
 } from '../models/suppression';
 import type { INotificationChannel } from '../interfaces/notification-channel';
 import type { NotificationRequest, NotificationDeliveryResult } from '../models/notification';
+import type { AlertOrchestrationRequest, AlertOrchestrationResult } from '../models/orchestration';
 import { AlertRegistry } from '../registry/AlertRegistry';
 import { AlertEvaluator } from '../evaluator/AlertEvaluator';
 import { AlertGenerator } from '../generator/AlertGenerator';
@@ -22,6 +23,7 @@ import { AlertLifecycleManager } from '../lifecycle/AlertLifecycleManager';
 import { AlertSuppressionManager } from '../suppression/AlertSuppressionManager';
 import { NotificationChannelRegistry } from '../notifications/NotificationChannelRegistry';
 import { NotificationDispatcher } from '../notifications/NotificationDispatcher';
+import { AlertOrchestrator } from '../orchestration/AlertOrchestrator';
 import { AlertingStateError, AlertGenerationError } from '../errors/AlertingErrors';
 import { createAlertingStatistics, createAlertingDiagnostics } from '../factories/alertingFactories';
 
@@ -35,6 +37,7 @@ export class AlertingProvider implements IAlertingProvider {
   private readonly _suppressionManager = new AlertSuppressionManager();
   private readonly _notificationRegistry = new NotificationChannelRegistry();
   private readonly _notificationDispatcher: NotificationDispatcher;
+  private readonly _orchestrator: AlertOrchestrator;
 
   private readonly _policy: DeduplicationPolicy = {
     enabled: true,
@@ -66,6 +69,7 @@ export class AlertingProvider implements IAlertingProvider {
 
   constructor() {
     this._notificationDispatcher = new NotificationDispatcher(this._notificationRegistry);
+    this._orchestrator = new AlertOrchestrator(this);
   }
 
   private ensureReady(action: string): void {
@@ -114,6 +118,7 @@ export class AlertingProvider implements IAlertingProvider {
       this._suppressionManager.clearAll();
       this._notificationRegistry.clear();
       this._notificationDispatcher.clear();
+      this._orchestrator.clear();
       this.clearEvaluationStats();
       this.clearGenerationStats();
       this.clearDeduplicationStats();
@@ -432,6 +437,27 @@ export class AlertingProvider implements IAlertingProvider {
     return this._notificationDispatcher.getHistory();
   }
 
+  // --- Orchestration APIs ---
+  public orchestrate(request: AlertOrchestrationRequest): Promise<AlertOrchestrationResult> {
+    this.ensureReady('orchestrate');
+    return this._orchestrator.orchestrate(request);
+  }
+
+  public orchestrateMany(requests: ReadonlyArray<AlertOrchestrationRequest>): Promise<ReadonlyArray<AlertOrchestrationResult>> {
+    this.ensureReady('orchestrateMany');
+    return this._orchestrator.orchestrateMany(requests);
+  }
+
+  public getResult(orchestrationId: string): AlertOrchestrationResult | null {
+    this.ensureReady('getResult');
+    return this._orchestrator.getResult(orchestrationId);
+  }
+
+  public getHistory(): ReadonlyArray<AlertOrchestrationResult> {
+    this.ensureReady('getHistory');
+    return this._orchestrator.getHistory();
+  }
+
   private clearEvaluationStats(): void {
     this._totalEvaluations = 0;
     this._matchedEvaluations = 0;
@@ -476,6 +502,7 @@ export class AlertingProvider implements IAlertingProvider {
     const enabledChannels = channels.filter(c => c.enabled).length;
     const disabledChannels = registeredChannels - enabledChannels;
     const notificationStats = this._notificationDispatcher.getStats();
+    const orchestrationStats = this._orchestrator.getStats();
 
     return createAlertingStatistics({
       registeredAlertCount: alertCount,
@@ -531,7 +558,15 @@ export class AlertingProvider implements IAlertingProvider {
       registeredChannels,
       enabledChannels,
       disabledChannels,
-      averageDeliveryDuration: notificationStats.averageDeliveryDuration
+      averageDeliveryDuration: notificationStats.averageDeliveryDuration,
+      orchestrationsTotal: orchestrationStats.orchestrationsTotal,
+      orchestrationsSuccessful: orchestrationStats.orchestrationsSuccessful,
+      orchestrationsSkipped: orchestrationStats.orchestrationsSkipped,
+      orchestrationsDuplicate: orchestrationStats.orchestrationsDuplicate,
+      orchestrationsSuppressed: orchestrationStats.orchestrationsSuppressed,
+      orchestrationsFailed: orchestrationStats.orchestrationsFailed,
+      averageOrchestrationDuration: orchestrationStats.averageOrchestrationDuration,
+      activeOrchestrations: orchestrationStats.activeOrchestrations
     });
   }
 
@@ -555,6 +590,7 @@ export class AlertingProvider implements IAlertingProvider {
     const enabledChannels = channels.filter(c => c.enabled).length;
     const disabledChannels = registeredChannels - enabledChannels;
     const notificationStats = this._notificationDispatcher.getStats();
+    const orchestrationStats = this._orchestrator.getStats();
 
     return createAlertingDiagnostics({
       runtimeState: this._state,
@@ -612,6 +648,14 @@ export class AlertingProvider implements IAlertingProvider {
       enabledChannels,
       disabledChannels,
       averageDeliveryDuration: notificationStats.averageDeliveryDuration,
+      orchestrationsTotal: orchestrationStats.orchestrationsTotal,
+      orchestrationsSuccessful: orchestrationStats.orchestrationsSuccessful,
+      orchestrationsSkipped: orchestrationStats.orchestrationsSkipped,
+      orchestrationsDuplicate: orchestrationStats.orchestrationsDuplicate,
+      orchestrationsSuppressed: orchestrationStats.orchestrationsSuppressed,
+      orchestrationsFailed: orchestrationStats.orchestrationsFailed,
+      averageOrchestrationDuration: orchestrationStats.averageOrchestrationDuration,
+      activeOrchestrations: orchestrationStats.activeOrchestrations,
       generatedAt: now
     });
   }

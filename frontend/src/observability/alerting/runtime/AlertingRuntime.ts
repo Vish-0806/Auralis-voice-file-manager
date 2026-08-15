@@ -16,6 +16,7 @@ import type {
 } from '../models/suppression';
 import type { INotificationChannel } from '../interfaces/notification-channel';
 import type { NotificationRequest, NotificationDeliveryResult } from '../models/notification';
+import type { AlertOrchestrationRequest, AlertOrchestrationResult } from '../models/orchestration';
 
 export class AlertingRuntime implements IAlertingRuntime {
   private readonly _provider: IAlertingProvider;
@@ -244,6 +245,23 @@ export class AlertingRuntime implements IAlertingRuntime {
 
   public getNotificationDeliveryHistory(): ReadonlyArray<NotificationDeliveryResult> {
     return this._provider.getNotificationDeliveryHistory();
+  }
+
+  // --- Orchestration APIs ---
+  public orchestrate(request: AlertOrchestrationRequest): Promise<AlertOrchestrationResult> {
+    return this._provider.orchestrate(request);
+  }
+
+  public orchestrateMany(requests: ReadonlyArray<AlertOrchestrationRequest>): Promise<ReadonlyArray<AlertOrchestrationResult>> {
+    return this._provider.orchestrateMany(requests);
+  }
+
+  public getResult(orchestrationId: string): AlertOrchestrationResult | null {
+    return this._provider.getResult(orchestrationId);
+  }
+
+  public getHistory(): ReadonlyArray<AlertOrchestrationResult> {
+    return this._provider.getHistory();
   }
 
   // --- Stats & Diags ---

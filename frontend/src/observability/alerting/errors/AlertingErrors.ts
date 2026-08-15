@@ -178,6 +178,35 @@ export class NotificationChannelNotFoundError extends AlertNotificationError {
   }
 }
 
+export class AlertOrchestrationError extends AlertingRuntimeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertOrchestrationError';
+  }
+}
+
+export class AlertOrchestrationStateError extends AlertOrchestrationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertOrchestrationStateError';
+  }
+}
+
+export class AlertOrchestrationStageError extends AlertOrchestrationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertOrchestrationStageError';
+  }
+}
+
+export class AlertOrchestrationFailureError extends AlertOrchestrationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertOrchestrationFailureError';
+  }
+}
+
+
 
 
 

@@ -12,3 +12,4 @@ export { AlertDeduplicator } from './deduplication/AlertDeduplicator';
 export { AlertLifecycleManager } from './lifecycle/AlertLifecycleManager';
 export { AlertSuppressionManager } from './suppression/AlertSuppressionManager';
 export { InMemoryNotificationChannel } from './notifications/InMemoryNotificationChannel';
+export { AlertOrchestrator } from './orchestration/AlertOrchestrator';

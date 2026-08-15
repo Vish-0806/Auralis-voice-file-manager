@@ -45,7 +45,6 @@ export interface AlertingStatistics extends AlertRuleStatistics {
   readonly activeMaintenanceWindows: number;
   readonly activeSnoozes: number;
 
-  // Extended for Phase 18.7.8
   readonly notificationRequests: number;
   readonly validationFailures: number;
   readonly dispatchedNotifications: number;
@@ -58,6 +57,16 @@ export interface AlertingStatistics extends AlertRuleStatistics {
   readonly enabledChannels: number;
   readonly disabledChannels: number;
   readonly averageDeliveryDuration: number;
+
+  // Extended for Phase 18.7.9
+  readonly orchestrationsTotal: number;
+  readonly orchestrationsSuccessful: number;
+  readonly orchestrationsSkipped: number;
+  readonly orchestrationsDuplicate: number;
+  readonly orchestrationsSuppressed: number;
+  readonly orchestrationsFailed: number;
+  readonly averageOrchestrationDuration: number;
+  readonly activeOrchestrations: number;
 }
 
 export interface AlertingDiagnostics extends AlertRuleStatistics {
@@ -106,7 +115,6 @@ export interface AlertingDiagnostics extends AlertRuleStatistics {
   readonly activeMaintenanceWindows: number;
   readonly activeSnoozes: number;
 
-  // Extended for Phase 18.7.8
   readonly notificationRequests: number;
   readonly validationFailures: number;
   readonly dispatchedNotifications: number;
@@ -119,6 +127,16 @@ export interface AlertingDiagnostics extends AlertRuleStatistics {
   readonly enabledChannels: number;
   readonly disabledChannels: number;
   readonly averageDeliveryDuration: number;
+
+  // Extended for Phase 18.7.9
+  readonly orchestrationsTotal: number;
+  readonly orchestrationsSuccessful: number;
+  readonly orchestrationsSkipped: number;
+  readonly orchestrationsDuplicate: number;
+  readonly orchestrationsSuppressed: number;
+  readonly orchestrationsFailed: number;
+  readonly averageOrchestrationDuration: number;
+  readonly activeOrchestrations: number;
 
   readonly generatedAt: number;
 }
