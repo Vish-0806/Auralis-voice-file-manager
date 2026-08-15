@@ -6,11 +6,18 @@ import type { AlertingStatistics, AlertingDiagnostics } from '../models/statisti
 import type { AlertEvaluationContext, RuleEvaluationResult } from '../models/evaluation';
 import type { DeduplicationDecision, DeduplicationRecord, DeduplicationPolicy } from '../models/deduplication';
 import type { AlertLifecycleRecord, AlertLifecycleHistoryEntry, AlertLifecycleActorValue } from '../models/lifecycle';
+import type {
+  AlertSuppressionPolicy,
+  AlertMaintenanceWindow,
+  AlertSnoozeRecord,
+  AlertSuppressionDecision
+} from '../models/suppression';
 import { AlertRegistry } from '../registry/AlertRegistry';
 import { AlertEvaluator } from '../evaluator/AlertEvaluator';
 import { AlertGenerator } from '../generator/AlertGenerator';
 import { AlertDeduplicator } from '../deduplication/AlertDeduplicator';
 import { AlertLifecycleManager } from '../lifecycle/AlertLifecycleManager';
+import { AlertSuppressionManager } from '../suppression/AlertSuppressionManager';
 import { AlertingStateError, AlertGenerationError } from '../errors/AlertingErrors';
 import { createAlertingStatistics, createAlertingDiagnostics } from '../factories/alertingFactories';
 
@@ -21,6 +28,7 @@ export class AlertingProvider implements IAlertingProvider {
   private readonly _generator = new AlertGenerator();
   private readonly _deduplicator = new AlertDeduplicator();
   private readonly _lifecycleManager = new AlertLifecycleManager();
+  private readonly _suppressionManager = new AlertSuppressionManager();
 
   private readonly _policy: DeduplicationPolicy = {
     enabled: true,
@@ -87,6 +95,7 @@ export class AlertingProvider implements IAlertingProvider {
       this._registry.clearRules();
       this._deduplicator.clear();
       this._lifecycleManager.clearAll();
+      this._suppressionManager.clearAll();
       this.clearEvaluationStats();
       this.clearGenerationStats();
       this.clearDeduplicationStats();
@@ -107,7 +116,6 @@ export class AlertingProvider implements IAlertingProvider {
   public registerAlert(alert: AlertRecord): void {
     this.ensureReady('registerAlert');
     this._registry.registerAlert(alert);
-    // Initialize lifecycle state as ACTIVE if not already present
     this._lifecycleManager.initializeRecord(alert.id, alert.fingerprint, alert.triggeredAt || alert.generatedAt || Date.now());
   }
 
@@ -125,6 +133,7 @@ export class AlertingProvider implements IAlertingProvider {
     this.ensureReady('removeAlert');
     this._registry.removeAlert(alertId);
     this._lifecycleManager.clear(alertId);
+    this._suppressionManager.clearSnooze(alertId);
   }
 
   public listAlerts(): ReadonlyArray<AlertRecord> {
@@ -136,6 +145,7 @@ export class AlertingProvider implements IAlertingProvider {
     this.ensureReady('clearAlerts');
     this._registry.clear();
     this._lifecycleManager.clearAll();
+    this._suppressionManager.clearAll();
   }
 
   // --- Rule API ---
@@ -206,7 +216,6 @@ export class AlertingProvider implements IAlertingProvider {
 
       this._registry.registerAlert(alert);
 
-      // Automatically initialize alert lifecycle as ACTIVE
       const generatedAt = alert.generatedAt || Date.now();
       this._lifecycleManager.initializeRecord(alert.id, alert.fingerprint, generatedAt);
 
@@ -305,6 +314,65 @@ export class AlertingProvider implements IAlertingProvider {
     return this._lifecycleManager.getHistory(alertId);
   }
 
+  // --- Suppression API ---
+  public registerSuppressionPolicy(policy: AlertSuppressionPolicy): void {
+    this.ensureReady('registerSuppressionPolicy');
+    this._suppressionManager.registerPolicy(policy);
+  }
+
+  public unregisterSuppressionPolicy(policyId: string): void {
+    this.ensureReady('unregisterSuppressionPolicy');
+    this._suppressionManager.unregisterPolicy(policyId);
+  }
+
+  public listSuppressionPolicies(): ReadonlyArray<AlertSuppressionPolicy> {
+    this.ensureReady('listSuppressionPolicies');
+    return this._suppressionManager.listPolicies();
+  }
+
+  public registerMaintenanceWindow(window: AlertMaintenanceWindow): void {
+    this.ensureReady('registerMaintenanceWindow');
+    this._suppressionManager.registerMaintenanceWindow(window);
+  }
+
+  public unregisterMaintenanceWindow(windowId: string): void {
+    this.ensureReady('unregisterMaintenanceWindow');
+    this._suppressionManager.unregisterMaintenanceWindow(windowId);
+  }
+
+  public listMaintenanceWindows(): ReadonlyArray<AlertMaintenanceWindow> {
+    this.ensureReady('listMaintenanceWindows');
+    return this._suppressionManager.listMaintenanceWindows();
+  }
+
+  public snoozeAlert(
+    alertId: string,
+    fingerprint: string | undefined,
+    durationMs: number,
+    actor: string,
+    reason?: string,
+    metadata?: Record<string, unknown>,
+    now?: number
+  ): AlertSnoozeRecord {
+    this.ensureReady('snoozeAlert');
+    return this._suppressionManager.snoozeAlert(alertId, fingerprint, durationMs, actor, reason, metadata, now);
+  }
+
+  public clearSnooze(alertId: string): void {
+    this.ensureReady('clearSnooze');
+    this._suppressionManager.clearSnooze(alertId);
+  }
+
+  public getSnooze(alertId: string): AlertSnoozeRecord | null {
+    this.ensureReady('getSnooze');
+    return this._suppressionManager.getSnooze(alertId);
+  }
+
+  public evaluateSuppression(alert: AlertRecord, now?: number): AlertSuppressionDecision {
+    this.ensureReady('evaluateSuppression');
+    return this._suppressionManager.evaluateSuppression(alert, now);
+  }
+
   private clearEvaluationStats(): void {
     this._totalEvaluations = 0;
     this._matchedEvaluations = 0;
@@ -342,6 +410,7 @@ export class AlertingProvider implements IAlertingProvider {
 
     const dedupDiags = this._deduplicator.getDiagnostics(Date.now());
     const lifecycleStats = this._lifecycleManager.getTransitionStats();
+    const suppressionStats = this._suppressionManager.getStats();
 
     return createAlertingStatistics({
       registeredAlertCount: alertCount,
@@ -375,7 +444,17 @@ export class AlertingProvider implements IAlertingProvider {
       activeAlerts: lifecycleStats.activeAlerts,
       acknowledgedAlerts: lifecycleStats.acknowledgedAlerts,
       resolvedAlerts: lifecycleStats.resolvedAlerts,
-      closedAlerts: lifecycleStats.closedAlerts
+      closedAlerts: lifecycleStats.closedAlerts,
+      suppressionEvaluations: suppressionStats.suppressionEvaluations,
+      suppressedAlerts: suppressionStats.suppressedAlerts,
+      allowedAlerts: suppressionStats.allowedAlerts,
+      policyMatches: suppressionStats.policyMatches,
+      maintenanceMatches: suppressionStats.maintenanceMatches,
+      snoozedMatches: suppressionStats.snoozedMatches,
+      evaluationFailures: suppressionStats.evaluationFailures,
+      activePolicies: suppressionStats.activePolicies,
+      activeMaintenanceWindows: suppressionStats.activeMaintenanceWindows,
+      activeSnoozes: suppressionStats.activeSnoozes
     });
   }
 
@@ -392,6 +471,7 @@ export class AlertingProvider implements IAlertingProvider {
     const now = Date.now();
     const dedupDiags = this._deduplicator.getDiagnostics(now);
     const lifecycleStats = this._lifecycleManager.getTransitionStats();
+    const suppressionStats = this._suppressionManager.getStats();
 
     return createAlertingDiagnostics({
       runtimeState: this._state,
@@ -427,6 +507,16 @@ export class AlertingProvider implements IAlertingProvider {
       acknowledgedAlerts: lifecycleStats.acknowledgedAlerts,
       resolvedAlerts: lifecycleStats.resolvedAlerts,
       closedAlerts: lifecycleStats.closedAlerts,
+      suppressionEvaluations: suppressionStats.suppressionEvaluations,
+      suppressedAlerts: suppressionStats.suppressedAlerts,
+      allowedAlerts: suppressionStats.allowedAlerts,
+      policyMatches: suppressionStats.policyMatches,
+      maintenanceMatches: suppressionStats.maintenanceMatches,
+      snoozedMatches: suppressionStats.snoozedMatches,
+      evaluationFailures: suppressionStats.evaluationFailures,
+      activePolicies: suppressionStats.activePolicies,
+      activeMaintenanceWindows: suppressionStats.activeMaintenanceWindows,
+      activeSnoozes: suppressionStats.activeSnoozes,
       generatedAt: now
     });
   }

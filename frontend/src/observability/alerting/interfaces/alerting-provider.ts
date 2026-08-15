@@ -5,6 +5,12 @@ import type { AlertingRuntimeStateValue } from '../models/runtime';
 import type { AlertEvaluationContext, RuleEvaluationResult } from '../models/evaluation';
 import type { DeduplicationDecision, DeduplicationRecord } from '../models/deduplication';
 import type { AlertLifecycleRecord, AlertLifecycleHistoryEntry, AlertLifecycleActorValue } from '../models/lifecycle';
+import type {
+  AlertSuppressionPolicy,
+  AlertMaintenanceWindow,
+  AlertSnoozeRecord,
+  AlertSuppressionDecision
+} from '../models/suppression';
 
 export interface IAlertingProvider {
   initialize(): Promise<void>;
@@ -34,7 +40,6 @@ export interface IAlertingProvider {
   getDeduplicationRecord(identityKey: string): DeduplicationRecord | null;
   clearDeduplication(): void;
 
-  // Extended for Phase 18.7.6
   initializeAlertLifecycle(alertId: string, fingerprint?: string, now?: number): AlertLifecycleRecord;
   getAlertLifecycle(alertId: string): AlertLifecycleRecord | null;
   acknowledgeAlert(
@@ -59,6 +64,26 @@ export interface IAlertingProvider {
     now?: number
   ): AlertLifecycleRecord;
   getAlertLifecycleHistory(alertId: string): ReadonlyArray<AlertLifecycleHistoryEntry>;
+
+  // Extended for Phase 18.7.7
+  registerSuppressionPolicy(policy: AlertSuppressionPolicy): void;
+  unregisterSuppressionPolicy(policyId: string): void;
+  listSuppressionPolicies(): ReadonlyArray<AlertSuppressionPolicy>;
+  registerMaintenanceWindow(window: AlertMaintenanceWindow): void;
+  unregisterMaintenanceWindow(windowId: string): void;
+  listMaintenanceWindows(): ReadonlyArray<AlertMaintenanceWindow>;
+  snoozeAlert(
+    alertId: string,
+    fingerprint: string | undefined,
+    durationMs: number,
+    actor: string,
+    reason?: string,
+    metadata?: Record<string, unknown>,
+    now?: number
+  ): AlertSnoozeRecord;
+  clearSnooze(alertId: string): void;
+  getSnooze(alertId: string): AlertSnoozeRecord | null;
+  evaluateSuppression(alert: AlertRecord, now?: number): AlertSuppressionDecision;
 
   getStatistics(): AlertingStatistics;
   getDiagnostics(): AlertingDiagnostics;

@@ -8,6 +8,12 @@ import type { AlertingRuntimeStateValue } from '../models/runtime';
 import type { AlertEvaluationContext, RuleEvaluationResult } from '../models/evaluation';
 import type { DeduplicationDecision, DeduplicationRecord } from '../models/deduplication';
 import type { AlertLifecycleRecord, AlertLifecycleHistoryEntry, AlertLifecycleActorValue } from '../models/lifecycle';
+import type {
+  AlertSuppressionPolicy,
+  AlertMaintenanceWindow,
+  AlertSnoozeRecord,
+  AlertSuppressionDecision
+} from '../models/suppression';
 
 export class AlertingRuntime implements IAlertingRuntime {
   private readonly _provider: IAlertingProvider;
@@ -154,6 +160,55 @@ export class AlertingRuntime implements IAlertingRuntime {
 
   public getAlertLifecycleHistory(alertId: string): ReadonlyArray<AlertLifecycleHistoryEntry> {
     return this._provider.getAlertLifecycleHistory(alertId);
+  }
+
+  // --- Suppression API ---
+  public registerSuppressionPolicy(policy: AlertSuppressionPolicy): void {
+    this._provider.registerSuppressionPolicy(policy);
+  }
+
+  public unregisterSuppressionPolicy(policyId: string): void {
+    this._provider.unregisterSuppressionPolicy(policyId);
+  }
+
+  public listSuppressionPolicies(): ReadonlyArray<AlertSuppressionPolicy> {
+    return this._provider.listSuppressionPolicies();
+  }
+
+  public registerMaintenanceWindow(window: AlertMaintenanceWindow): void {
+    this._provider.registerMaintenanceWindow(window);
+  }
+
+  public unregisterMaintenanceWindow(windowId: string): void {
+    this._provider.unregisterMaintenanceWindow(windowId);
+  }
+
+  public listMaintenanceWindows(): ReadonlyArray<AlertMaintenanceWindow> {
+    return this._provider.listMaintenanceWindows();
+  }
+
+  public snoozeAlert(
+    alertId: string,
+    fingerprint: string | undefined,
+    durationMs: number,
+    actor: string,
+    reason?: string,
+    metadata?: Record<string, unknown>,
+    now?: number
+  ): AlertSnoozeRecord {
+    return this._provider.snoozeAlert(alertId, fingerprint, durationMs, actor, reason, metadata, now);
+  }
+
+  public clearSnooze(alertId: string): void {
+    this._provider.clearSnooze(alertId);
+  }
+
+  public getSnooze(alertId: string): AlertSnoozeRecord | null {
+    return this._provider.getSnooze(alertId);
+  }
+
+  public evaluateSuppression(alert: AlertRecord, now?: number): AlertSuppressionDecision {
+    return this._provider.evaluateSuppression(alert, now);
   }
 
   // --- Stats & Diags ---

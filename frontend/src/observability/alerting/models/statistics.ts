@@ -24,7 +24,6 @@ export interface AlertingStatistics extends AlertRuleStatistics {
   readonly activeCooldownCount: number;
   readonly trackedFingerprintCount: number;
 
-  // Extended for Phase 18.7.6
   readonly lifecycleTransitions: number;
   readonly acknowledgements: number;
   readonly resolutions: number;
@@ -34,6 +33,18 @@ export interface AlertingStatistics extends AlertRuleStatistics {
   readonly acknowledgedAlerts: number;
   readonly resolvedAlerts: number;
   readonly closedAlerts: number;
+
+  // Extended for Phase 18.7.7
+  readonly suppressionEvaluations: number;
+  readonly suppressedAlerts: number;
+  readonly allowedAlerts: number;
+  readonly policyMatches: number;
+  readonly maintenanceMatches: number;
+  readonly snoozedMatches: number;
+  readonly evaluationFailures: number;
+  readonly activePolicies: number;
+  readonly activeMaintenanceWindows: number;
+  readonly activeSnoozes: number;
 }
 
 export interface AlertingDiagnostics extends AlertRuleStatistics {
@@ -61,7 +72,6 @@ export interface AlertingDiagnostics extends AlertRuleStatistics {
   readonly activeCooldownCount: number;
   readonly trackedFingerprintCount: number;
 
-  // Extended for Phase 18.7.6
   readonly lifecycleTransitions: number;
   readonly acknowledgements: number;
   readonly resolutions: number;
@@ -71,6 +81,18 @@ export interface AlertingDiagnostics extends AlertRuleStatistics {
   readonly acknowledgedAlerts: number;
   readonly resolvedAlerts: number;
   readonly closedAlerts: number;
+
+  // Extended for Phase 18.7.7
+  readonly suppressionEvaluations: number;
+  readonly suppressedAlerts: number;
+  readonly allowedAlerts: number;
+  readonly policyMatches: number;
+  readonly maintenanceMatches: number;
+  readonly snoozedMatches: number;
+  readonly evaluationFailures: number;
+  readonly activePolicies: number;
+  readonly activeMaintenanceWindows: number;
+  readonly activeSnoozes: number;
 
   readonly generatedAt: number;
 }

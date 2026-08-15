@@ -101,6 +101,42 @@ export class AlertLifecycleNotFoundError extends AlertLifecycleError {
   }
 }
 
+export class AlertSuppressionError extends AlertingRuntimeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertSuppressionError';
+  }
+}
+
+export class AlertSuppressionPolicyError extends AlertSuppressionError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertSuppressionPolicyError';
+  }
+}
+
+export class AlertMaintenanceWindowError extends AlertSuppressionError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertMaintenanceWindowError';
+  }
+}
+
+export class AlertSnoozeError extends AlertSuppressionError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertSnoozeError';
+  }
+}
+
+export class AlertSuppressionEvaluationError extends AlertSuppressionError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertSuppressionEvaluationError';
+  }
+}
+
+
 
 
 

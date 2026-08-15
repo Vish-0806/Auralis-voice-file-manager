@@ -25,6 +25,16 @@ import {
   AlertLifecycleHistoryEntry,
   AlertLifecycleRecord
 } from '../models/lifecycle';
+import {
+  AlertSuppressionReason,
+  AlertSuppressionReasonValue,
+  AlertSuppressionScope,
+  AlertSuppressionScopeValue,
+  AlertSuppressionPolicy,
+  AlertMaintenanceWindow,
+  AlertSnoozeRecord,
+  AlertSuppressionDecision
+} from '../models/suppression';
 import { freezeDeepSafe } from '../../models/monitoring';
 
 export function createAlertRecord(input: {
@@ -277,6 +287,16 @@ export function createAlertingStatistics(input: {
   acknowledgedAlerts: number;
   resolvedAlerts: number;
   closedAlerts: number;
+  suppressionEvaluations: number;
+  suppressedAlerts: number;
+  allowedAlerts: number;
+  policyMatches: number;
+  maintenanceMatches: number;
+  snoozedMatches: number;
+  evaluationFailures: number;
+  activePolicies: number;
+  activeMaintenanceWindows: number;
+  activeSnoozes: number;
 }): AlertingStatistics {
   const stats: AlertingStatistics = {
     registeredAlertCount: input.registeredAlertCount,
@@ -310,7 +330,17 @@ export function createAlertingStatistics(input: {
     activeAlerts: input.activeAlerts,
     acknowledgedAlerts: input.acknowledgedAlerts,
     resolvedAlerts: input.resolvedAlerts,
-    closedAlerts: input.closedAlerts
+    closedAlerts: input.closedAlerts,
+    suppressionEvaluations: input.suppressionEvaluations,
+    suppressedAlerts: input.suppressedAlerts,
+    allowedAlerts: input.allowedAlerts,
+    policyMatches: input.policyMatches,
+    maintenanceMatches: input.maintenanceMatches,
+    snoozedMatches: input.snoozedMatches,
+    evaluationFailures: input.evaluationFailures,
+    activePolicies: input.activePolicies,
+    activeMaintenanceWindows: input.activeMaintenanceWindows,
+    activeSnoozes: input.activeSnoozes
   };
 
   return freezeDeepSafe(stats);
@@ -350,6 +380,16 @@ export function createAlertingDiagnostics(input: {
   acknowledgedAlerts: number;
   resolvedAlerts: number;
   closedAlerts: number;
+  suppressionEvaluations: number;
+  suppressedAlerts: number;
+  allowedAlerts: number;
+  policyMatches: number;
+  maintenanceMatches: number;
+  snoozedMatches: number;
+  evaluationFailures: number;
+  activePolicies: number;
+  activeMaintenanceWindows: number;
+  activeSnoozes: number;
   generatedAt: number;
 }): AlertingDiagnostics {
   const diag: AlertingDiagnostics = {
@@ -386,6 +426,16 @@ export function createAlertingDiagnostics(input: {
     acknowledgedAlerts: input.acknowledgedAlerts,
     resolvedAlerts: input.resolvedAlerts,
     closedAlerts: input.closedAlerts,
+    suppressionEvaluations: input.suppressionEvaluations,
+    suppressedAlerts: input.suppressedAlerts,
+    allowedAlerts: input.allowedAlerts,
+    policyMatches: input.policyMatches,
+    maintenanceMatches: input.maintenanceMatches,
+    snoozedMatches: input.snoozedMatches,
+    evaluationFailures: input.evaluationFailures,
+    activePolicies: input.activePolicies,
+    activeMaintenanceWindows: input.activeMaintenanceWindows,
+    activeSnoozes: input.activeSnoozes,
     generatedAt: input.generatedAt
   };
 
@@ -647,4 +697,182 @@ export function createAlertLifecycleRecord(input: {
   };
 
   return freezeDeepSafe(record);
+}
+
+export function createAlertSuppressionPolicy(input: {
+  id: string;
+  name: string;
+  enabled: boolean;
+  priority: number;
+  scope: AlertSuppressionScopeValue;
+  ruleId?: string;
+  alertId?: string;
+  fingerprint?: string;
+  sourceId?: string;
+  startTime?: number;
+  endTime?: number;
+  reason: AlertSuppressionReasonValue;
+  metadata?: Record<string, unknown>;
+}): AlertSuppressionPolicy {
+  if (!input.id) {
+    throw new AlertRuleValidationError('Policy ID is required');
+  }
+  if (!input.name) {
+    throw new AlertRuleValidationError('Policy name is required');
+  }
+  if (typeof input.priority !== 'number' || isNaN(input.priority)) {
+    throw new AlertRuleValidationError('Policy priority must be a valid number');
+  }
+  if (!Object.values(AlertSuppressionScope).includes(input.scope)) {
+    throw new AlertRuleValidationError(`Invalid policy scope: ${input.scope}`);
+  }
+  if (!Object.values(AlertSuppressionReason).includes(input.reason)) {
+    throw new AlertRuleValidationError(`Invalid policy reason: ${input.reason}`);
+  }
+  if (input.startTime !== undefined && (typeof input.startTime !== 'number' || input.startTime < 0)) {
+    throw new AlertRuleValidationError('Invalid policy startTime');
+  }
+  if (input.endTime !== undefined && (typeof input.endTime !== 'number' || input.endTime < 0)) {
+    throw new AlertRuleValidationError('Invalid policy endTime');
+  }
+  if (input.startTime !== undefined && input.endTime !== undefined && input.startTime >= input.endTime) {
+    throw new AlertRuleValidationError('Policy startTime must be less than endTime');
+  }
+
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const policy: AlertSuppressionPolicy = {
+    id: input.id,
+    name: input.name,
+    enabled: input.enabled,
+    priority: input.priority,
+    scope: input.scope,
+    ruleId: input.ruleId,
+    alertId: input.alertId,
+    fingerprint: input.fingerprint,
+    sourceId: input.sourceId,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    reason: input.reason,
+    metadata
+  };
+
+  return freezeDeepSafe(policy);
+}
+
+export function createAlertMaintenanceWindow(input: {
+  id: string;
+  name: string;
+  enabled: boolean;
+  startTime: number;
+  endTime: number;
+  scope?: AlertSuppressionScopeValue;
+  reason: string;
+  metadata?: Record<string, unknown>;
+}): AlertMaintenanceWindow {
+  if (!input.id) {
+    throw new AlertRuleValidationError('Maintenance Window ID is required');
+  }
+  if (!input.name) {
+    throw new AlertRuleValidationError('Maintenance Window name is required');
+  }
+  if (typeof input.startTime !== 'number' || isNaN(input.startTime) || input.startTime < 0) {
+    throw new AlertRuleValidationError('Invalid maintenance window startTime');
+  }
+  if (typeof input.endTime !== 'number' || isNaN(input.endTime) || input.endTime < 0) {
+    throw new AlertRuleValidationError('Invalid maintenance window endTime');
+  }
+  if (input.startTime >= input.endTime) {
+    throw new AlertRuleValidationError('Maintenance window startTime must be less than endTime');
+  }
+  if (input.scope !== undefined && !Object.values(AlertSuppressionScope).includes(input.scope)) {
+    throw new AlertRuleValidationError(`Invalid maintenance window scope: ${input.scope}`);
+  }
+
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const window: AlertMaintenanceWindow = {
+    id: input.id,
+    name: input.name,
+    enabled: input.enabled,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    scope: input.scope,
+    reason: input.reason,
+    metadata
+  };
+
+  return freezeDeepSafe(window);
+}
+
+export function createAlertSnoozeRecord(input: {
+  alertId: string;
+  fingerprint?: string;
+  startTime: number;
+  endTime: number;
+  actor: string;
+  reason?: string;
+  metadata?: Record<string, unknown>;
+}): AlertSnoozeRecord {
+  if (!input.alertId) {
+    throw new AlertRuleValidationError('Snooze Alert ID is required');
+  }
+  if (typeof input.startTime !== 'number' || isNaN(input.startTime) || input.startTime < 0) {
+    throw new AlertRuleValidationError('Invalid snooze startTime');
+  }
+  if (typeof input.endTime !== 'number' || isNaN(input.endTime) || input.endTime < 0) {
+    throw new AlertRuleValidationError('Invalid snooze endTime');
+  }
+  if (input.startTime >= input.endTime) {
+    throw new AlertRuleValidationError('Snooze startTime must be less than endTime');
+  }
+  if (!input.actor) {
+    throw new AlertRuleValidationError('Snooze actor is required');
+  }
+
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const snooze: AlertSnoozeRecord = {
+    alertId: input.alertId,
+    fingerprint: input.fingerprint,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    actor: input.actor,
+    reason: input.reason,
+    metadata
+  };
+
+  return freezeDeepSafe(snooze);
+}
+
+export function createAlertSuppressionDecision(input: {
+  suppressed: boolean;
+  reason: AlertSuppressionReasonValue | null;
+  policyId?: string;
+  windowId?: string;
+  evaluatedAt: number;
+  metadata?: Record<string, unknown>;
+}): AlertSuppressionDecision {
+  if (input.suppressed && !input.reason) {
+    throw new AlertRuleValidationError('reason is required when alert is suppressed');
+  }
+  if (input.reason !== null && !Object.values(AlertSuppressionReason).includes(input.reason)) {
+    throw new AlertRuleValidationError(`Invalid suppression reason: ${input.reason}`);
+  }
+  if (typeof input.evaluatedAt !== 'number' || isNaN(input.evaluatedAt) || input.evaluatedAt < 0) {
+    throw new AlertRuleValidationError('Invalid suppression evaluatedAt timestamp');
+  }
+
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const decision: AlertSuppressionDecision = {
+    suppressed: input.suppressed,
+    reason: input.reason,
+    policyId: input.policyId,
+    windowId: input.windowId,
+    evaluatedAt: input.evaluatedAt,
+    metadata
+  };
+
+  return freezeDeepSafe(decision);
 }

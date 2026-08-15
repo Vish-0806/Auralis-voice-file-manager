@@ -10,3 +10,4 @@ export { AlertGenerator } from './generator/AlertGenerator';
 export { createAlertFingerprint } from './factories/fingerprint';
 export { AlertDeduplicator } from './deduplication/AlertDeduplicator';
 export { AlertLifecycleManager } from './lifecycle/AlertLifecycleManager';
+export { AlertSuppressionManager } from './suppression/AlertSuppressionManager';
