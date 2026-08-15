@@ -2,6 +2,7 @@ import type { AlertRecord } from '../models/alert';
 import type { AlertRule } from '../models/alert-rule';
 import type { AlertingStatistics, AlertingDiagnostics } from '../models/statistics';
 import type { AlertingRuntimeStateValue } from '../models/runtime';
+import type { AlertEvaluationContext, RuleEvaluationResult } from '../models/evaluation';
 
 export interface IAlertingProvider {
   initialize(): Promise<void>;
@@ -23,6 +24,8 @@ export interface IAlertingProvider {
   listRules(): ReadonlyArray<AlertRule>;
   updateRule(rule: AlertRule): void;
   clearRules(): void;
+
+  evaluateRule(rule: AlertRule, context: AlertEvaluationContext): RuleEvaluationResult;
 
   getStatistics(): AlertingStatistics;
   getDiagnostics(): AlertingDiagnostics;

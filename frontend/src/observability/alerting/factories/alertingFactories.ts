@@ -5,6 +5,13 @@ import { AlertingStatistics, AlertingDiagnostics } from '../models/statistics';
 import { AlertOperator, AlertOperatorValue, RuleCondition } from '../models/rule-condition';
 import { ConditionGroup } from '../models/condition-group';
 import { AlertRule } from '../models/alert-rule';
+import {
+  ConditionEvaluationResult,
+  GroupEvaluationResult,
+  RuleEvaluationResult,
+  ConditionEvaluationStatus,
+  RuleEvaluationStatus
+} from '../models/evaluation';
 import { freezeDeepSafe } from '../../models/monitoring';
 
 export function createAlertRecord(input: {
@@ -229,25 +236,26 @@ export function createAlertingStatistics(input: {
   registeredRuleCount: number;
   enabledRuleCount: number;
   disabledRuleCount: number;
+  totalEvaluations: number;
+  matchedEvaluations: number;
+  unmatchedEvaluations: number;
+  errorEvaluations: number;
+  skippedEvaluations: number;
+  totalEvaluationDuration: number;
+  averageEvaluationDuration: number;
 }): AlertingStatistics {
-  if (typeof input.registeredAlertCount !== 'number' || isNaN(input.registeredAlertCount) || input.registeredAlertCount < 0) {
-    throw new AlertValidationError('registeredAlertCount must be a non-negative number');
-  }
-  if (typeof input.registeredRuleCount !== 'number' || isNaN(input.registeredRuleCount) || input.registeredRuleCount < 0) {
-    throw new AlertValidationError('registeredRuleCount must be a non-negative number');
-  }
-  if (typeof input.enabledRuleCount !== 'number' || isNaN(input.enabledRuleCount) || input.enabledRuleCount < 0) {
-    throw new AlertValidationError('enabledRuleCount must be a non-negative number');
-  }
-  if (typeof input.disabledRuleCount !== 'number' || isNaN(input.disabledRuleCount) || input.disabledRuleCount < 0) {
-    throw new AlertValidationError('disabledRuleCount must be a non-negative number');
-  }
-
   const stats: AlertingStatistics = {
     registeredAlertCount: input.registeredAlertCount,
     registeredRuleCount: input.registeredRuleCount,
     enabledRuleCount: input.enabledRuleCount,
-    disabledRuleCount: input.disabledRuleCount
+    disabledRuleCount: input.disabledRuleCount,
+    totalEvaluations: input.totalEvaluations,
+    matchedEvaluations: input.matchedEvaluations,
+    unmatchedEvaluations: input.unmatchedEvaluations,
+    errorEvaluations: input.errorEvaluations,
+    skippedEvaluations: input.skippedEvaluations,
+    totalEvaluationDuration: input.totalEvaluationDuration,
+    averageEvaluationDuration: input.averageEvaluationDuration
   };
 
   return freezeDeepSafe(stats);
@@ -259,35 +267,137 @@ export function createAlertingDiagnostics(input: {
   registeredRuleCount: number;
   enabledRuleCount: number;
   disabledRuleCount: number;
+  totalEvaluations: number;
+  matchedEvaluations: number;
+  unmatchedEvaluations: number;
+  errorEvaluations: number;
+  skippedEvaluations: number;
+  totalEvaluationDuration: number;
+  averageEvaluationDuration: number;
   generatedAt: number;
 }): AlertingDiagnostics {
-  if (typeof input.runtimeState !== 'string' || input.runtimeState.trim() === '') {
-    throw new AlertValidationError('runtimeState must be a non-empty string');
-  }
-  if (typeof input.registeredAlertCount !== 'number' || isNaN(input.registeredAlertCount) || input.registeredAlertCount < 0) {
-    throw new AlertValidationError('registeredAlertCount must be a non-negative number');
-  }
-  if (typeof input.registeredRuleCount !== 'number' || isNaN(input.registeredRuleCount) || input.registeredRuleCount < 0) {
-    throw new AlertValidationError('registeredRuleCount must be a non-negative number');
-  }
-  if (typeof input.enabledRuleCount !== 'number' || isNaN(input.enabledRuleCount) || input.enabledRuleCount < 0) {
-    throw new AlertValidationError('enabledRuleCount must be a non-negative number');
-  }
-  if (typeof input.disabledRuleCount !== 'number' || isNaN(input.disabledRuleCount) || input.disabledRuleCount < 0) {
-    throw new AlertValidationError('disabledRuleCount must be a non-negative number');
-  }
-  if (typeof input.generatedAt !== 'number' || isNaN(input.generatedAt) || input.generatedAt < 0) {
-    throw new AlertValidationError('generatedAt must be a valid timestamp');
-  }
-
   const diag: AlertingDiagnostics = {
     runtimeState: input.runtimeState,
     registeredAlertCount: input.registeredAlertCount,
     registeredRuleCount: input.registeredRuleCount,
     enabledRuleCount: input.enabledRuleCount,
     disabledRuleCount: input.disabledRuleCount,
+    totalEvaluations: input.totalEvaluations,
+    matchedEvaluations: input.matchedEvaluations,
+    unmatchedEvaluations: input.unmatchedEvaluations,
+    errorEvaluations: input.errorEvaluations,
+    skippedEvaluations: input.skippedEvaluations,
+    totalEvaluationDuration: input.totalEvaluationDuration,
+    averageEvaluationDuration: input.averageEvaluationDuration,
     generatedAt: input.generatedAt
   };
 
   return freezeDeepSafe(diag);
+}
+
+export function createConditionEvaluationResult(input: {
+  conditionId: string;
+  matched: boolean;
+  status: any;
+  actualValue: unknown;
+  expectedValue: unknown;
+  operator: string;
+  field: string;
+  reason?: string;
+  error?: { name: string; message: string; stack?: string };
+  durationMs?: number;
+}): ConditionEvaluationResult {
+  if (!input.conditionId) {
+    throw new AlertRuleValidationError('Condition ID is required in evaluation result');
+  }
+  if (!input.field) {
+    throw new AlertRuleValidationError('Field is required in evaluation result');
+  }
+  if (!input.operator) {
+    throw new AlertRuleValidationError('Operator is required in evaluation result');
+  }
+  if (!Object.values(ConditionEvaluationStatus).includes(input.status)) {
+    throw new AlertRuleValidationError(`Invalid condition evaluation status: ${input.status}`);
+  }
+
+  const result: ConditionEvaluationResult = {
+    conditionId: input.conditionId,
+    matched: input.matched,
+    status: input.status,
+    actualValue: input.actualValue,
+    expectedValue: input.expectedValue,
+    operator: input.operator,
+    field: input.field,
+    reason: input.reason,
+    error: input.error,
+    durationMs: input.durationMs
+  };
+
+  return freezeDeepSafe(result);
+}
+
+export function createGroupEvaluationResult(input: {
+  operator: 'ALL' | 'ANY' | 'NOT';
+  matched: boolean;
+  conditions: ReadonlyArray<ConditionEvaluationResult | GroupEvaluationResult>;
+  reason?: string;
+  durationMs?: number;
+}): GroupEvaluationResult {
+  if (!['ALL', 'ANY', 'NOT'].includes(input.operator)) {
+    throw new AlertRuleValidationError(`Invalid group operator: ${input.operator}`);
+  }
+  if (!Array.isArray(input.conditions)) {
+    throw new AlertRuleValidationError('Conditions array is required in group evaluation result');
+  }
+
+  const result: GroupEvaluationResult = {
+    operator: input.operator,
+    matched: input.matched,
+    conditions: input.conditions,
+    reason: input.reason,
+    durationMs: input.durationMs
+  };
+
+  return freezeDeepSafe(result);
+}
+
+export function createRuleEvaluationResult(input: {
+  ruleId: string;
+  ruleVersion?: number;
+  matched: boolean;
+  status: any;
+  results: GroupEvaluationResult;
+  evaluatedAt: number;
+  durationMs: number;
+  error?: { name: string; message: string; stack?: string };
+  metadata?: Record<string, unknown>;
+}): RuleEvaluationResult {
+  if (!input.ruleId) {
+    throw new AlertRuleValidationError('Rule ID is required in rule evaluation result');
+  }
+  if (!Object.values(RuleEvaluationStatus).includes(input.status)) {
+    throw new AlertRuleValidationError(`Invalid rule evaluation status: ${input.status}`);
+  }
+  if (typeof input.evaluatedAt !== 'number' || input.evaluatedAt < 0) {
+    throw new AlertRuleValidationError('EvaluatedAt timestamp is required');
+  }
+  if (typeof input.durationMs !== 'number' || input.durationMs < 0) {
+    throw new AlertRuleValidationError('DurationMs must be a non-negative number');
+  }
+
+  const metadata = input.metadata ? JSON.parse(JSON.stringify(input.metadata)) : {};
+
+  const result: RuleEvaluationResult = {
+    ruleId: input.ruleId,
+    ruleVersion: input.ruleVersion,
+    matched: input.matched,
+    status: input.status,
+    results: input.results,
+    evaluatedAt: input.evaluatedAt,
+    durationMs: input.durationMs,
+    error: input.error,
+    metadata
+  };
+
+  return freezeDeepSafe(result);
 }

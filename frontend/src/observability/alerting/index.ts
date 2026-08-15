@@ -5,3 +5,4 @@ export { AlertingRuntime } from './runtime/AlertingRuntime';
 export { AlertRegistry } from './registry/AlertRegistry';
 export * from './errors/AlertingErrors';
 export * from './factories/alertingFactories';
+export { AlertEvaluator } from './evaluator/AlertEvaluator';

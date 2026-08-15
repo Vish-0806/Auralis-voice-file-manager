@@ -51,3 +51,11 @@ export class AlertRuleNotFoundError extends AlertingRuntimeError {
     this.name = 'AlertRuleNotFoundError';
   }
 }
+
+export class AlertEvaluationError extends AlertingRuntimeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertEvaluationError';
+  }
+}
+

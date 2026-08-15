@@ -6,3 +6,4 @@ export * from './rule-condition';
 export * from './condition-group';
 export * from './alert-rule';
 export * from './rule-statistics';
+export * from './evaluation';

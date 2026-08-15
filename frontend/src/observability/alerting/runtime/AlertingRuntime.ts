@@ -5,6 +5,7 @@ import type { AlertRecord } from '../models/alert';
 import type { AlertRule } from '../models/alert-rule';
 import type { AlertingStatistics, AlertingDiagnostics } from '../models/statistics';
 import type { AlertingRuntimeStateValue } from '../models/runtime';
+import type { AlertEvaluationContext, RuleEvaluationResult } from '../models/evaluation';
 
 export class AlertingRuntime implements IAlertingRuntime {
   private readonly _provider: IAlertingProvider;
@@ -85,6 +86,11 @@ export class AlertingRuntime implements IAlertingRuntime {
 
   public clearRules(): void {
     this._provider.clearRules();
+  }
+
+  // --- Evaluation API ---
+  public evaluateRule(rule: AlertRule, context: AlertEvaluationContext): RuleEvaluationResult {
+    return this._provider.evaluateRule(rule, context);
   }
 
   // --- Stats & Diags ---
