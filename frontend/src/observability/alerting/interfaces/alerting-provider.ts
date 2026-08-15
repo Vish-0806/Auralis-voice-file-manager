@@ -5,7 +5,8 @@ import type { AlertingRuntimeStateValue } from '../models/runtime';
 export interface IAlertingProvider {
   initialize(): Promise<void>;
   shutdown(): Promise<void>;
-  getState(): AlertingRuntimeStateValue;
+  getRuntimeState(): AlertingRuntimeStateValue;
+  getState(): AlertingRuntimeStateValue; // for backwards/system-wide state checking compatibility
 
   registerAlert(alert: AlertRecord): void;
   getAlert(alertId: string): AlertRecord | null;

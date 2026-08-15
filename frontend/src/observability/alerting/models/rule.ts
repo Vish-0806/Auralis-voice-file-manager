@@ -1,4 +1,4 @@
-import { AlertSeverityValue } from './alert';
+import { AlertSeverityValue } from './severity';
 import { AlertCondition, AlertConditionGroup } from './condition';
 
 export interface AlertRule {
