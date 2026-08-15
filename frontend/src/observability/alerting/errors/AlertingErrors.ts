@@ -30,3 +30,24 @@ export class AlertNotFoundError extends AlertingRuntimeError {
     this.name = 'AlertNotFoundError';
   }
 }
+
+export class AlertRuleValidationError extends AlertingRuntimeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertRuleValidationError';
+  }
+}
+
+export class AlertRuleAlreadyExistsError extends AlertingRuntimeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertRuleAlreadyExistsError';
+  }
+}
+
+export class AlertRuleNotFoundError extends AlertingRuntimeError {
+  constructor(message: string, readonly ruleId?: string) {
+    super(message);
+    this.name = 'AlertRuleNotFoundError';
+  }
+}

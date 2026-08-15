@@ -102,6 +102,49 @@ describe('AlertingRuntime Coordination & DI Tests', () => {
     runtime.clearAlerts();
     expect(clearSpy).toHaveBeenCalled();
 
+    const registerRuleSpy = vi.spyOn(customProvider, 'registerRule');
+    const getRuleSpy = vi.spyOn(customProvider, 'getRule');
+    const hasRuleSpy = vi.spyOn(customProvider, 'hasRule');
+    const listRulesSpy = vi.spyOn(customProvider, 'listRules');
+    const updateRuleSpy = vi.spyOn(customProvider, 'updateRule');
+    const unregisterRuleSpy = vi.spyOn(customProvider, 'unregisterRule');
+    const clearRulesSpy = vi.spyOn(customProvider, 'clearRules');
+
+    const rule = {
+      id: 'rule-x',
+      name: 'Rule X',
+      description: 'Desc',
+      enabled: true,
+      severity: 'ERROR' as const,
+      conditions: { operator: 'ALL' as const, conditions: [] },
+      sourceId: 'src-1',
+      tags: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata: {}
+    };
+
+    runtime.registerRule(rule);
+    expect(registerRuleSpy).toHaveBeenCalledWith(rule);
+
+    runtime.getRule('rule-x');
+    expect(getRuleSpy).toHaveBeenCalledWith('rule-x');
+
+    runtime.hasRule('rule-x');
+    expect(hasRuleSpy).toHaveBeenCalledWith('rule-x');
+
+    runtime.listRules();
+    expect(listRulesSpy).toHaveBeenCalled();
+
+    runtime.updateRule(rule);
+    expect(updateRuleSpy).toHaveBeenCalledWith(rule);
+
+    runtime.unregisterRule('rule-x');
+    expect(unregisterRuleSpy).toHaveBeenCalledWith('rule-x');
+
+    runtime.clearRules();
+    expect(clearRulesSpy).toHaveBeenCalled();
+
     await runtime.shutdown();
     expect(shutdownSpy).toHaveBeenCalled();
   });

@@ -1,5 +1,5 @@
 import { AlertSeverityValue } from './severity';
-import { AlertCondition, AlertConditionGroup } from './condition';
+import { ConditionGroup } from './condition-group';
 
 export interface AlertRule {
   readonly id: string;
@@ -7,11 +7,11 @@ export interface AlertRule {
   readonly description: string;
   readonly enabled: boolean;
   readonly severity: AlertSeverityValue;
+  readonly conditions: ConditionGroup;
   readonly sourceId: string;
-  readonly priority: number;
-  readonly cooldownMs?: number;
-  readonly suppressionMs?: number;
-  readonly expirationMs?: number;
-  readonly conditions: AlertConditionGroup | ReadonlyArray<AlertCondition>;
+  readonly tags: ReadonlyArray<string>;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+  readonly version?: number;
   readonly metadata: Record<string, unknown>;
 }

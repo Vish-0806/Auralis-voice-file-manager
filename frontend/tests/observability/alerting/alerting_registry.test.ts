@@ -114,4 +114,156 @@ describe('AlertRegistry Tests', () => {
     registry.clear();
     expect(registry.listAlerts()).toHaveLength(0);
   });
+
+  it('6. should register rules and list them in deterministic insertion order', () => {
+    const registry = new AlertRegistry();
+    const cond = { id: 'c1', field: 'f1', operator: 'EQ' as const, expectedValue: 1 };
+    const group = { operator: 'ALL' as const, conditions: [cond] };
+
+    const r1 = {
+      id: 'rule-1',
+      name: 'Rule 1',
+      description: 'Desc 1',
+      enabled: true,
+      severity: 'ERROR' as const,
+      conditions: group,
+      sourceId: 'src-1',
+      tags: ['tag1'],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata: {}
+    };
+
+    const r2 = {
+      id: 'rule-2',
+      name: 'Rule 2',
+      description: 'Desc 2',
+      enabled: false,
+      severity: 'WARNING' as const,
+      conditions: group,
+      sourceId: 'src-2',
+      tags: ['tag2'],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata: {}
+    };
+
+    registry.registerRule(r1);
+    registry.registerRule(r2);
+
+    const rules = registry.listRules();
+    expect(rules).toHaveLength(2);
+    expect(rules[0].id).toBe('rule-1');
+    expect(rules[1].id).toBe('rule-2');
+  });
+
+  it('7. should reject duplicate rule IDs', () => {
+    const registry = new AlertRegistry();
+    const cond = { id: 'c1', field: 'f1', operator: 'EQ' as const, expectedValue: 1 };
+    const group = { operator: 'ALL' as const, conditions: [cond] };
+
+    const r1 = {
+      id: 'rule-1',
+      name: 'Rule 1',
+      description: 'Desc 1',
+      enabled: true,
+      severity: 'ERROR' as const,
+      conditions: group,
+      sourceId: 'src-1',
+      tags: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata: {}
+    };
+
+    registry.registerRule(r1);
+    expect(() => registry.registerRule(r1)).toThrow();
+  });
+
+  it('8. should support rule lookup and state checking', () => {
+    const registry = new AlertRegistry();
+    const cond = { id: 'c1', field: 'f1', operator: 'EQ' as const, expectedValue: 1 };
+    const group = { operator: 'ALL' as const, conditions: [cond] };
+
+    const r1 = {
+      id: 'rule-1',
+      name: 'Rule 1',
+      description: 'Desc 1',
+      enabled: true,
+      severity: 'ERROR' as const,
+      conditions: group,
+      sourceId: 'src-1',
+      tags: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata: {}
+    };
+
+    registry.registerRule(r1);
+    expect(registry.hasRule('rule-1')).toBe(true);
+    expect(registry.hasRule('rule-missing')).toBe(false);
+    expect(registry.getRule('rule-1')!.name).toBe('Rule 1');
+    expect(registry.getRule('rule-missing')).toBeNull();
+  });
+
+  it('9. should support updating existing rules and reject unknown updates', () => {
+    const registry = new AlertRegistry();
+    const cond = { id: 'c1', field: 'f1', operator: 'EQ' as const, expectedValue: 1 };
+    const group = { operator: 'ALL' as const, conditions: [cond] };
+
+    const r1 = {
+      id: 'rule-1',
+      name: 'Rule 1',
+      description: 'Desc 1',
+      enabled: true,
+      severity: 'ERROR' as const,
+      conditions: group,
+      sourceId: 'src-1',
+      tags: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata: {}
+    };
+
+    registry.registerRule(r1);
+
+    const updatedRule = { ...r1, name: 'Updated Rule Name' };
+    registry.updateRule(updatedRule);
+    expect(registry.getRule('rule-1')!.name).toBe('Updated Rule Name');
+
+    const unknownRule = { ...r1, id: 'rule-unknown' };
+    expect(() => registry.updateRule(unknownRule)).toThrow();
+  });
+
+  it('10. should support rule unregistration and clear', () => {
+    const registry = new AlertRegistry();
+    const cond = { id: 'c1', field: 'f1', operator: 'EQ' as const, expectedValue: 1 };
+    const group = { operator: 'ALL' as const, conditions: [cond] };
+
+    const r1 = {
+      id: 'rule-1',
+      name: 'Rule 1',
+      description: 'Desc 1',
+      enabled: true,
+      severity: 'ERROR' as const,
+      conditions: group,
+      sourceId: 'src-1',
+      tags: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata: {}
+    };
+
+    registry.registerRule(r1);
+    expect(registry.listRules()).toHaveLength(1);
+
+    expect(() => registry.unregisterRule('rule-missing')).toThrow();
+
+    registry.unregisterRule('rule-1');
+    expect(registry.listRules()).toHaveLength(0);
+
+    registry.registerRule(r1);
+    registry.clearRules();
+    expect(registry.listRules()).toHaveLength(0);
+  });
 });

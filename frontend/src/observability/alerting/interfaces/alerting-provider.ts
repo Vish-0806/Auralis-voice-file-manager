@@ -1,4 +1,5 @@
 import type { AlertRecord } from '../models/alert';
+import type { AlertRule } from '../models/alert-rule';
 import type { AlertingStatistics, AlertingDiagnostics } from '../models/statistics';
 import type { AlertingRuntimeStateValue } from '../models/runtime';
 
@@ -14,6 +15,14 @@ export interface IAlertingProvider {
   removeAlert(alertId: string): void;
   listAlerts(): ReadonlyArray<AlertRecord>;
   clearAlerts(): void;
+
+  registerRule(rule: AlertRule): void;
+  unregisterRule(ruleId: string): void;
+  getRule(ruleId: string): AlertRule | null;
+  hasRule(ruleId: string): boolean;
+  listRules(): ReadonlyArray<AlertRule>;
+  updateRule(rule: AlertRule): void;
+  clearRules(): void;
 
   getStatistics(): AlertingStatistics;
   getDiagnostics(): AlertingDiagnostics;

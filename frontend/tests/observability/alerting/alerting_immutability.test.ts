@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   AlertingProvider,
-  createAlertRecord
+  createAlertRecord,
+  createAlertRule,
+  createRuleCondition,
+  createConditionGroup
 } from '../../../src/observability';
 
 describe('Alerting Immutability & Defensive Snapshots Tests', () => {
@@ -82,6 +85,60 @@ describe('Alerting Immutability & Defensive Snapshots Tests', () => {
 
     expect(() => {
       (diags as any).runtimeState = 'STOPPED';
+    }).toThrow();
+  });
+
+  it('4. alert rule and condition group must be frozen', async () => {
+    const provider = new AlertingProvider();
+    await provider.initialize();
+
+    const cond = createRuleCondition({
+      id: 'cond-1',
+      field: 'cpu',
+      operator: 'GT',
+      expectedValue: 80,
+      metadata: { limit: '80%' }
+    });
+
+    const group = createConditionGroup({
+      operator: 'ALL',
+      conditions: [cond]
+    });
+
+    const rule = createAlertRule({
+      id: 'rule-1',
+      name: 'Rule 1',
+      description: 'Desc',
+      enabled: true,
+      severity: 'ERROR',
+      conditions: group,
+      sourceId: 'src-1',
+      tags: ['tag1'],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata: { env: 'prod' }
+    });
+
+    expect(Object.isFrozen(rule)).toBe(true);
+    expect(Object.isFrozen(rule.conditions)).toBe(true);
+    expect(Object.isFrozen(rule.conditions.conditions)).toBe(true);
+    expect(Object.isFrozen(rule.tags)).toBe(true);
+    expect(Object.isFrozen(rule.metadata)).toBe(true);
+
+    provider.registerRule(rule);
+
+    const retrieved = provider.getRule('rule-1')!;
+    expect(Object.isFrozen(retrieved)).toBe(true);
+    expect(Object.isFrozen(retrieved.conditions)).toBe(true);
+
+    expect(() => {
+      (retrieved as any).name = 'mutate';
+    }).toThrow();
+
+    const rulesList = provider.listRules();
+    expect(Object.isFrozen(rulesList)).toBe(true);
+    expect(() => {
+      (rulesList as any).push(rule);
     }).toThrow();
   });
 });

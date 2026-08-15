@@ -92,7 +92,72 @@ describe('AlertingProvider Lifecycle & API Tests', () => {
     expect(() => provider.getAlert('alert-1')).toThrow(AlertingStateError);
   });
 
-  it('6. benchmark: alert registration, lookup, and diagnostics generation via provider', async () => {
+  it('6. should restrict rule API access to READY state', async () => {
+    const provider = new AlertingProvider();
+    const cond = { id: 'c1', field: 'f1', operator: 'EQ' as const, expectedValue: 1 };
+    const group = { operator: 'ALL' as const, conditions: [cond] };
+
+    const rule = {
+      id: 'rule-1',
+      name: 'Rule 1',
+      description: 'Desc 1',
+      enabled: true,
+      severity: 'ERROR' as const,
+      conditions: group,
+      sourceId: 'src-1',
+      tags: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      metadata: {}
+    };
+
+    // Check throws when UNINITIALIZED
+    expect(() => provider.registerRule(rule)).toThrow(AlertingStateError);
+    expect(() => provider.getRule('rule-1')).toThrow(AlertingStateError);
+    expect(() => provider.hasRule('rule-1')).toThrow(AlertingStateError);
+    expect(() => provider.listRules()).toThrow(AlertingStateError);
+    expect(() => provider.updateRule(rule)).toThrow(AlertingStateError);
+    expect(() => provider.unregisterRule('rule-1')).toThrow(AlertingStateError);
+    expect(() => provider.clearRules()).toThrow(AlertingStateError);
+
+    await provider.initialize();
+
+    // Works when READY
+    provider.registerRule(rule);
+    expect(provider.getRule('rule-1')).toBeDefined();
+    expect(provider.hasRule('rule-1')).toBe(true);
+    expect(provider.listRules()).toHaveLength(1);
+    
+    // Validate Stats & Diags include rules
+    const stats = provider.getStatistics();
+    expect(stats.registeredRuleCount).toBe(1);
+    expect(stats.enabledRuleCount).toBe(1);
+    expect(stats.disabledRuleCount).toBe(0);
+
+    const diags = provider.getDiagnostics();
+    expect(diags.registeredRuleCount).toBe(1);
+    expect(diags.enabledRuleCount).toBe(1);
+    expect(diags.disabledRuleCount).toBe(0);
+
+    const updated = { ...rule, enabled: false };
+    provider.updateRule(updated);
+    expect(provider.getRule('rule-1')!.enabled).toBe(false);
+    expect(provider.getStatistics().disabledRuleCount).toBe(1);
+
+    provider.unregisterRule('rule-1');
+    expect(provider.listRules()).toHaveLength(0);
+
+    provider.registerRule(rule);
+    provider.clearRules();
+    expect(provider.listRules()).toHaveLength(0);
+
+    await provider.shutdown();
+
+    // Throws when STOPPED
+    expect(() => provider.registerRule(rule)).toThrow(AlertingStateError);
+  });
+
+  it('7. benchmark: alert registration, lookup, and diagnostics generation via provider', async () => {
     const provider = new AlertingProvider();
     await provider.initialize();
     const count = 1000;

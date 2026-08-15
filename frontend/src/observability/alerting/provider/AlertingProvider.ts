@@ -1,5 +1,6 @@
 import type { IAlertingProvider } from '../interfaces/alerting-provider';
 import type { AlertRecord } from '../models/alert';
+import type { AlertRule } from '../models/alert-rule';
 import { AlertingRuntimeState, AlertingRuntimeStateValue } from '../models/runtime';
 import type { AlertingStatistics, AlertingDiagnostics } from '../models/statistics';
 import { AlertRegistry } from '../registry/AlertRegistry';
@@ -44,6 +45,7 @@ export class AlertingProvider implements IAlertingProvider {
     this._state = AlertingRuntimeState.STOPPING;
     try {
       this._registry.clear();
+      this._registry.clearRules();
     } finally {
       this._state = AlertingRuntimeState.STOPPED;
     }
@@ -57,6 +59,7 @@ export class AlertingProvider implements IAlertingProvider {
     return this._state;
   }
 
+  // --- Alert API ---
   public registerAlert(alert: AlertRecord): void {
     this.ensureReady('registerAlert');
     this._registry.registerAlert(alert);
@@ -74,7 +77,7 @@ export class AlertingProvider implements IAlertingProvider {
 
   public removeAlert(alertId: string): void {
     this.ensureReady('removeAlert');
-    this._registry.removeAlert(alertId);
+    return this._registry.removeAlert(alertId);
   }
 
   public listAlerts(): ReadonlyArray<AlertRecord> {
@@ -87,18 +90,73 @@ export class AlertingProvider implements IAlertingProvider {
     this._registry.clear();
   }
 
+  // --- Rule API ---
+  public registerRule(rule: AlertRule): void {
+    this.ensureReady('registerRule');
+    this._registry.registerRule(rule);
+  }
+
+  public unregisterRule(ruleId: string): void {
+    this.ensureReady('unregisterRule');
+    this._registry.unregisterRule(ruleId);
+  }
+
+  public getRule(ruleId: string): AlertRule | null {
+    this.ensureReady('getRule');
+    return this._registry.getRule(ruleId);
+  }
+
+  public hasRule(ruleId: string): boolean {
+    this.ensureReady('hasRule');
+    return this._registry.hasRule(ruleId);
+  }
+
+  public listRules(): ReadonlyArray<AlertRule> {
+    this.ensureReady('listRules');
+    return this._registry.listRules();
+  }
+
+  public updateRule(rule: AlertRule): void {
+    this.ensureReady('updateRule');
+    this._registry.updateRule(rule);
+  }
+
+  public clearRules(): void {
+    this.ensureReady('clearRules');
+    this._registry.clearRules();
+  }
+
+  // --- Statistics & Diagnostics ---
   public getStatistics(): AlertingStatistics {
     this.ensureReady('getStatistics');
-    const count = this._registry.listAlerts().length;
-    return createAlertingStatistics({ registeredAlertCount: count });
+    const alertCount = this._registry.listAlerts().length;
+    const rules = this._registry.listRules();
+    const ruleCount = rules.length;
+    const enabledRuleCount = rules.filter(r => r.enabled).length;
+    const disabledRuleCount = ruleCount - enabledRuleCount;
+
+    return createAlertingStatistics({
+      registeredAlertCount: alertCount,
+      registeredRuleCount: ruleCount,
+      enabledRuleCount,
+      disabledRuleCount
+    });
   }
 
   public getDiagnostics(): AlertingDiagnostics {
     this.ensureReady('getDiagnostics');
-    const count = this._registry.listAlerts().length;
+    const alertCount = this._registry.listAlerts().length;
+    const rules = this._registry.listRules();
+    const ruleCount = rules.length;
+    const enabledRuleCount = rules.filter(r => r.enabled).length;
+    const disabledRuleCount = ruleCount - enabledRuleCount;
+
     return createAlertingDiagnostics({
       runtimeState: this._state,
-      registeredAlertCount: count,
+      registeredAlertCount: alertCount,
+      registeredRuleCount: ruleCount,
+      enabledRuleCount,
+      disabledRuleCount,
       generatedAt: Date.now()
     });
   }

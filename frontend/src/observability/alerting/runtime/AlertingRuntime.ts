@@ -2,6 +2,7 @@ import type { IAlertingRuntime } from '../interfaces/alerting-runtime';
 import type { IAlertingProvider } from '../interfaces/alerting-provider';
 import { AlertingProvider } from '../provider/AlertingProvider';
 import type { AlertRecord } from '../models/alert';
+import type { AlertRule } from '../models/alert-rule';
 import type { AlertingStatistics, AlertingDiagnostics } from '../models/statistics';
 import type { AlertingRuntimeStateValue } from '../models/runtime';
 
@@ -32,6 +33,7 @@ export class AlertingRuntime implements IAlertingRuntime {
     return this._provider.getState();
   }
 
+  // --- Alert API ---
   public registerAlert(alert: AlertRecord): void {
     this._provider.registerAlert(alert);
   }
@@ -56,6 +58,36 @@ export class AlertingRuntime implements IAlertingRuntime {
     this._provider.clearAlerts();
   }
 
+  // --- Rule API ---
+  public registerRule(rule: AlertRule): void {
+    this._provider.registerRule(rule);
+  }
+
+  public unregisterRule(ruleId: string): void {
+    this._provider.unregisterRule(ruleId);
+  }
+
+  public getRule(ruleId: string): AlertRule | null {
+    return this._provider.getRule(ruleId);
+  }
+
+  public hasRule(ruleId: string): boolean {
+    return this._provider.hasRule(ruleId);
+  }
+
+  public listRules(): ReadonlyArray<AlertRule> {
+    return this._provider.listRules();
+  }
+
+  public updateRule(rule: AlertRule): void {
+    this._provider.updateRule(rule);
+  }
+
+  public clearRules(): void {
+    this._provider.clearRules();
+  }
+
+  // --- Stats & Diags ---
   public getStatistics(): AlertingStatistics {
     return this._provider.getStatistics();
   }
