@@ -10,3 +10,4 @@ export * from './evaluation';
 export * from './deduplication';
 export * from './lifecycle';
 export * from './suppression';
+export * from './notification';

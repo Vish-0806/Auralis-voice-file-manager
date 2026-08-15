@@ -11,6 +11,8 @@ import type {
   AlertSnoozeRecord,
   AlertSuppressionDecision
 } from '../models/suppression';
+import type { INotificationChannel } from './notification-channel';
+import type { NotificationRequest, NotificationDeliveryResult } from '../models/notification';
 
 export interface IAlertingProvider {
   initialize(): Promise<void>;
@@ -65,7 +67,6 @@ export interface IAlertingProvider {
   ): AlertLifecycleRecord;
   getAlertLifecycleHistory(alertId: string): ReadonlyArray<AlertLifecycleHistoryEntry>;
 
-  // Extended for Phase 18.7.7
   registerSuppressionPolicy(policy: AlertSuppressionPolicy): void;
   unregisterSuppressionPolicy(policyId: string): void;
   listSuppressionPolicies(): ReadonlyArray<AlertSuppressionPolicy>;
@@ -84,6 +85,16 @@ export interface IAlertingProvider {
   clearSnooze(alertId: string): void;
   getSnooze(alertId: string): AlertSnoozeRecord | null;
   evaluateSuppression(alert: AlertRecord, now?: number): AlertSuppressionDecision;
+
+  // Extended for Phase 18.7.8
+  registerNotificationChannel(channel: INotificationChannel): void;
+  unregisterNotificationChannel(channelId: string): void;
+  getNotificationChannel(channelId: string): INotificationChannel | null;
+  listNotificationChannels(): ReadonlyArray<INotificationChannel>;
+  enableNotificationChannel(channelId: string): void;
+  disableNotificationChannel(channelId: string): void;
+  dispatchNotification(request: NotificationRequest, maxAttempts?: number): Promise<NotificationDeliveryResult>;
+  getNotificationDeliveryHistory(): ReadonlyArray<NotificationDeliveryResult>;
 
   getStatistics(): AlertingStatistics;
   getDiagnostics(): AlertingDiagnostics;

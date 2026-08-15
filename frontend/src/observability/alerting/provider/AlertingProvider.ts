@@ -12,12 +12,16 @@ import type {
   AlertSnoozeRecord,
   AlertSuppressionDecision
 } from '../models/suppression';
+import type { INotificationChannel } from '../interfaces/notification-channel';
+import type { NotificationRequest, NotificationDeliveryResult } from '../models/notification';
 import { AlertRegistry } from '../registry/AlertRegistry';
 import { AlertEvaluator } from '../evaluator/AlertEvaluator';
 import { AlertGenerator } from '../generator/AlertGenerator';
 import { AlertDeduplicator } from '../deduplication/AlertDeduplicator';
 import { AlertLifecycleManager } from '../lifecycle/AlertLifecycleManager';
 import { AlertSuppressionManager } from '../suppression/AlertSuppressionManager';
+import { NotificationChannelRegistry } from '../notifications/NotificationChannelRegistry';
+import { NotificationDispatcher } from '../notifications/NotificationDispatcher';
 import { AlertingStateError, AlertGenerationError } from '../errors/AlertingErrors';
 import { createAlertingStatistics, createAlertingDiagnostics } from '../factories/alertingFactories';
 
@@ -29,6 +33,8 @@ export class AlertingProvider implements IAlertingProvider {
   private readonly _deduplicator = new AlertDeduplicator();
   private readonly _lifecycleManager = new AlertLifecycleManager();
   private readonly _suppressionManager = new AlertSuppressionManager();
+  private readonly _notificationRegistry = new NotificationChannelRegistry();
+  private readonly _notificationDispatcher: NotificationDispatcher;
 
   private readonly _policy: DeduplicationPolicy = {
     enabled: true,
@@ -58,9 +64,15 @@ export class AlertingProvider implements IAlertingProvider {
   private _duplicateAlertCount = 0;
   private _cooldownSuppressedCount = 0;
 
+  constructor() {
+    this._notificationDispatcher = new NotificationDispatcher(this._notificationRegistry);
+  }
+
   private ensureReady(action: string): void {
     if (this._state !== AlertingRuntimeState.READY) {
-      throw new AlertingStateError(`Cannot perform action '${action}' when state is ${this._state}. Provider must be READY.`);
+      throw new AlertingStateError(
+        `Cannot perform action '${action}' when state is ${this._state}. Provider must be READY.`
+      );
     }
   }
 
@@ -68,7 +80,11 @@ export class AlertingProvider implements IAlertingProvider {
     if (this._state === AlertingRuntimeState.READY) {
       return;
     }
-    if (this._state === AlertingRuntimeState.INITIALIZING || this._state === AlertingRuntimeState.STOPPING || this._state === AlertingRuntimeState.STOPPED) {
+    if (
+      this._state === AlertingRuntimeState.INITIALIZING ||
+      this._state === AlertingRuntimeState.STOPPING ||
+      this._state === AlertingRuntimeState.STOPPED
+    ) {
       throw new AlertingStateError(`Cannot initialize alerting provider from state: ${this._state}`);
     }
 
@@ -96,6 +112,8 @@ export class AlertingProvider implements IAlertingProvider {
       this._deduplicator.clear();
       this._lifecycleManager.clearAll();
       this._suppressionManager.clearAll();
+      this._notificationRegistry.clear();
+      this._notificationDispatcher.clear();
       this.clearEvaluationStats();
       this.clearGenerationStats();
       this.clearDeduplicationStats();
@@ -373,6 +391,47 @@ export class AlertingProvider implements IAlertingProvider {
     return this._suppressionManager.evaluateSuppression(alert, now);
   }
 
+  // --- Notification Channel Runtime APIs ---
+  public registerNotificationChannel(channel: INotificationChannel): void {
+    this.ensureReady('registerNotificationChannel');
+    this._notificationRegistry.register(channel);
+  }
+
+  public unregisterNotificationChannel(channelId: string): void {
+    this.ensureReady('unregisterNotificationChannel');
+    this._notificationRegistry.unregister(channelId);
+  }
+
+  public getNotificationChannel(channelId: string): INotificationChannel | null {
+    this.ensureReady('getNotificationChannel');
+    return this._notificationRegistry.get(channelId);
+  }
+
+  public listNotificationChannels(): ReadonlyArray<INotificationChannel> {
+    this.ensureReady('listNotificationChannels');
+    return this._notificationRegistry.list();
+  }
+
+  public enableNotificationChannel(channelId: string): void {
+    this.ensureReady('enableNotificationChannel');
+    this._notificationRegistry.enable(channelId);
+  }
+
+  public disableNotificationChannel(channelId: string): void {
+    this.ensureReady('disableNotificationChannel');
+    this._notificationRegistry.disable(channelId);
+  }
+
+  public dispatchNotification(request: NotificationRequest, maxAttempts?: number): Promise<NotificationDeliveryResult> {
+    this.ensureReady('dispatchNotification');
+    return this._notificationDispatcher.dispatch(request, maxAttempts);
+  }
+
+  public getNotificationDeliveryHistory(): ReadonlyArray<NotificationDeliveryResult> {
+    this.ensureReady('getNotificationDeliveryHistory');
+    return this._notificationDispatcher.getHistory();
+  }
+
   private clearEvaluationStats(): void {
     this._totalEvaluations = 0;
     this._matchedEvaluations = 0;
@@ -411,6 +470,12 @@ export class AlertingProvider implements IAlertingProvider {
     const dedupDiags = this._deduplicator.getDiagnostics(Date.now());
     const lifecycleStats = this._lifecycleManager.getTransitionStats();
     const suppressionStats = this._suppressionManager.getStats();
+
+    const channels = this._notificationRegistry.list();
+    const registeredChannels = channels.length;
+    const enabledChannels = channels.filter(c => c.enabled).length;
+    const disabledChannels = registeredChannels - enabledChannels;
+    const notificationStats = this._notificationDispatcher.getStats();
 
     return createAlertingStatistics({
       registeredAlertCount: alertCount,
@@ -454,7 +519,19 @@ export class AlertingProvider implements IAlertingProvider {
       evaluationFailures: suppressionStats.evaluationFailures,
       activePolicies: suppressionStats.activePolicies,
       activeMaintenanceWindows: suppressionStats.activeMaintenanceWindows,
-      activeSnoozes: suppressionStats.activeSnoozes
+      activeSnoozes: suppressionStats.activeSnoozes,
+      notificationRequests: notificationStats.notificationRequests,
+      validationFailures: notificationStats.validationFailures,
+      dispatchedNotifications: notificationStats.dispatchedNotifications,
+      deliveredNotifications: notificationStats.deliveredNotifications,
+      failedNotifications: notificationStats.failedNotifications,
+      skippedNotifications: notificationStats.skippedNotifications,
+      cancelledNotifications: notificationStats.cancelledNotifications,
+      retryAttempts: notificationStats.retryAttempts,
+      registeredChannels,
+      enabledChannels,
+      disabledChannels,
+      averageDeliveryDuration: notificationStats.averageDeliveryDuration
     });
   }
 
@@ -472,6 +549,12 @@ export class AlertingProvider implements IAlertingProvider {
     const dedupDiags = this._deduplicator.getDiagnostics(now);
     const lifecycleStats = this._lifecycleManager.getTransitionStats();
     const suppressionStats = this._suppressionManager.getStats();
+
+    const channels = this._notificationRegistry.list();
+    const registeredChannels = channels.length;
+    const enabledChannels = channels.filter(c => c.enabled).length;
+    const disabledChannels = registeredChannels - enabledChannels;
+    const notificationStats = this._notificationDispatcher.getStats();
 
     return createAlertingDiagnostics({
       runtimeState: this._state,
@@ -517,6 +600,18 @@ export class AlertingProvider implements IAlertingProvider {
       activePolicies: suppressionStats.activePolicies,
       activeMaintenanceWindows: suppressionStats.activeMaintenanceWindows,
       activeSnoozes: suppressionStats.activeSnoozes,
+      notificationRequests: notificationStats.notificationRequests,
+      validationFailures: notificationStats.validationFailures,
+      dispatchedNotifications: notificationStats.dispatchedNotifications,
+      deliveredNotifications: notificationStats.deliveredNotifications,
+      failedNotifications: notificationStats.failedNotifications,
+      skippedNotifications: notificationStats.skippedNotifications,
+      cancelledNotifications: notificationStats.cancelledNotifications,
+      retryAttempts: notificationStats.retryAttempts,
+      registeredChannels,
+      enabledChannels,
+      disabledChannels,
+      averageDeliveryDuration: notificationStats.averageDeliveryDuration,
       generatedAt: now
     });
   }

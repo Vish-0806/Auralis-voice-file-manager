@@ -34,7 +34,6 @@ export interface AlertingStatistics extends AlertRuleStatistics {
   readonly resolvedAlerts: number;
   readonly closedAlerts: number;
 
-  // Extended for Phase 18.7.7
   readonly suppressionEvaluations: number;
   readonly suppressedAlerts: number;
   readonly allowedAlerts: number;
@@ -45,6 +44,20 @@ export interface AlertingStatistics extends AlertRuleStatistics {
   readonly activePolicies: number;
   readonly activeMaintenanceWindows: number;
   readonly activeSnoozes: number;
+
+  // Extended for Phase 18.7.8
+  readonly notificationRequests: number;
+  readonly validationFailures: number;
+  readonly dispatchedNotifications: number;
+  readonly deliveredNotifications: number;
+  readonly failedNotifications: number;
+  readonly skippedNotifications: number;
+  readonly cancelledNotifications: number;
+  readonly retryAttempts: number;
+  readonly registeredChannels: number;
+  readonly enabledChannels: number;
+  readonly disabledChannels: number;
+  readonly averageDeliveryDuration: number;
 }
 
 export interface AlertingDiagnostics extends AlertRuleStatistics {
@@ -82,7 +95,6 @@ export interface AlertingDiagnostics extends AlertRuleStatistics {
   readonly resolvedAlerts: number;
   readonly closedAlerts: number;
 
-  // Extended for Phase 18.7.7
   readonly suppressionEvaluations: number;
   readonly suppressedAlerts: number;
   readonly allowedAlerts: number;
@@ -93,6 +105,20 @@ export interface AlertingDiagnostics extends AlertRuleStatistics {
   readonly activePolicies: number;
   readonly activeMaintenanceWindows: number;
   readonly activeSnoozes: number;
+
+  // Extended for Phase 18.7.8
+  readonly notificationRequests: number;
+  readonly validationFailures: number;
+  readonly dispatchedNotifications: number;
+  readonly deliveredNotifications: number;
+  readonly failedNotifications: number;
+  readonly skippedNotifications: number;
+  readonly cancelledNotifications: number;
+  readonly retryAttempts: number;
+  readonly registeredChannels: number;
+  readonly enabledChannels: number;
+  readonly disabledChannels: number;
+  readonly averageDeliveryDuration: number;
 
   readonly generatedAt: number;
 }

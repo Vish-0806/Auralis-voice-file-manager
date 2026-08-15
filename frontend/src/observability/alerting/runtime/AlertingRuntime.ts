@@ -14,6 +14,8 @@ import type {
   AlertSnoozeRecord,
   AlertSuppressionDecision
 } from '../models/suppression';
+import type { INotificationChannel } from '../interfaces/notification-channel';
+import type { NotificationRequest, NotificationDeliveryResult } from '../models/notification';
 
 export class AlertingRuntime implements IAlertingRuntime {
   private readonly _provider: IAlertingProvider;
@@ -209,6 +211,39 @@ export class AlertingRuntime implements IAlertingRuntime {
 
   public evaluateSuppression(alert: AlertRecord, now?: number): AlertSuppressionDecision {
     return this._provider.evaluateSuppression(alert, now);
+  }
+
+  // --- Notification API ---
+  public registerNotificationChannel(channel: INotificationChannel): void {
+    this._provider.registerNotificationChannel(channel);
+  }
+
+  public unregisterNotificationChannel(channelId: string): void {
+    this._provider.unregisterNotificationChannel(channelId);
+  }
+
+  public getNotificationChannel(channelId: string): INotificationChannel | null {
+    return this._provider.getNotificationChannel(channelId);
+  }
+
+  public listNotificationChannels(): ReadonlyArray<INotificationChannel> {
+    return this._provider.listNotificationChannels();
+  }
+
+  public enableNotificationChannel(channelId: string): void {
+    this._provider.enableNotificationChannel(channelId);
+  }
+
+  public disableNotificationChannel(channelId: string): void {
+    this._provider.disableNotificationChannel(channelId);
+  }
+
+  public dispatchNotification(request: NotificationRequest, maxAttempts?: number): Promise<NotificationDeliveryResult> {
+    return this._provider.dispatchNotification(request, maxAttempts);
+  }
+
+  public getNotificationDeliveryHistory(): ReadonlyArray<NotificationDeliveryResult> {
+    return this._provider.getNotificationDeliveryHistory();
   }
 
   // --- Stats & Diags ---

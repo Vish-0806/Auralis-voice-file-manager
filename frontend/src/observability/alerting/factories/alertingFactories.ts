@@ -35,6 +35,19 @@ import {
   AlertSnoozeRecord,
   AlertSuppressionDecision
 } from '../models/suppression';
+import {
+  NotificationChannelType,
+  NotificationChannelTypeValue,
+  NotificationPriority,
+  NotificationPriorityValue,
+  NotificationDeliveryStatus,
+  NotificationDeliveryStatusValue,
+  NotificationRecipient,
+  NotificationPayload,
+  NotificationRequest,
+  NotificationDeliveryAttempt,
+  NotificationDeliveryResult
+} from '../models/notification';
 import { freezeDeepSafe } from '../../models/monitoring';
 
 export function createAlertRecord(input: {
@@ -297,6 +310,18 @@ export function createAlertingStatistics(input: {
   activePolicies: number;
   activeMaintenanceWindows: number;
   activeSnoozes: number;
+  notificationRequests: number;
+  validationFailures: number;
+  dispatchedNotifications: number;
+  deliveredNotifications: number;
+  failedNotifications: number;
+  skippedNotifications: number;
+  cancelledNotifications: number;
+  retryAttempts: number;
+  registeredChannels: number;
+  enabledChannels: number;
+  disabledChannels: number;
+  averageDeliveryDuration: number;
 }): AlertingStatistics {
   const stats: AlertingStatistics = {
     registeredAlertCount: input.registeredAlertCount,
@@ -340,7 +365,19 @@ export function createAlertingStatistics(input: {
     evaluationFailures: input.evaluationFailures,
     activePolicies: input.activePolicies,
     activeMaintenanceWindows: input.activeMaintenanceWindows,
-    activeSnoozes: input.activeSnoozes
+    activeSnoozes: input.activeSnoozes,
+    notificationRequests: input.notificationRequests,
+    validationFailures: input.validationFailures,
+    dispatchedNotifications: input.dispatchedNotifications,
+    deliveredNotifications: input.deliveredNotifications,
+    failedNotifications: input.failedNotifications,
+    skippedNotifications: input.skippedNotifications,
+    cancelledNotifications: input.cancelledNotifications,
+    retryAttempts: input.retryAttempts,
+    registeredChannels: input.registeredChannels,
+    enabledChannels: input.enabledChannels,
+    disabledChannels: input.disabledChannels,
+    averageDeliveryDuration: input.averageDeliveryDuration
   };
 
   return freezeDeepSafe(stats);
@@ -390,6 +427,18 @@ export function createAlertingDiagnostics(input: {
   activePolicies: number;
   activeMaintenanceWindows: number;
   activeSnoozes: number;
+  notificationRequests: number;
+  validationFailures: number;
+  dispatchedNotifications: number;
+  deliveredNotifications: number;
+  failedNotifications: number;
+  skippedNotifications: number;
+  cancelledNotifications: number;
+  retryAttempts: number;
+  registeredChannels: number;
+  enabledChannels: number;
+  disabledChannels: number;
+  averageDeliveryDuration: number;
   generatedAt: number;
 }): AlertingDiagnostics {
   const diag: AlertingDiagnostics = {
@@ -436,6 +485,18 @@ export function createAlertingDiagnostics(input: {
     activePolicies: input.activePolicies,
     activeMaintenanceWindows: input.activeMaintenanceWindows,
     activeSnoozes: input.activeSnoozes,
+    notificationRequests: input.notificationRequests,
+    validationFailures: input.validationFailures,
+    dispatchedNotifications: input.dispatchedNotifications,
+    deliveredNotifications: input.deliveredNotifications,
+    failedNotifications: input.failedNotifications,
+    skippedNotifications: input.skippedNotifications,
+    cancelledNotifications: input.cancelledNotifications,
+    retryAttempts: input.retryAttempts,
+    registeredChannels: input.registeredChannels,
+    enabledChannels: input.enabledChannels,
+    disabledChannels: input.disabledChannels,
+    averageDeliveryDuration: input.averageDeliveryDuration,
     generatedAt: input.generatedAt
   };
 
@@ -875,4 +936,164 @@ export function createAlertSuppressionDecision(input: {
   };
 
   return freezeDeepSafe(decision);
+}
+
+export function createNotificationRequest(input: {
+  id: string;
+  alertId: string;
+  fingerprint?: string;
+  channelId: string;
+  payload: NotificationPayload;
+  priority: NotificationPriorityValue;
+  channelType: NotificationChannelTypeValue;
+  recipient: NotificationRecipient;
+  createdAt: number;
+  correlationId?: string;
+}): NotificationRequest {
+  if (!input.id) {
+    throw new AlertRuleValidationError('Notification ID is required');
+  }
+  if (!input.alertId) {
+    throw new AlertRuleValidationError('Alert ID is required');
+  }
+  if (!input.channelId) {
+    throw new AlertRuleValidationError('Channel ID is required');
+  }
+  if (!input.payload) {
+    throw new AlertRuleValidationError('Payload is required');
+  }
+  if (!input.payload.title) {
+    throw new AlertRuleValidationError('Payload title is required');
+  }
+  if (!input.payload.message) {
+    throw new AlertRuleValidationError('Payload message is required');
+  }
+  if (!input.recipient) {
+    throw new AlertRuleValidationError('Recipient info is required');
+  }
+  if (!input.recipient.id) {
+    throw new AlertRuleValidationError('Recipient ID is required');
+  }
+  if (!input.recipient.name) {
+    throw new AlertRuleValidationError('Recipient name is required');
+  }
+  if (typeof input.createdAt !== 'number' || isNaN(input.createdAt) || input.createdAt < 0) {
+    throw new AlertRuleValidationError('Invalid notification createdAt timestamp');
+  }
+  if (!Object.values(NotificationPriority).includes(input.priority)) {
+    throw new AlertRuleValidationError(`Invalid priority: ${input.priority}`);
+  }
+  if (!Object.values(NotificationChannelType).includes(input.channelType)) {
+    throw new AlertRuleValidationError(`Invalid channelType: ${input.channelType}`);
+  }
+
+  const payload = freezeDeepSafe(input.payload);
+  const recipient = freezeDeepSafe(input.recipient);
+
+  const request: NotificationRequest = {
+    id: input.id,
+    alertId: input.alertId,
+    fingerprint: input.fingerprint,
+    channelId: input.channelId,
+    payload,
+    priority: input.priority,
+    channelType: input.channelType,
+    recipient,
+    createdAt: input.createdAt,
+    correlationId: input.correlationId
+  };
+
+  return freezeDeepSafe(request);
+}
+
+export function createNotificationDeliveryAttempt(input: {
+  notificationId: string;
+  attempt: number;
+  status: NotificationDeliveryStatusValue;
+  timestamp: number;
+  duration: number;
+  error?: { name: string; message: string; stack?: string };
+}): NotificationDeliveryAttempt {
+  if (!input.notificationId) {
+    throw new AlertRuleValidationError('Notification ID is required for delivery attempt');
+  }
+  if (typeof input.attempt !== 'number' || isNaN(input.attempt) || input.attempt <= 0) {
+    throw new AlertRuleValidationError('Invalid attempt number');
+  }
+  if (!Object.values(NotificationDeliveryStatus).includes(input.status)) {
+    throw new AlertRuleValidationError(`Invalid delivery attempt status: ${input.status}`);
+  }
+  if (typeof input.timestamp !== 'number' || isNaN(input.timestamp) || input.timestamp < 0) {
+    throw new AlertRuleValidationError('Invalid timestamp');
+  }
+  if (typeof input.duration !== 'number' || isNaN(input.duration) || input.duration < 0) {
+    throw new AlertRuleValidationError('Invalid duration');
+  }
+
+  const error = input.error ? freezeDeepSafe(input.error) : undefined;
+
+  const attempt: NotificationDeliveryAttempt = {
+    notificationId: input.notificationId,
+    attempt: input.attempt,
+    status: input.status,
+    timestamp: input.timestamp,
+    duration: input.duration,
+    error
+  };
+
+  return freezeDeepSafe(attempt);
+}
+
+export function createNotificationDeliveryResult(input: {
+  notificationId: string;
+  channelId: string;
+  status: NotificationDeliveryStatusValue;
+  error?: { name: string; message: string; stack?: string };
+  attemptedAt: number;
+  completedAt: number;
+  duration: number;
+  attempts: number;
+  history: ReadonlyArray<NotificationDeliveryAttempt>;
+}): NotificationDeliveryResult {
+  if (!input.notificationId) {
+    throw new AlertRuleValidationError('Notification ID is required for delivery result');
+  }
+  if (!input.channelId) {
+    throw new AlertRuleValidationError('Channel ID is required for delivery result');
+  }
+  if (!Object.values(NotificationDeliveryStatus).includes(input.status)) {
+    throw new AlertRuleValidationError(`Invalid delivery result status: ${input.status}`);
+  }
+  if (typeof input.attemptedAt !== 'number' || isNaN(input.attemptedAt) || input.attemptedAt < 0) {
+    throw new AlertRuleValidationError('Invalid attemptedAt');
+  }
+  if (typeof input.completedAt !== 'number' || isNaN(input.completedAt) || input.completedAt < 0) {
+    throw new AlertRuleValidationError('Invalid completedAt');
+  }
+  if (typeof input.duration !== 'number' || isNaN(input.duration) || input.duration < 0) {
+    throw new AlertRuleValidationError('Invalid duration');
+  }
+  if (typeof input.attempts !== 'number' || isNaN(input.attempts) || input.attempts < 0) {
+    throw new AlertRuleValidationError('Invalid attempts count');
+  }
+  if (!Array.isArray(input.history)) {
+    throw new AlertRuleValidationError('History array is required');
+  }
+
+  const error = input.error ? freezeDeepSafe(input.error) : undefined;
+  const history = freezeDeepSafe(input.history);
+
+  const result: NotificationDeliveryResult = {
+    notificationId: input.notificationId,
+    channelId: input.channelId,
+    status: input.status,
+    error,
+    attemptedAt: input.attemptedAt,
+    completedAt: input.completedAt,
+    duration: input.duration,
+    attempts: input.attempts,
+    history
+  };
+
+  return freezeDeepSafe(result);
 }

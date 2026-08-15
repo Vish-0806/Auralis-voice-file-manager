@@ -136,6 +136,49 @@ export class AlertSuppressionEvaluationError extends AlertSuppressionError {
   }
 }
 
+export class AlertNotificationError extends AlertingRuntimeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertNotificationError';
+  }
+}
+
+export class NotificationValidationError extends AlertNotificationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotificationValidationError';
+  }
+}
+
+export class NotificationChannelError extends AlertNotificationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotificationChannelError';
+  }
+}
+
+export class NotificationDispatchError extends AlertNotificationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotificationDispatchError';
+  }
+}
+
+export class NotificationDeliveryError extends AlertNotificationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotificationDeliveryError';
+  }
+}
+
+export class NotificationChannelNotFoundError extends AlertNotificationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NotificationChannelNotFoundError';
+  }
+}
+
+
 
 
 
