@@ -93,6 +93,11 @@ export class AlertingRuntime implements IAlertingRuntime {
     return this._provider.evaluateRule(rule, context);
   }
 
+  // --- Generation API ---
+  public generateAlert(rule: AlertRule, evaluationResult: RuleEvaluationResult): AlertRecord {
+    return this._provider.generateAlert(rule, evaluationResult);
+  }
+
   // --- Stats & Diags ---
   public getStatistics(): AlertingStatistics {
     return this._provider.getStatistics();

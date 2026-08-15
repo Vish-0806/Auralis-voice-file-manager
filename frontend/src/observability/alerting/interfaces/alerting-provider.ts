@@ -26,6 +26,7 @@ export interface IAlertingProvider {
   clearRules(): void;
 
   evaluateRule(rule: AlertRule, context: AlertEvaluationContext): RuleEvaluationResult;
+  generateAlert(rule: AlertRule, evaluationResult: RuleEvaluationResult): AlertRecord;
 
   getStatistics(): AlertingStatistics;
   getDiagnostics(): AlertingDiagnostics;

@@ -243,6 +243,12 @@ export function createAlertingStatistics(input: {
   skippedEvaluations: number;
   totalEvaluationDuration: number;
   averageEvaluationDuration: number;
+  totalAlertGenerations: number;
+  successfulAlertGenerations: number;
+  rejectedAlertGenerations: number;
+  generationErrors: number;
+  totalGenerationDuration: number;
+  averageGenerationDuration: number;
 }): AlertingStatistics {
   const stats: AlertingStatistics = {
     registeredAlertCount: input.registeredAlertCount,
@@ -255,7 +261,13 @@ export function createAlertingStatistics(input: {
     errorEvaluations: input.errorEvaluations,
     skippedEvaluations: input.skippedEvaluations,
     totalEvaluationDuration: input.totalEvaluationDuration,
-    averageEvaluationDuration: input.averageEvaluationDuration
+    averageEvaluationDuration: input.averageEvaluationDuration,
+    totalAlertGenerations: input.totalAlertGenerations,
+    successfulAlertGenerations: input.successfulAlertGenerations,
+    rejectedAlertGenerations: input.rejectedAlertGenerations,
+    generationErrors: input.generationErrors,
+    totalGenerationDuration: input.totalGenerationDuration,
+    averageGenerationDuration: input.averageGenerationDuration
   };
 
   return freezeDeepSafe(stats);
@@ -274,6 +286,12 @@ export function createAlertingDiagnostics(input: {
   skippedEvaluations: number;
   totalEvaluationDuration: number;
   averageEvaluationDuration: number;
+  totalAlertGenerations: number;
+  successfulAlertGenerations: number;
+  rejectedAlertGenerations: number;
+  generationErrors: number;
+  totalGenerationDuration: number;
+  averageGenerationDuration: number;
   generatedAt: number;
 }): AlertingDiagnostics {
   const diag: AlertingDiagnostics = {
@@ -289,6 +307,12 @@ export function createAlertingDiagnostics(input: {
     skippedEvaluations: input.skippedEvaluations,
     totalEvaluationDuration: input.totalEvaluationDuration,
     averageEvaluationDuration: input.averageEvaluationDuration,
+    totalAlertGenerations: input.totalAlertGenerations,
+    successfulAlertGenerations: input.successfulAlertGenerations,
+    rejectedAlertGenerations: input.rejectedAlertGenerations,
+    generationErrors: input.generationErrors,
+    totalGenerationDuration: input.totalGenerationDuration,
+    averageGenerationDuration: input.averageGenerationDuration,
     generatedAt: input.generatedAt
   };
 

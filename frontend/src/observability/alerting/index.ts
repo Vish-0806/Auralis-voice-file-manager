@@ -6,3 +6,5 @@ export { AlertRegistry } from './registry/AlertRegistry';
 export * from './errors/AlertingErrors';
 export * from './factories/alertingFactories';
 export { AlertEvaluator } from './evaluator/AlertEvaluator';
+export { AlertGenerator } from './generator/AlertGenerator';
+export { createAlertFingerprint } from './factories/fingerprint';

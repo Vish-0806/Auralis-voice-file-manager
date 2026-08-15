@@ -6,13 +6,15 @@ import type { AlertingStatistics, AlertingDiagnostics } from '../models/statisti
 import type { AlertEvaluationContext, RuleEvaluationResult } from '../models/evaluation';
 import { AlertRegistry } from '../registry/AlertRegistry';
 import { AlertEvaluator } from '../evaluator/AlertEvaluator';
-import { AlertingStateError } from '../errors/AlertingErrors';
+import { AlertGenerator } from '../generator/AlertGenerator';
+import { AlertingStateError, AlertGenerationError } from '../errors/AlertingErrors';
 import { createAlertingStatistics, createAlertingDiagnostics } from '../factories/alertingFactories';
 
 export class AlertingProvider implements IAlertingProvider {
   private _state: AlertingRuntimeStateValue = AlertingRuntimeState.UNINITIALIZED;
   private readonly _registry = new AlertRegistry();
   private readonly _evaluator = new AlertEvaluator();
+  private readonly _generator = new AlertGenerator();
 
   // Evaluation counters
   private _totalEvaluations = 0;
@@ -21,6 +23,13 @@ export class AlertingProvider implements IAlertingProvider {
   private _errorEvaluations = 0;
   private _skippedEvaluations = 0;
   private _totalEvaluationDuration = 0;
+
+  // Generation counters
+  private _totalAlertGenerations = 0;
+  private _successfulAlertGenerations = 0;
+  private _rejectedAlertGenerations = 0;
+  private _generationErrors = 0;
+  private _totalGenerationDuration = 0;
 
   private ensureReady(action: string): void {
     if (this._state !== AlertingRuntimeState.READY) {
@@ -58,6 +67,7 @@ export class AlertingProvider implements IAlertingProvider {
       this._registry.clear();
       this._registry.clearRules();
       this.clearEvaluationStats();
+      this.clearGenerationStats();
     } finally {
       this._state = AlertingRuntimeState.STOPPED;
     }
@@ -160,6 +170,35 @@ export class AlertingProvider implements IAlertingProvider {
     return result;
   }
 
+  // --- Generation API ---
+  public generateAlert(rule: AlertRule, evaluationResult: RuleEvaluationResult): AlertRecord {
+    this.ensureReady('generateAlert');
+    const startTime = performance.now();
+    this._totalAlertGenerations++;
+
+    try {
+      const alert = this._generator.generate(rule, evaluationResult);
+
+      // Store in registry
+      this._registry.registerAlert(alert);
+
+      this._successfulAlertGenerations++;
+      const duration = performance.now() - startTime;
+      this._totalGenerationDuration += duration;
+      return alert;
+    } catch (err: any) {
+      const duration = performance.now() - startTime;
+      this._totalGenerationDuration += duration;
+
+      if (err instanceof AlertGenerationError) {
+        this._rejectedAlertGenerations++;
+      } else {
+        this._generationErrors++;
+      }
+      throw err;
+    }
+  }
+
   private clearEvaluationStats(): void {
     this._totalEvaluations = 0;
     this._matchedEvaluations = 0;
@@ -167,6 +206,14 @@ export class AlertingProvider implements IAlertingProvider {
     this._errorEvaluations = 0;
     this._skippedEvaluations = 0;
     this._totalEvaluationDuration = 0;
+  }
+
+  private clearGenerationStats(): void {
+    this._totalAlertGenerations = 0;
+    this._successfulAlertGenerations = 0;
+    this._rejectedAlertGenerations = 0;
+    this._generationErrors = 0;
+    this._totalGenerationDuration = 0;
   }
 
   // --- Statistics & Diagnostics ---
@@ -178,6 +225,7 @@ export class AlertingProvider implements IAlertingProvider {
     const enabledRuleCount = rules.filter(r => r.enabled).length;
     const disabledRuleCount = ruleCount - enabledRuleCount;
     const averageEvaluationDuration = this._totalEvaluations > 0 ? this._totalEvaluationDuration / this._totalEvaluations : 0;
+    const averageGenerationDuration = this._totalAlertGenerations > 0 ? this._totalGenerationDuration / this._totalAlertGenerations : 0;
 
     return createAlertingStatistics({
       registeredAlertCount: alertCount,
@@ -190,7 +238,13 @@ export class AlertingProvider implements IAlertingProvider {
       errorEvaluations: this._errorEvaluations,
       skippedEvaluations: this._skippedEvaluations,
       totalEvaluationDuration: this._totalEvaluationDuration,
-      averageEvaluationDuration
+      averageEvaluationDuration,
+      totalAlertGenerations: this._totalAlertGenerations,
+      successfulAlertGenerations: this._successfulAlertGenerations,
+      rejectedAlertGenerations: this._rejectedAlertGenerations,
+      generationErrors: this._generationErrors,
+      totalGenerationDuration: this._totalGenerationDuration,
+      averageGenerationDuration
     });
   }
 
@@ -202,6 +256,7 @@ export class AlertingProvider implements IAlertingProvider {
     const enabledRuleCount = rules.filter(r => r.enabled).length;
     const disabledRuleCount = ruleCount - enabledRuleCount;
     const averageEvaluationDuration = this._totalEvaluations > 0 ? this._totalEvaluationDuration / this._totalEvaluations : 0;
+    const averageGenerationDuration = this._totalAlertGenerations > 0 ? this._totalGenerationDuration / this._totalAlertGenerations : 0;
 
     return createAlertingDiagnostics({
       runtimeState: this._state,
@@ -216,6 +271,12 @@ export class AlertingProvider implements IAlertingProvider {
       skippedEvaluations: this._skippedEvaluations,
       totalEvaluationDuration: this._totalEvaluationDuration,
       averageEvaluationDuration,
+      totalAlertGenerations: this._totalAlertGenerations,
+      successfulAlertGenerations: this._successfulAlertGenerations,
+      rejectedAlertGenerations: this._rejectedAlertGenerations,
+      generationErrors: this._generationErrors,
+      totalGenerationDuration: this._totalGenerationDuration,
+      averageGenerationDuration,
       generatedAt: Date.now()
     });
   }

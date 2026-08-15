@@ -59,3 +59,11 @@ export class AlertEvaluationError extends AlertingRuntimeError {
   }
 }
 
+export class AlertGenerationError extends AlertingRuntimeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertGenerationError';
+  }
+}
+
+
