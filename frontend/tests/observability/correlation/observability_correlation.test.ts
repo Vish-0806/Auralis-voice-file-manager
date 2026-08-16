@@ -1,13 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   CorrelationRuntime,
   CorrelationProvider,
   CorrelationStateError,
   CorrelationValidationError,
-  CorrelationContextError,
   CorrelationEventError,
-  CorrelationLinkError,
-  generateCorrelationId
+  CorrelationLinkError
 } from '../../../src/observability';
 
 describe('Cross-Runtime Event Correlation Tests', () => {
@@ -272,7 +270,7 @@ describe('Cross-Runtime Event Correlation Tests', () => {
 
     const ctx = runtime.createContext();
 
-    const ev1 = runtime.recordEvent({ eventId: 'ev-1', eventType: 'A', context: ctx, sourceSubsystem: 'S' });
+    runtime.recordEvent({ eventId: 'ev-1', eventType: 'A', context: ctx, sourceSubsystem: 'S' });
     runtime.recordEvent({ eventId: 'ev-2', eventType: 'B', context: ctx, sourceSubsystem: 'S' });
     runtime.recordEvent({ eventId: 'ev-3', eventType: 'C', context: ctx, sourceSubsystem: 'S' });
 

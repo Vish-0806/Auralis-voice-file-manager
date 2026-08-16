@@ -100,8 +100,6 @@ export class CorrelationProvider implements ICorrelationProvider {
   private _queryMatches = 0;
   private _invalidContexts = 0;
   private _invalidEvents = 0;
-  private _evictedEvents = 0;
-  private _evictedLinks = 0;
   private _lifecycleOperations = 0;
   private _lifecycleFailures = 0;
 
