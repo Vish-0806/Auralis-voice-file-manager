@@ -14,3 +14,4 @@ export * from './alerting/index';
 export * from './composition/index';
 export * from './correlation/index';
 export * from './integrations/monitoring-alerting/index';
+export * from './integrations/logging-metrics/index';
