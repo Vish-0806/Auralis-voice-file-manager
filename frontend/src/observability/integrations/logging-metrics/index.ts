@@ -5,4 +5,3 @@ export { LoggingMetricsPolicyRegistry } from './registry/LoggingMetricsPolicyReg
 export { LoggingMetricsProvider } from './provider/LoggingMetricsProvider';
 export { LoggingMetricsRuntime } from './runtime/LoggingMetricsRuntime';
 export { LoggingMetricsAdapter } from './LoggingMetricsAdapter';
-export { buildTrigger, buildRequest } from './factories/loggingMetricsFactories';
