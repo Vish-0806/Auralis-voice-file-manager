@@ -12,3 +12,4 @@ export * from './telemetry/index';
 export * from './diagnostics/index';
 export * from './alerting/index';
 export * from './composition/index';
+export * from './correlation/index';
