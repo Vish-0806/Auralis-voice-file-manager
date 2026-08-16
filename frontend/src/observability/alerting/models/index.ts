@@ -12,3 +12,4 @@ export * from './lifecycle';
 export * from './suppression';
 export * from './notification';
 export * from './orchestration';
+export * from './certification';

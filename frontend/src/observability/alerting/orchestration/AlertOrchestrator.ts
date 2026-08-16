@@ -410,7 +410,7 @@ export class AlertOrchestrator {
 
     this._inFlight.set(request.orchestrationId, execution);
 
-    execution.finally(() => {
+    execution.catch(() => {}).finally(() => {
       this._inFlight.delete(request.orchestrationId);
     });
 

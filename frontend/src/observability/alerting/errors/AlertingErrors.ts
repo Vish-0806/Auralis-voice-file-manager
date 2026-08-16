@@ -206,6 +206,27 @@ export class AlertOrchestrationFailureError extends AlertOrchestrationError {
   }
 }
 
+export class AlertCertificationError extends AlertingRuntimeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertCertificationError';
+  }
+}
+
+export class AlertCertificationStageError extends AlertCertificationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertCertificationStageError';
+  }
+}
+
+export class AlertCertificationFailureError extends AlertCertificationError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AlertCertificationFailureError';
+  }
+}
+
 
 
 

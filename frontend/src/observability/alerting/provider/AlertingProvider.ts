@@ -26,6 +26,12 @@ import { NotificationDispatcher } from '../notifications/NotificationDispatcher'
 import { AlertOrchestrator } from '../orchestration/AlertOrchestrator';
 import { AlertingStateError, AlertGenerationError } from '../errors/AlertingErrors';
 import { createAlertingStatistics, createAlertingDiagnostics } from '../factories/alertingFactories';
+import { AlertCertifier } from '../certification/AlertCertifier';
+import {
+  AlertCertificationStageValue,
+  AlertCertificationStageResult,
+  AlertCertificationReport
+} from '../models/certification';
 
 export class AlertingProvider implements IAlertingProvider {
   private _state: AlertingRuntimeStateValue = AlertingRuntimeState.UNINITIALIZED;
@@ -38,6 +44,7 @@ export class AlertingProvider implements IAlertingProvider {
   private readonly _notificationRegistry = new NotificationChannelRegistry();
   private readonly _notificationDispatcher: NotificationDispatcher;
   private readonly _orchestrator: AlertOrchestrator;
+  private readonly _certifier = new AlertCertifier();
 
   private readonly _policy: DeduplicationPolicy = {
     enabled: true,
@@ -119,6 +126,7 @@ export class AlertingProvider implements IAlertingProvider {
       this._notificationRegistry.clear();
       this._notificationDispatcher.clear();
       this._orchestrator.clear();
+      this._certifier.reset();
       this.clearEvaluationStats();
       this.clearGenerationStats();
       this.clearDeduplicationStats();
@@ -456,6 +464,27 @@ export class AlertingProvider implements IAlertingProvider {
   public getHistory(): ReadonlyArray<AlertOrchestrationResult> {
     this.ensureReady('getHistory');
     return this._orchestrator.getHistory();
+  }
+
+  // --- Certification APIs ---
+  public certify(): Promise<AlertCertificationReport> {
+    this.ensureReady('certify');
+    return this._certifier.certify();
+  }
+
+  public certifyStage(stage: AlertCertificationStageValue): Promise<AlertCertificationStageResult> {
+    this.ensureReady('certifyStage');
+    return this._certifier.certifyStage(stage);
+  }
+
+  public getReport(): AlertCertificationReport | null {
+    this.ensureReady('getReport');
+    return this._certifier.getReport();
+  }
+
+  public reset(): void {
+    this.ensureReady('reset');
+    this._certifier.reset();
   }
 
   private clearEvaluationStats(): void {

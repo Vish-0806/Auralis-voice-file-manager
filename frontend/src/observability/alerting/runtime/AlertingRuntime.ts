@@ -17,6 +17,11 @@ import type {
 import type { INotificationChannel } from '../interfaces/notification-channel';
 import type { NotificationRequest, NotificationDeliveryResult } from '../models/notification';
 import type { AlertOrchestrationRequest, AlertOrchestrationResult } from '../models/orchestration';
+import type {
+  AlertCertificationStageValue,
+  AlertCertificationStageResult,
+  AlertCertificationReport
+} from '../models/certification';
 
 export class AlertingRuntime implements IAlertingRuntime {
   private readonly _provider: IAlertingProvider;
@@ -262,6 +267,23 @@ export class AlertingRuntime implements IAlertingRuntime {
 
   public getHistory(): ReadonlyArray<AlertOrchestrationResult> {
     return this._provider.getHistory();
+  }
+
+  // --- Certification APIs ---
+  public certify(): Promise<AlertCertificationReport> {
+    return this._provider.certify();
+  }
+
+  public certifyStage(stage: AlertCertificationStageValue): Promise<AlertCertificationStageResult> {
+    return this._provider.certifyStage(stage);
+  }
+
+  public getReport(): AlertCertificationReport | null {
+    return this._provider.getReport();
+  }
+
+  public reset(): void {
+    this._provider.reset();
   }
 
   // --- Stats & Diags ---

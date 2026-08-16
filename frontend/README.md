@@ -13,9 +13,9 @@ A clean, scalable, production-oriented React + TypeScript architecture built on 
 ## Current Status
 *   **Phases 16.1 to 16.10 — Core Frontend V2 Stack & Production Certification** is fully complete. This includes the Component Runtime, Layout & Navigation, Theme & Design Tokens system, global Zustand state store boundaries, Axios API client, in-memory AuthService, WebSocket client, State Synchronization bridge, localized Error Boundaries, dynamic mock test isolation, and 7 comprehensive end-to-end integration workflow tests. All 132 tests across 22 test files run and pass cleanly.
 *   **Phases 17.1 to 17.10 — Plugin & Extension Runtime Platform** is fully complete. This includes the Plugin Runtime Foundation, Plugin Discovery & Manifest parsing, Plugin Dependency Resolution, Plugin Loading Runtime, Plugin Lifecycle management, Capability & Extension registration, Plugin Security Sandbox isolation, dynamic configuration binding, Integration hooks, and Production Certification.
-*   **Phases 18.1 to 18.5 — Observability & Operations Runtime Platform** is complete through Phase 18.5. This includes the Monitoring Foundation (18.1), Logging Runtime (18.2), Metrics Runtime (18.3), Distributed Tracing Runtime (18.4), and Telemetry Runtime (18.5) with in-memory FIFO buffers, deterministic sampling policies, and multi-exporter isolation pipelines.
+*   **Phases 18.1 to 18.7.10 — Observability & Operations Runtime Platform** is fully complete. This includes the Monitoring Foundation (18.1), Logging Runtime (18.2), Metrics Runtime (18.3), Distributed Tracing Runtime (18.4), Telemetry Runtime (18.5), and the certified Alerting Runtime (18.7.1–18.7.10) with Rule, Condition, Evaluation, Generation, Fingerprinting, Deduplication, Lifecycle, Suppression, Notification, and Orchestration pipelines certified under sandbox scorecard checkpoints.
 
-All 520 tests across 53 test files run and pass cleanly.
+All 669 tests across 73 test files run and pass cleanly.
 
 ---
 
