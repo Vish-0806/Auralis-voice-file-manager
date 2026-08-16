@@ -14,8 +14,9 @@ import type {
 import type { INotificationChannel } from './notification-channel';
 import type { NotificationRequest, NotificationDeliveryResult } from '../models/notification';
 import type { IAlertOrchestrationManager } from './alert-orchestration';
+import type { IAlertCertificationManager } from './alert-certification';
 
-export interface IAlertingProvider extends IAlertOrchestrationManager {
+export interface IAlertingProvider extends IAlertOrchestrationManager, IAlertCertificationManager {
   initialize(): Promise<void>;
   shutdown(): Promise<void>;
   getRuntimeState(): AlertingRuntimeStateValue;

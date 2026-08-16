@@ -11,5 +11,9 @@ export * from './tracing/index';
 export * from './telemetry/index';
 export * from './diagnostics/index';
 export * from './alerting/index';
-
-
+export * from './composition/index';
+export * from './correlation/index';
+export * from './integrations/monitoring-alerting/index';
+export * from './integrations/logging-metrics/index';
+export * from './integrations/tracing-telemetry/index';
+export * from './integrations/diagnostics-telemetry/index';
