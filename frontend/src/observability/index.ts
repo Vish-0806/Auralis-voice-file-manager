@@ -17,3 +17,5 @@ export * from './integrations/monitoring-alerting/index';
 export * from './integrations/logging-metrics/index';
 export * from './integrations/tracing-telemetry/index';
 export * from './integrations/diagnostics-telemetry/index';
+export * from './integrations/alerting-telemetry/index';
+
