@@ -10,13 +10,14 @@
 
 <p align="center">
   <a href="https://github.com/Vish-0806/Auralis-voice-file-manager"><img src="https://img.shields.io/badge/status-active-brightgreen?style=flat-square" alt="Status"></a>
-  <a href="https://github.com/Vish-0806/Auralis-voice-file-manager/releases"><img src="https://img.shields.io/badge/version-2.0.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/Vish-0806/Auralis-voice-file-manager/releases"><img src="https://img.shields.io/badge/version-2.3.0-blue?style=flat-square" alt="Version"></a>
   <a href="file:///d:/Auralis-voice-file-manager/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/python-3.13-blue?style=flat-square" alt="Python"></a>
   <a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-0.136.1-red?style=flat-square" alt="FastAPI"></a>
   <a href="https://typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-5.5-blue?style=flat-square" alt="TypeScript"></a>
   <a href="#architecture"><img src="https://img.shields.io/badge/AI-brain-purple?style=flat-square" alt="AI"></a>
   <a href="#repository-certification"><img src="https://img.shields.io/badge/Health-100.0%2F100-brightgreen?style=flat-square" alt="Health"></a>
+  <a href="#installation--testing"><img src="https://img.shields.io/badge/tests-3%2C650%2B%20passed-brightgreen?style=flat-square" alt="Tests"></a>
 </p>
 
 ---
@@ -41,7 +42,12 @@ Auralis offers a broad set of capabilities designed for productivity and ease of
 | **Assistant Architecture** | 8-Stage Integration Gateway | Provider-independent Assistant Runtime Platform coordinating Conversation, Dialogue, Decision, Memory, Response, Voice, Proactive, and System runtimes. |
 | **Application Infrastructure** | DI & Config Platform (Phase 14) | Enterprise-grade Application Runtime, thread-safe Dependency Injection Container, and Certified Configuration Subsystem. |
 | **API Runtime Platform** | 8-Stage Pipeline Gateway (Phase 15) | Certified Provider-Independent API Runtime Platform orchestrating Routing, Middleware, Authentication, Validation, Versioning, Protection, WebSocket, and Gateway Coordination. |
-| **Frontend Runtime Platform** | 5 Subsystem Architecture (Phase 16) | Provider-Independent Frontend Runtime orchestrating Dependency Injection, Application Lifecycle & Plugins, Certified Configuration, Event Runtime, and State Management. |
+| **Frontend Runtime Platform** | Modern V2 App Architecture (Phase 16) | Provider-Independent Frontend V2 Application orchestrating Component, Layout, Theme, Zustand State Boundaries, API Client, and Voice UI with 100% WAI-ARIA compliance. |
+| **Plugin Platform** | Sandboxed Extensibility (Phase 17) | Enterprise-grade dynamic plugin architecture with DAG dependency resolution, security sandboxes, manifest discovery, lifecycle states, and extension point registries. |
+| **Observability Platform** | Enterprise Telemetry & Alerting (Phase 18) | Full-stack observability: structured Logging, aggregate Metrics, distributed Tracing, FIFO Telemetry buffers, Diagnostics, and 10-stage Alerting pipeline. |
+| **Diagnostics Engine** | Health & Source Aggregation (Phase 18.6) | Provider-independent diagnostic aggregation layer with error-isolating check executors, timeout enforcement, source registries, health metrics, and bounded execution history. |
+| **Alerting Orchestration** | Multi-Channel Alerting (Phase 18.7) | 10-stage alerting pipeline evaluating rules, conditions, fingerprinting, deduplication, cooldowns, maintenance suppression windows, and multi-channel dispatchers (console, webhook, in-app). |
+| **Cross-Runtime Synergy** | Event Correlation & Telemetry Bridges (Phase 18.8) | Cryptographic trace linking, log-to-metric aggregation, monitoring-to-alert triggers, diagnostics-to-telemetry forwarding, and unified observability runtime composition. |
 | **AI Conversation** | Contextual Intent Parsing | Recognizes natural language, resolving fuzzy commands, relative dates, and implied locations. |
 | **Dialogue Management** | State Machine & Turn Tracking | Manages dialogue sessions, turn transitions (`IDLE` → `PROCESSING` → `RESPONDING`), clarification prompts, and user confirmation loops. |
 | **Decision & Reasoning** | Deterministic Candidate Routing | Evaluates request candidates, confidence thresholds, and priority scoring without LLM overhead. |
@@ -156,7 +162,7 @@ Auralis implements a comprehensive, enterprise-ready **Plugin & Extension Runtim
 
 ---
 
-## Observability & Operations Runtime Platform (Phase 18)
+## Observability & Operations Runtime Platform (v2.2.0 / Phase 18)
 
 Auralis implements a clean, provider-independent, strongly-typed **Observability & Operations Runtime Platform** (`frontend/src/observability/`):
 
@@ -168,21 +174,65 @@ Auralis implements a clean, provider-independent, strongly-typed **Observability
 
 ---
 
+## Diagnostics, Alerting & Cross-Runtime Synergy Platform (v2.3.0 / Phase 18.6 – 18.8)
+
+Auralis expands the Observability Platform with diagnostic aggregation, automated multi-channel alerting, and cross-runtime telemetry correlation:
+
+1. **Diagnostics Runtime (Phase 18.6)**: Provider-independent diagnostic aggregation layer with error-isolating check executors, timeout enforcement, source registries, health metrics, and bounded execution history.
+2. **Alerting Runtime Platform (Phase 18.7)**: Complete 10-stage enterprise alerting pipeline:
+   - **Alerting Foundation (Phase 18.7.1)**: Core data models, alert definitions, severity rankings (`CRITICAL`, `ERROR`, `WARNING`, `INFO`), and deep-freeze immutability.
+   - **Alert Rule & Condition Runtime (Phase 18.7.2)**: Condition operators (`GT`, `LT`, `EQ`, `CONTAINS`, `REGEX`, `BETWEEN`), multi-condition boolean combinators (`AND`, `OR`), and schema validation.
+   - **Alert Rule Evaluation Runtime (Phase 18.7.3)**: Real-time evaluation engine with threshold breach tracking, duration evaluation windows, and evaluation metrics.
+   - **Alert Generation & Fingerprinting Runtime (Phase 18.7.4)**: Deterministic hashing algorithms generating unique fingerprints to identify identical alert conditions across time.
+   - **Deduplication & Cooldown Runtime (Phase 18.7.5)**: Sliding cooldown windows, occurrence counters, and deduplication caches preventing alert fatigue.
+   - **Alert Lifecycle Runtime (Phase 18.7.6)**: Deterministic state machine (`PENDING` → `FIRING` → `ACKNOWLEDGED` → `RESOLVED` / `EXPIRED`) with timestamp audits.
+   - **Alert Suppression & Maintenance Windows (Phase 18.7.7)**: Time-based maintenance windows, recurring suppression schedules, and regex matching suppression rules.
+   - **Notification Channels Runtime (Phase 18.7.8)**: Multi-channel dispatchers supporting Console, Webhook, and In-App notification channels with retry backoffs and delivery audits.
+   - **Alerting Orchestration Runtime (Phase 18.7.9)**: Top-level gateway pipeline coordinating evaluation, fingerprinting, deduplication, suppression, lifecycle transitions, and notification dispatching.
+   - **Alerting Production Certification (Phase 18.7.10)**: Rigorous verification across 10 lifecycle stages, resilience benchmarks, and end-to-end integration workflows.
+3. **Cross-Runtime Observability Integration & Synergy (Phase 18.8)**:
+   - **Observability Runtime Composition (Phase 18.8.1)**: Unified facade aggregating Logging, Metrics, Tracing, Telemetry, Diagnostics, and Alerting into a single cohesive runtime provider.
+   - **Cross-Runtime Event Correlation (Phase 18.8.2)**: Cryptographically correlates trace IDs and span contexts across logs, metrics, alerts, and telemetry envelopes.
+   - **Monitoring ↔ Alerting Integration (Phase 18.8.3)**: Automates alert generation from monitoring threshold breaches and system health status regressions.
+   - **Logging ↔ Metrics Integration (Phase 18.8.4)**: Automatically extracts and increments quantitative metric counters and histograms directly from structured log event flows.
+   - **Tracing ↔ Telemetry Integration (Phase 18.8.5)**: Seamlessly exports completed distributed trace spans into telemetry batching and export buffers.
+   - **Diagnostics ↔ Telemetry Integration (Phase 18.8.6)**: Forwards diagnostic health checks and subsystem status reports into historical telemetry queues.
+   - **Alerting ↔ Telemetry Integration (Phase 18.8.7)**: Maps alert triggers, state transitions, and delivery notifications into normalized telemetry logs, metrics, and trace spans with sensitivity redactions.
+
+---
+
 ## Architecture Overview
 
 ```mermaid
 graph TD
-    User([User]) -->|Spoken / Typed Command| FrontendRuntime[Frontend Runtime Platform]
-    
-    subgraph Frontend Runtime Architecture Platform (Phase 16)
-        FrontendRuntime --> FrontDI[1. Dependency Injection Container]
-        FrontendRuntime --> FrontApp[2. Application & Plugin Runtime]
-        FrontendRuntime --> FrontConfig[3. Configuration Runtime Subsystem]
-        FrontendRuntime --> FrontEvents[4. Event Runtime Platform]
-        FrontendRuntime --> FrontState[5. State Management Runtime Platform]
+    User([User]) -->|Spoken / Typed Command| FrontendV2[Frontend V2 Architecture]
+
+    subgraph Frontend V2 Application Layer (Phase 16)
+        FrontendV2 --> UIViews[Views: Dashboard, Files, Workspace, Assistant, Settings]
+        FrontendV2 --> StateStores[Zustand State Stores & Sync Bridges]
+        FrontendV2 --> VoiceUI[Voice UI & Waveform Visualizers]
     end
 
-    FrontEvents -->|API Request| Gateway[API Integration Gateway (Phase 15)]
+    subgraph Plugin & Extension Platform (Phase 17)
+        FrontendV2 --> PluginRuntime[Plugin Runtime Coordinator]
+        PluginRuntime --> PluginDiscovery[Discovery & Manifest Validation]
+        PluginRuntime --> PluginDAG[DAG Dependency Resolution]
+        PluginRuntime --> PluginSandbox[Security Sandbox & Proxies]
+        PluginRuntime --> PluginCaps[Extension & Capability Registry]
+    end
+
+    subgraph Observability & Operations Platform (Phase 18)
+        FrontendV2 -.-> ObsCompose[Observability Runtime Composition]
+        ObsCompose --> LogEngine[Structured Logging]
+        ObsCompose --> MetricEngine[Metrics Aggregation]
+        ObsCompose --> TraceEngine[Distributed Tracing]
+        ObsCompose --> TelemEngine[Telemetry FIFO Buffer & Exporters]
+        ObsCompose --> DiagEngine[Diagnostics & Health Aggregator]
+        ObsCompose --> AlertOrch[10-Stage Alerting Orchestrator]
+        ObsCompose --> EventCorr[Cross-Runtime Event Correlation]
+    end
+
+    StateStores -->|API Request| Gateway[API Integration Gateway (Phase 15)]
 
     subgraph API & Backend Infrastructure Platform (Phases 14 & 15)
         Gateway --> ApiRouting[Request Routing & Auth Runtime]
@@ -267,10 +317,31 @@ Auralis/
 │   │   ├── components/        # Reusable presentation widgets (common, layout, navigation)
 │   │   ├── layouts/           # Shell templates (AppLayout, DashboardLayout, WorkspaceLayout)
 │   │   ├── pages/             # Route views (Dashboard, Files, Workspace, Assistant, Settings)
-│   │   ├── services/          # Client layers (apiClient, authService, websocket, sync)
-│   │   ├── state/             # Global Zustand stores, selectors, and models
-│   │   └── theme/             # Styling theme provider templates
-│   └── tests/                 # 132 Vitest tests covering state, views, themes, and integration workflows
+│   │   ├── services/          # Client layers (apiClient, authService, websocketClient, syncBridge)
+│   │   ├── state/             # Global Zustand stores (UI, Files, Workspace, Assistant, Settings)
+│   │   ├── voice/             # Real-time voice UI controllers and store
+│   │   ├── plugins/           # Plugin & Extension Runtime Platform (Phase 17)
+│   │   │   ├── capabilities/  # Capability & extension point registry
+│   │   │   ├── config/        # Plugin configuration schemas & validation
+│   │   │   ├── dependencies/  # DAG dependency resolution & cycle detection
+│   │   │   ├── discovery/     # Manifest scanning & schema validation
+│   │   │   ├── lifecycle/     # 5-stage lifecycle state transitions
+│   │   │   ├── loading/       # ES module loaders & isolation
+│   │   │   ├── sandbox/       # Security sandboxing proxies & restrictions
+│   │   │   └── runtime/       # Plugin runtime coordinator
+│   │   ├── observability/     # Observability & Operations Platform (Phase 18)
+│   │   │   ├── alerting/      # 10-stage Alerting Runtime Platform (Phase 18.7)
+│   │   │   ├── composition/   # Unified Observability Composition (Phase 18.8.1)
+│   │   │   ├── correlation/   # Cross-Runtime Event Correlation (Phase 18.8.2)
+│   │   │   ├── diagnostics/   # Diagnostics & Health Aggregation (Phase 18.6)
+│   │   │   ├── integrations/  # Cross-subsystem synergy bridges (Phase 18.8.3 - 18.8.7)
+│   │   │   ├── logging/       # Structured Logging Runtime (Phase 18.2)
+│   │   │   ├── metrics/       # Metrics Aggregation Runtime (Phase 18.3)
+│   │   │   ├── monitoring/    # Monitoring Foundation (Phase 18.1)
+│   │   │   ├── telemetry/     # Telemetry Buffer & Multi-Exporter (Phase 18.5)
+│   │   │   └── tracing/       # Distributed Tracing Runtime (Phase 18.4)
+│   │   └── theme/             # Styling tokens and ThemeProvider templates
+│   └── tests/                 # 748 Vitest tests across 80 test suites
 └── docs/                      # Technical documentation and architecture specifications
 ```
 
@@ -300,6 +371,7 @@ Track the development stages of Auralis:
 * [x] **Lightweight Rebuilt Frontend Architecture (Phases 16.1 to 16.10):** Component Runtime, Layout & Navigation structures, Theme systems, global Zustand state store boundaries, API Client interfaces, WebSocket synchronization, voice and workspace controls, localized error boundaries, production builds, and 132 passed Vitest tests.
 * [x] **Plugin & Extension Runtime Platform (Phases 17.1 to 17.10):** Plugin Runtime Foundation, discovery and manifest parsing, dependency resolution, ES module loaders, dynamic lifecycle hook pipelines, capability extension registries, security sandboxing proxies, and integration. Certified with 144 passed Vitest tests.
 * [x] **Observability & Operations Runtime Platform (Phases 18.1 to 18.7.10):** Monitoring Foundation, structured Logging Runtime, metrics aggregation instrument systems, hierarchical Trace/Span indexing, Telemetry buffer pipelines, and certified Alerting Runtime (Foundation, Rules, Evaluator, Generator, Fingerprinter, Deduplicator, Lifecycle, Suppression, Notifications, and Orchestration pipelines). Certified with 109 passed Vitest tests.
+* [x] **Diagnostics, Alerting & Cross-Runtime Synergy Platform (Phases 18.6 to 18.8.7):** Diagnostics Runtime with error isolation and timeout enforcement, 10-stage enterprise Alerting Runtime with multi-channel dispatchers, and 7 cross-runtime synergy integrations (Composition, Event Correlation, Monitoring ↔ Alerting, Logging ↔ Metrics, Tracing ↔ Telemetry, Diagnostics ↔ Telemetry, Alerting ↔ Telemetry). Certified with 748 passed Vitest tests across 80 test suites.
 * [ ] **Future Objectives:**
   * [ ] Operating System Desktop Packaging (Phase 11 / Electron & Tauri integration).
   * [ ] Document intelligence parser using local PyMuPDF extraction.
@@ -311,13 +383,13 @@ Track the development stages of Auralis:
 ## Installation & Testing
 
 ```bash
-# Backend Setup & Test Suite (2,905 Pytest tests)
+# Backend Setup & Test Suite (2,905 Pytest tests across 162 test modules)
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r backend/requirements.txt
 pytest backend/tests
 
-# Frontend Setup, Test Suite & Build (520 Vitest tests)
+# Frontend Setup, Test Suite & Build (748 Vitest tests across 80 test suites)
 cd frontend
 npm install
 npm test
